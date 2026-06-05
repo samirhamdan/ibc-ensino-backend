@@ -4,29 +4,29 @@ Autenticação real com SQLite, permissões por perfil, API REST
 """
 import os
 from flask import Flask, jsonify, session, request
-from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from datetime import timedelta
+from extensions import db
 
 # ──────────────────────────────────────────────────────
 # Configuração
 # ──────────────────────────────────────────────────────
-
-db = SQLAlchemy()
 
 def create_app(config_name='development'):
     """Factory para criar instância Flask"""
     app = Flask(__name__)
     
     # Config
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
-        'DATABASE_URL', 'sqlite:///instance/ibc_ensino.db'
-    )
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    instance_dir = os.path.join(basedir, 'instance')
+    os.makedirs(instance_dir, exist_ok=True)
+    default_db = f"sqlite:///{os.path.join(instance_dir, 'ibc_ensino.db')}"
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', default_db)
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-prod')
     app.config['SESSION_PERMANENT'] = True
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
-    app.config['SESSION_COOKIE_SECURE'] = True  # HTTPS only em produção
+    app.config['SESSION_COOKIE_SECURE'] = os.getenv('FLASK_ENV') == 'production'
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     
@@ -56,6 +56,12 @@ def create_app(config_name='development'):
         app.register_blueprint(courses_bp, url_prefix='/api/courses')
         app.register_blueprint(progress_bp, url_prefix='/api/progress')
         app.register_blueprint(questions_bp, url_prefix='/api/questions')
+
+        # Convenience alias so GET /api/user works alongside /api/auth/user
+        @app.route('/api/user', methods=['GET'])
+        def api_user():
+            from routes.auth import get_user
+            return get_user()
         
         # Health check
         @app.route('/health', methods=['GET'])
