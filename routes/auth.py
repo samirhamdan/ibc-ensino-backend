@@ -99,3 +99,29 @@ def get_user():
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
     return jsonify(user.to_dict()), 200
+
+
+@auth_bp.route('/users', methods=['GET'])
+def list_users():
+    user = _current_user()
+    if not user:
+        return jsonify({'error': 'Não autenticado'}), 401
+    if user.role not in ('admin', 'tutor'):
+        return jsonify({'error': 'Acesso negado'}), 403
+    users = User.query.order_by(User.created_at).all()
+    return jsonify([u.to_dict() for u in users]), 200
+
+
+@auth_bp.route('/users/<int:user_id>', methods=['DELETE'])
+def delete_user(user_id):
+    user = _current_user()
+    if not user:
+        return jsonify({'error': 'Não autenticado'}), 401
+    if user.role != 'admin':
+        return jsonify({'error': 'Acesso negado'}), 403
+    if user.id == user_id:
+        return jsonify({'error': 'Não é possível remover a si mesmo'}), 400
+    target = User.query.get_or_404(user_id)
+    db.session.delete(target)
+    db.session.commit()
+    return jsonify({'message': 'Usuário removido'}), 200
