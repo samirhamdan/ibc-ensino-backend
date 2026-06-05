@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IBC Ensino — Plataforma EAD</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --navy:#006a7f;--navy-light:#008ea8;--gold:#008ea8;--gold-light:#33adc0;
+    --cream:#f9f6f0;--cream2:#f0ebe0;--text:#1a1a2e;--muted:#6b7280;
+    --success:#2d6a4f;--success-bg:#d8f3dc;--danger:#c0392b;--danger-bg:#fde8e8;
+    --radius:10px;
+  }
+  body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);min-height:100vh}
+  .screen{display:none;min-height:100vh;animation:fadeIn .35s ease}
+  .screen.active{display:flex}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+  /* LOGIN */
+  #screen-login{flex-direction:column;align-items:center;justify-content:center;
+    background:linear-gradient(160deg,#004d5e 0%,#006a7f 50%,#008ea8 100%);padding:2rem}
+  .login-card{background:white;border-radius:18px;padding:2.5rem 2rem;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+  .login-logo{text-align:center;margin-bottom:1.8rem}
+  .login-logo .cross{font-size:2.2rem;color:var(--gold)}
+  .login-logo h1{font-family:'Playfair Display',serif;font-size:1.5rem;color:var(--navy);line-height:1.2;margin-top:.3rem}
+  .login-logo p{font-size:.8rem;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-top:.2rem}
+  .field{margin-bottom:1rem}
+  .field label{display:block;font-size:.78rem;font-weight:600;color:var(--navy);margin-bottom:.35rem;letter-spacing:.03em}
+  .field input{width:100%;padding:.65rem .9rem;border:1.5px solid #dde;border-radius:var(--radius);font-family:inherit;font-size:.9rem;color:var(--text);background:#fafafa;transition:border .2s}
+  .field input:focus{outline:none;border-color:var(--navy);background:white}
+  .btn-primary{width:100%;padding:.75rem;background:var(--navy);color:white;border:none;border-radius:var(--radius);font-family:inherit;font-size:.95rem;font-weight:600;cursor:pointer;letter-spacing:.02em;transition:background .2s,transform .1s}
+  .btn-primary:hover{background:var(--navy-light)}
+  .btn-primary:active{transform:scale(.98)}
+  .login-error{font-size:.82rem;color:var(--danger);text-align:center;margin-top:.6rem;min-height:1.2rem}
+
+  /* MAIN */
+  #screen-main{flex-direction:column;min-height:100vh}
+  .topbar{background:var(--navy);color:white;padding:.8rem 1.2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+  .topbar-left{display:flex;align-items:center;gap:.7rem}
+  .topbar-cross{color:var(--gold);font-size:1.3rem}
+  .topbar-title{font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:600}
+  .topbar-subtitle{font-size:.7rem;color:rgba(255,255,255,.55);letter-spacing:.05em;text-transform:uppercase}
+  .topbar-user{display:flex;align-items:center;gap:.6rem}
+  .avatar{width:32px;height:32px;border-radius:50%;background:var(--gold);color:var(--navy);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.78rem}
+  .btn-logout{background:none;border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.7);padding:.3rem .7rem;border-radius:6px;font-size:.75rem;cursor:pointer;font-family:inherit;transition:all .2s}
+  .btn-logout:hover{background:rgba(255,255,255,.1);color:white}
+  .main-body{display:flex;flex:1}
+  .sidebar{width:230px;background:white;border-right:1px solid #e8e0d4;padding:1rem .75rem;flex-shrink:0;overflow-y:auto}
+  .sidebar-section{margin-bottom:1.2rem}
+  .sidebar-label{font-size:.68rem;font-weight:700;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;padding:.3rem .5rem;margin-bottom:.3rem}
+  .course-item{padding:.55rem .7rem;border-radius:8px;cursor:pointer;margin-bottom:.15rem;transition:background .15s;display:flex;align-items:center;gap:.5rem}
+  .course-item:hover{background:var(--cream2)}
+  .course-item.active{background:var(--navy);color:white}
+  .course-item.active .ci-icon{color:var(--gold)}
+  .ci-icon{font-size:.9rem;flex-shrink:0}
+  .ci-text{flex:1;min-width:0}
+  .ci-name{font-size:.82rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ci-progress{font-size:.7rem;opacity:.65;margin-top:.1rem}
+  .mini-bar{height:3px;background:#e8e0d4;border-radius:2px;margin-top:.3rem}
+  .mini-bar-fill{height:100%;background:var(--gold);border-radius:2px;transition:width .4s}
+  .course-item.active .mini-bar{background:rgba(255,255,255,.2)}
+  .course-item.active .mini-bar-fill{background:var(--gold-light)}
+  .content{flex:1;padding:1.5rem;overflow-y:auto;max-width:860px}
+
+  /* COURSE */
+  .course-header{margin-bottom:1.5rem}
+  .course-tag{display:inline-block;background:var(--navy);color:var(--gold);font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:.25rem .7rem;border-radius:20px;margin-bottom:.6rem}
+  .course-title{font-family:'Playfair Display',serif;font-size:1.6rem;color:var(--navy);margin-bottom:.4rem}
+  .course-meta{font-size:.8rem;color:var(--muted);display:flex;gap:1rem;flex-wrap:wrap}
+  .progress-section{background:white;border-radius:var(--radius);padding:1rem 1.2rem;margin-bottom:1.2rem;border:1px solid #e8e0d4}
+  .progress-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem}
+  .progress-label{font-size:.8rem;font-weight:600;color:var(--navy)}
+  .progress-pct{font-size:.8rem;color:var(--gold);font-weight:700}
+  .progress-bar{height:8px;background:var(--cream2);border-radius:4px;overflow:hidden}
+  .progress-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold-light));border-radius:4px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+  .progress-steps{display:flex;gap:.5rem;margin-top:.6rem}
+  .step-dot{width:10px;height:10px;border-radius:50%;background:#e8e0d4;transition:background .3s}
+  .step-dot.done{background:var(--gold)}
+  .step-dot.current{background:var(--navy);box-shadow:0 0 0 2px var(--navy-light)}
+  .tabs{display:flex;gap:0;margin-bottom:1.2rem;background:white;border-radius:var(--radius);border:1px solid #e8e0d4;overflow:hidden}
+  .tab{flex:1;padding:.6rem;text-align:center;font-size:.82rem;font-weight:500;cursor:pointer;color:var(--muted);transition:all .2s;border:none;background:none;font-family:inherit}
+  .tab.active{background:var(--navy);color:white}
+  .tab:hover:not(.active){background:var(--cream2)}
+
+  /* PDF */
+  .pdf-section{background:white;border-radius:var(--radius);border:1px solid #e8e0d4;overflow:hidden}
+  .pdf-toolbar{background:var(--cream2);padding:.6rem 1rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e8e0d4}
+  .pdf-toolbar-left{display:flex;align-items:center;gap:.5rem}
+  .pdf-filename{font-size:.82rem;font-weight:600;color:var(--navy)}
+  .pdf-badge{font-size:.65rem;background:var(--navy);color:var(--gold);padding:.15rem .5rem;border-radius:4px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  .pdf-viewer-frame{width:100%;height:500px;border:none;display:block}
+  .pdf-list{padding:.5rem}
+  .pdf-item{display:flex;align-items:center;gap:.7rem;padding:.65rem .8rem;border-radius:8px;cursor:pointer;transition:background .15s;border:1px solid transparent}
+  .pdf-item:hover{background:var(--cream);border-color:#e8e0d4}
+  .pdf-item.viewing{background:var(--navy);color:white}
+  .pdf-item.viewing .pdf-item-meta{color:rgba(255,255,255,.6)}
+  .pdf-item-icon{font-size:1.2rem;flex-shrink:0}
+  .pdf-item-name{font-size:.85rem;font-weight:500;flex:1}
+  .pdf-item-meta{font-size:.72rem;color:var(--muted)}
+  .btn-view{background:var(--gold);color:var(--navy);border:none;padding:.3rem .7rem;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:inherit}
+  .pdf-no-files{padding:2rem;text-align:center;color:var(--muted);font-size:.85rem}
+
+  /* QUIZ */
+  .quiz-wrap{background:white;border-radius:var(--radius);border:1px solid #e8e0d4;overflow:hidden}
+  .quiz-header{background:var(--navy);padding:1rem 1.2rem;color:white}
+  .quiz-title{font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--gold-light)}
+  .quiz-desc{font-size:.78rem;color:rgba(255,255,255,.6);margin-top:.2rem}
+  .quiz-body{padding:1.2rem}
+  .question-card{margin-bottom:1.3rem;padding:1rem 1.1rem;border-radius:8px;background:var(--cream);border:1px solid #e8e0d4;transition:border .2s}
+  .question-card.correct{border-color:#2d6a4f;background:#f0fff4}
+  .question-card.wrong{border-color:var(--danger);background:#fff5f5}
+  .q-num{font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem}
+  .q-text{font-size:.9rem;font-weight:500;color:var(--navy);margin-bottom:.8rem;line-height:1.5}
+  .options{display:flex;flex-direction:column;gap:.4rem}
+  .option{display:flex;align-items:center;gap:.6rem;padding:.5rem .7rem;border-radius:7px;cursor:pointer;border:1.5px solid transparent;transition:all .15s;font-size:.85rem;background:white}
+  .option:hover{border-color:var(--navy);background:var(--cream)}
+  .option input[type=radio]{accent-color:var(--navy);flex-shrink:0}
+  .option.selected{border-color:var(--navy);background:#e8edf7}
+  .option.correct-ans{border-color:#2d6a4f;background:#d8f3dc;color:#1b4332}
+  .option.wrong-ans{border-color:var(--danger);background:#fde8e8;color:#7b1818}
+  .q-feedback{font-size:.78rem;margin-top:.6rem;padding:.4rem .7rem;border-radius:5px;font-weight:500}
+  .q-feedback.ok{background:var(--success-bg);color:var(--success)}
+  .q-feedback.err{background:var(--danger-bg);color:var(--danger)}
+  .quiz-actions{display:flex;justify-content:flex-end;gap:.7rem;padding-top:.5rem}
+  .btn-secondary{padding:.6rem 1.2rem;background:white;color:var(--navy);border:1.5px solid var(--navy);border-radius:var(--radius);font-family:inherit;font-size:.85rem;font-weight:600;cursor:pointer;transition:all .2s}
+  .btn-secondary:hover{background:var(--cream)}
+  .btn-gold{padding:.6rem 1.4rem;background:var(--gold);color:var(--navy);border:none;border-radius:var(--radius);font-family:inherit;font-size:.85rem;font-weight:700;cursor:pointer;transition:all .2s}
+  .btn-gold:hover{background:var(--gold-light)}
+  .quiz-result{text-align:center;padding:2rem 1rem}
+  .result-score{font-size:3rem;font-weight:700;color:var(--navy);font-family:'Playfair Display',serif}
+  .result-label{font-size:.9rem;color:var(--muted);margin-top:.3rem}
+  .result-msg{margin-top:1rem;font-size:.95rem;font-weight:500;padding:.6rem 1rem;border-radius:8px;display:inline-block}
+  .result-msg.pass{background:var(--success-bg);color:var(--success)}
+  .result-msg.fail{background:var(--danger-bg);color:var(--danger)}
+
+  /* ADMIN */
+  .admin-section{background:white;border-radius:var(--radius);border:1px solid #e8e0d4;margin-bottom:1rem;overflow:hidden}
+  .admin-section-header{background:var(--cream2);padding:.7rem 1rem;font-size:.8rem;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #e8e0d4}
+  .admin-section-body{padding:1rem}
+  .form-row{display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:.8rem}
+  .form-group{flex:1;min-width:160px}
+  .form-group label{display:block;font-size:.75rem;font-weight:600;color:var(--navy);margin-bottom:.3rem}
+  .form-group input,.form-group select,.form-group textarea{width:100%;padding:.55rem .8rem;border:1.5px solid #dde;border-radius:8px;font-family:inherit;font-size:.85rem;color:var(--text);background:#fafafa}
+  .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--navy)}
+  .form-group textarea{resize:vertical;min-height:60px}
+  .table-users{width:100%;font-size:.82rem;border-collapse:collapse}
+  .table-users th{text-align:left;padding:.5rem .7rem;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #e8e0d4}
+  .table-users td{padding:.55rem .7rem;border-bottom:1px solid #f0ebe0}
+  .table-users tr:last-child td{border-bottom:none}
+  .badge-role{font-size:.65rem;padding:.2rem .5rem;border-radius:4px;font-weight:700;text-transform:uppercase}
+  .badge-admin{background:#e8edf7;color:var(--navy)}
+  .badge-aluno{background:var(--success-bg);color:var(--success)}
+  .btn-sm{padding:.3rem .65rem;border-radius:6px;font-size:.72rem;font-weight:600;cursor:pointer;border:1px solid;font-family:inherit}
+  .btn-danger-sm{background:#fff5f5;color:var(--danger);border-color:#f7c6c6}
+  .btn-danger-sm:hover{background:var(--danger-bg)}
+
+
+  /* DASHBOARD */
+  .dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.9rem;margin-bottom:1.5rem}
+  .dash-card{background:white;border-radius:var(--radius);padding:1.1rem 1rem;border:1px solid #e8e0d4;display:flex;flex-direction:column;gap:.3rem}
+  .dash-card-icon{font-size:1.4rem}
+  .dash-card-value{font-family:'Playfair Display',serif;font-size:2rem;font-weight:700;color:var(--navy);line-height:1}
+  .dash-card-label{font-size:.75rem;color:var(--muted);font-weight:500}
+  .dash-card.highlight{background:var(--navy);border-color:var(--navy)}
+  .dash-card.highlight .dash-card-value{color:white}
+  .dash-card.highlight .dash-card-label{color:rgba(255,255,255,.65)}
+
+  /* CATÁLOGO */
+  .catalog-filters{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.2rem}
+  .cat-filter{padding:.3rem .85rem;border-radius:20px;border:1.5px solid #e8e0d4;background:white;color:var(--muted);font-family:inherit;font-size:.78rem;font-weight:500;cursor:pointer;transition:all .15s}
+  .cat-filter.active,.cat-filter:hover{background:var(--navy);color:white;border-color:var(--navy)}
+  .catalog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem}
+  .course-card{background:white;border-radius:var(--radius);border:1px solid #e8e0d4;overflow:hidden;cursor:pointer;transition:box-shadow .2s,transform .15s}
+  .course-card:hover{box-shadow:0 6px 24px rgba(0,106,127,.12);transform:translateY(-2px)}
+  .course-card-banner{height:80px;display:flex;align-items:center;justify-content:center;font-size:2.5rem;background:linear-gradient(135deg,#004d5e,#008ea8)}
+  .course-card-body{padding:.8rem}
+  .course-card-tag{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--navy-light);margin-bottom:.3rem}
+  .course-card-name{font-size:.9rem;font-weight:600;color:var(--navy);margin-bottom:.5rem;line-height:1.3}
+  .course-card-meta{font-size:.72rem;color:var(--muted);display:flex;gap:.7rem}
+  .course-card-progress{margin-top:.6rem}
+  .cc-bar{height:4px;background:var(--cream2);border-radius:2px;overflow:hidden}
+  .cc-bar-fill{height:100%;background:var(--navy-light);border-radius:2px;transition:width .4s}
+  .cc-pct{font-size:.68rem;color:var(--muted);margin-top:.25rem}
+  .badge-cat{display:inline-block;font-size:.65rem;padding:.2rem .55rem;border-radius:4px;font-weight:600;background:#e8f4f6;color:var(--navy)}
+
+  /* CATEGORIAS */
+  .cat-list{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.5rem}
+  .cat-chip{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .7rem;border-radius:20px;background:#e8f4f6;color:var(--navy);font-size:.78rem;font-weight:500}
+  .cat-chip button{background:none;border:none;cursor:pointer;color:var(--muted);font-size:.8rem;line-height:1;padding:0;margin-left:.1rem}
+  .cat-chip button:hover{color:var(--danger)}
+
+  /* ── COURSE TABS EXPANDIDOS ── */
+  .tabs-5{display:flex;gap:0;margin-bottom:1.2rem;background:white;border-radius:var(--radius);border:1px solid #e8e0d4;overflow:hidden;flex-wrap:wrap}
+  .tabs-5 .tab{flex:1;min-width:80px;padding:.55rem .4rem;font-size:.75rem}
+
+  /* ── RESUMO ── */
+  .resumo-box{background:white;border-radius:var(--radius);border:1px solid #e8e0d4;padding:1.1rem 1.2rem;margin-bottom:1rem}
+  .resumo-desc{font-size:.88rem;color:var(--text);line-height:1.65;margin-bottom:1rem}
+  .resumo-stats{display:flex;gap:.8rem;flex-wrap:wrap}
+  .resumo-stat{display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:var(--muted);background:var(--cream);padding:.4rem .75rem;border-radius:6px}
+  .resumo-stat strong{color:var(--navy)}
+
+  /* ── MÓDULOS ── */
+  .modulo-list{display:flex;flex-direction:column;gap:.5rem}
+  .modulo-item{background:white;border:1px solid #e8e0d4;border-radius:8px;padding:.65rem .9rem;display:flex;align-items:center;gap:.7rem}
+  .modulo-num{width:24px;height:24px;border-radius:50%;background:var(--navy);color:white;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;flex-shrink:0}
+  .modulo-name{font-size:.85rem;font-weight:500;color:var(--navy);flex:1}
+  .modulo-dur{font-size:.72rem;color:var(--muted)}
+
+  /* ── MATERIAIS ── */
+  .material-list{display:flex;flex-direction:column;gap:.5rem}
+  .material-item{background:white;border:1px solid #e8e0d4;border-radius:8px;padding:.6rem .9rem;display:flex;align-items:center;gap:.7rem;transition:background .15s}
+  .material-item:hover{background:var(--cream)}
+  .mat-icon{font-size:1.2rem;flex-shrink:0}
+  .mat-info{flex:1;min-width:0}
+  .mat-name{font-size:.85rem;font-weight:500;color:var(--navy)}
+  .mat-meta{font-size:.7rem;color:var(--muted);margin-top:.1rem}
+  .mat-type{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:.15rem .45rem;border-radius:3px}
+  .mat-pdf{background:#fde8e8;color:#a00}
+  .mat-link{background:#e8f4f6;color:var(--navy)}
+  .mat-viewing{background:var(--navy);color:white}
+  .mat-viewing .mat-name,.mat-viewing .mat-meta{color:rgba(255,255,255,.85)}
+
+  /* ── PERGUNTAS AO TUTOR ── */
+  .pergunta-list{display:flex;flex-direction:column;gap:.8rem;margin-bottom:1rem}
+  .pergunta-card{background:white;border:1px solid #e8e0d4;border-radius:8px;overflow:hidden}
+  .pergunta-header{padding:.65rem .9rem;display:flex;align-items:flex-start;gap:.6rem}
+  .pergunta-avatar{width:28px;height:28px;border-radius:50%;background:var(--navy);color:white;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;flex-shrink:0}
+  .pergunta-meta{flex:1}
+  .pergunta-autor{font-size:.78rem;font-weight:600;color:var(--navy)}
+  .pergunta-data{font-size:.68rem;color:var(--muted)}
+  .pergunta-texto{font-size:.85rem;color:var(--text);line-height:1.5;padding:.1rem 0 .6rem 2.5rem}
+  .resposta-area{background:var(--cream2);border-top:1px solid #e8e0d4;padding:.7rem .9rem;display:flex;align-items:flex-start;gap:.6rem}
+  .resposta-avatar{width:24px;height:24px;border-radius:50%;background:var(--gold);color:var(--navy);display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;flex-shrink:0;margin-top:.15rem}
+  .resposta-texto{font-size:.82rem;color:var(--text);flex:1;line-height:1.5}
+  .resposta-form{background:var(--cream2);border-top:1px solid #e8e0d4;padding:.7rem .9rem}
+  .resposta-form textarea{width:100%;padding:.5rem .7rem;border:1.5px solid #dde;border-radius:7px;font-family:inherit;font-size:.82rem;resize:vertical;min-height:56px;background:white}
+  .resposta-form textarea:focus{outline:none;border-color:var(--navy)}
+  .badge-respondida{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:.15rem .5rem;border-radius:4px;background:var(--success-bg);color:var(--success)}
+  .badge-pendente{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:.15rem .5rem;border-radius:4px;background:#fff3cd;color:#856404}
+
+  /* ── ADMIN MATERIAL FORM ── */
+  .mat-type-toggle{display:flex;gap:0;border:1.5px solid #dde;border-radius:8px;overflow:hidden;margin-bottom:.8rem}
+  .mat-type-btn{flex:1;padding:.45rem;text-align:center;font-size:.8rem;font-weight:500;cursor:pointer;border:none;background:#fafafa;font-family:inherit;color:var(--muted);transition:all .15s}
+  .mat-type-btn.active{background:var(--navy);color:white}
+  @media(max-width:600px){
+    .sidebar{width:100%;border-right:none;border-bottom:1px solid #e8e0d4}
+    .main-body{flex-direction:column}
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="screen-login" class="screen active">
+  <div class="login-card">
+    <div class="login-logo">
+      <img src="data:image/png;base64,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" alt="Escola da IBC" style="width:180px;margin-bottom:.5rem;filter:brightness(0) saturate(100%) invert(35%) sepia(80%) saturate(500%) hue-rotate(155deg) brightness(90%)">
+      <p style="font-size:.75rem;color:#888;letter-spacing:.05em;text-transform:uppercase;margin-top:.2rem">Plataforma de Estudos</p>
+    </div>
+    <div class="field">
+      <label>E-mail</label>
+      <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Senha</label>
+      <input type="password" id="login-pass" placeholder="••••••">
+    </div>
+    <button class="btn-primary" onclick="doLogin()">Entrar</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="screen-main" class="screen" style="flex-direction:column">
+  <div class="topbar">
+    <div class="topbar-left">
+      <img src="data:image/png;base64,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" alt="Escola da IBC" style="height:36px;filter:brightness(0) invert(1);margin-right:.5rem">
+      <div style="border-left:1px solid rgba(255,255,255,.25);padding-left:.7rem">
+        <div class="topbar-subtitle">Plataforma EAD</div>
+      </div>
+    </div>
+    <div class="topbar-user">
+      <div class="avatar" id="topbar-avatar">A</div>
+      <div style="display:flex;flex-direction:column;align-items:flex-start"><span style="font-size:.82rem;color:rgba(255,255,255,.85);line-height:1.2" id="topbar-name">Usuário</span><span style="font-size:.65rem;color:rgba(255,255,255,.5)" id="topbar-role">—</span></div>
+      <button class="btn-logout" onclick="doLogout()">Sair</button>
+    </div>
+  </div>
+  <div class="main-body">
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-label">Menu</div>
+        <div class="course-item" id="nav-catalog" onclick="showCatalog()">
+          <span class="ci-icon">🗂️</span>
+          <div class="ci-text"><div class="ci-name">Catálogo de Cursos</div></div>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Meus Cursos</div>
+        <div id="course-list"></div>
+      </div>
+      <div class="sidebar-section" id="admin-nav-section" style="display:none">
+        <div class="sidebar-label">Administração</div>
+        <div class="course-item" id="nav-admin-dashboard" onclick="showAdminPanel('dashboard')" style="display:none">
+          <span class="ci-icon">📊</span>
+          <div class="ci-text"><div class="ci-name">Dashboard</div></div>
+        </div>
+        <div class="course-item" id="nav-admin-catalog" onclick="showAdminPanel('catalog')">
+          <span class="ci-icon">🗂️</span>
+          <div class="ci-text"><div class="ci-name">Catálogo de Cursos</div></div>
+        </div>
+        <div class="course-item" id="nav-admin-categories" onclick="showAdminPanel('categories')" style="display:none">
+          <span class="ci-icon">🏷️</span>
+          <div class="ci-text"><div class="ci-name">Categorias</div></div>
+        </div>
+        <div class="course-item" id="nav-admin-courses" onclick="showAdminPanel('courses')" style="display:none">
+          <span class="ci-icon">➕</span>
+          <div class="ci-text"><div class="ci-name">Novo Curso</div></div>
+        </div>
+        <div class="course-item" id="nav-admin-users" onclick="showAdminPanel('users')">
+          <span class="ci-icon">👥</span>
+          <div class="ci-text"><div class="ci-name">Usuários</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="content" id="main-content"></div>
+  </div>
+</div>
+
+<script>
+const USERS_DEFAULT=[
+  {id:1,name:'Pastor Admin',email:'admin@ibc.com',pass:'admin123',role:'admin'},
+  {id:2,name:'Prof. Maria',email:'tutor@ibc.com',pass:'ibc2024',role:'tutor',cursos:[]},
+  {id:3,name:'João Silva',email:'joao@ibc.com',pass:'ibc2024',role:'aluno-interno'},
+  {id:4,name:'Pedro Costa',email:'pedro@email.com',pass:'ibc2024',role:'aluno-externo'},
+];
+
+// ── Helpers de permissão ──
+// ── Filtro de cursos por perfil ──
+function cursosVisiveis(){
+  if(isAdmin(currentUser)||isTutor(currentUser)) return courses;
+  if(isAlunoInterno(currentUser)) return courses; // interno vê todos
+  // externo vê só públicos
+  return courses.filter(c=>c.acesso==='publico'||!c.acesso);
+}
+
+function isAdmin(u){ return (u||currentUser).role==='admin'; }
+function isTutor(u){ return (u||currentUser).role==='tutor'; }
+function isAlunoInterno(u){ return (u||currentUser).role==='aluno-interno'; }
+function isAlunoExterno(u){ return (u||currentUser).role==='aluno-externo'; }
+function isAluno(u){ const r=(u||currentUser).role; return r==='aluno-interno'||r==='aluno-externo'||r==='aluno'; }
+function canManageCourse(u,cid){
+  u=u||currentUser;
+  if(isAdmin(u)) return true;
+  if(isTutor(u)) return (u.cursos||[]).includes(cid);
+  return false;
+}
+function canEditContent(cid){ return canManageCourse(currentUser,cid); }
+
+function roleBadge(role){
+  const map={
+    'admin':     {cls:'badge-admin',     label:'Admin'},
+    'tutor':     {cls:'badge-tutor',     label:'Professor/Tutor'},
+    'aluno-interno': {cls:'badge-aluno-interno', label:'Aluno Interno'},
+    'aluno-externo': {cls:'badge-aluno-externo', label:'Aluno Externo'},
+    'aluno':     {cls:'badge-aluno',     label:'Aluno'},
+  };
+  const r=map[role]||{cls:'badge-aluno',label:role};
+  return '<span class="badge-role '+r.cls+'">'+r.label+'</span>';
+}
+
+function roleIcon(role){
+  return {admin:'🛡️',tutor:'🎓','aluno-interno':'✝️','aluno-externo':'👤',aluno:'👤'}[role]||'👤';
+}
+function roleDesc(role){
+  return {
+    admin:'Acesso total à plataforma: cursos, usuários, dashboard e configurações.',
+    tutor:'Acesso total aos cursos vinculados: editar conteúdo, responder perguntas e ver progresso dos alunos.',
+    'aluno-interno':'Membro da igreja. Acesso a todos os cursos disponíveis.',
+    'aluno-externo':'Visitante ou externo. Acesso aos cursos permitidos para o público geral.',
+    aluno:'Aluno.',
+  }[role]||'';
+}
+const COURSES_DEFAULT=[
+  {id:1,name:'Fundamentos da Fé',tag:'Teologia',icon:'📖',acesso:'interno',resumo:'Um estudo introdutório sobre os pilares da fé cristã: a Bíblia, a salvação e a vida em comunidade.',duracao:'4 semanas',modules:[{nome:'Introdução à Fé',dur:'30 min'},{nome:'A Bíblia e sua Autoridade',dur:'45 min'},{nome:'A Doutrina da Salvação',dur:'45 min'},{nome:'A Igreja e sua Missão',dur:'40 min'}],materiais:[],perguntas:[],
+    quiz:[
+      {q:'O que significa a palavra "Evangelho"?',opts:['Boa notícia','Livro sagrado','Tradição religiosa','Mandamento'],ans:0,exp:'Evangelho vem do grego "euangelion", que significa "boa notícia".'},
+      {q:'Quantos livros compõem a Bíblia?',opts:['60','66','72','80'],ans:1,exp:'A Bíblia é composta por 66 livros — 39 no AT e 27 no NT.'},
+      {q:'O que é justificação pela fé?',opts:['Obras que nos tornam justos','Ser declarado justo pela fé em Cristo','Um ritual de purificação','Uma promessa futura'],ans:1,exp:'Rm 5:1 — "Justificados pela fé, temos paz com Deus."'},
+      {q:'Qual é a missão principal da Igreja?',opts:['Arrecadar fundos','Fazer discípulos de todas as nações','Organizar eventos sociais','Preservar tradições'],ans:1,exp:'Mt 28:19 — "Ide, e fazei discípulos de todas as nações."'},
+    ]
+  },
+  {id:2,name:'Discipulado Cristão',tag:'Crescimento',icon:'🌱',acesso:'interno',resumo:'Aprenda o que significa seguir a Jesus no dia a dia, desenvolvendo disciplinas espirituais e vivendo a missão.',duracao:'3 semanas',modules:[{nome:'O Chamado ao Discipulado',dur:'35 min'},{nome:'Obediência e Caráter',dur:'40 min'},{nome:'A Vida de Oração',dur:'35 min'},{nome:'Vivendo a Missão',dur:'30 min'}],materiais:[],perguntas:[],
+    quiz:[
+      {q:'O que significa ser discípulo de Jesus?',opts:['Ir à igreja aos domingos','Seguir e aprender com Jesus diariamente','Memorizar versículos','Ser membro de um grupo'],ans:1,exp:'Discipulado é um estilo de vida de seguir a Jesus.'},
+      {q:'Qual a frequência ideal de oração segundo Paulo?',opts:['Apenas em dificuldades','Somente em cultos','Incessantemente','Uma vez por semana'],ans:2,exp:'1Ts 5:17 — "Orai sem cessar."'},
+      {q:'O que é o fruto do Espírito?',opts:['Habilidades espirituais','Amor, alegria, paz e mais virtudes','Milagres e curas','Conhecimento bíblico'],ans:1,exp:'Gl 5:22-23 lista amor, alegria, paz, paciência, bondade, benignidade, fidelidade, mansidão, domínio próprio.'},
+    ]
+  },
+  {id:3,name:'Estudo Bíblico — Salmos',tag:'Bíblia',icon:'🕊️',acesso:'publico',resumo:'Mergulhe no livro dos Salmos explorando os gêneros literários, contexto histórico e aplicação para hoje.',duracao:'3 semanas',modules:[{nome:'Salmos de Louvor',dur:'40 min'},{nome:'Salmos de Lamento',dur:'35 min'},{nome:'Salmos de Confiança',dur:'35 min'},{nome:'Salmos de Gratidão',dur:'30 min'}],materiais:[],perguntas:[],
+    quiz:[
+      {q:'Quem escreveu a maioria dos Salmos?',opts:['Moisés','Davi','Salomão','Asafe'],ans:1,exp:'Cerca de 73 salmos são atribuídos ao rei Davi.'},
+      {q:'O Salmo 23 começa com qual frase?',opts:['"Deus é o nosso refúgio"','"O Senhor é o meu pastor"','"Alegremo-nos no Senhor"','"Cantai ao Senhor"'],ans:1,exp:'Sl 23:1 — "O Senhor é o meu pastor; nada me faltará."'},
+      {q:'Quantos Salmos existem no total?',opts:['100','120','150','175'],ans:2,exp:'O livro dos Salmos contém 150 poemas e cânticos.'},
+    ]
+  },
+];
+
+let users=JSON.parse(localStorage.getItem('ibc_users')||'null')||USERS_DEFAULT;
+let courses=JSON.parse(localStorage.getItem('ibc_courses')||'null')||COURSES_DEFAULT;
+let progress=JSON.parse(localStorage.getItem('ibc_progress')||'{}');
+let currentUser=null,currentCourse=null,activeTab='material',quizAnswers={},quizSubmitted=false,viewingPDF=null;
+
+function save(){
+  localStorage.setItem('ibc_users',JSON.stringify(users));
+  localStorage.setItem('ibc_courses',JSON.stringify(courses));
+  localStorage.setItem('ibc_progress',JSON.stringify(progress));
+}
+
+function doLogin(){
+  const email=document.getElementById('login-email').value.trim().toLowerCase();
+  const pass=document.getElementById('login-pass').value;
+  const u=users.find(x=>x.email.toLowerCase()===email&&x.pass===pass);
+  if(!u){document.getElementById('login-error').textContent='E-mail ou senha incorretos.';return;}
+  currentUser=u;
+  document.getElementById('topbar-name').textContent=u.name;
+  const roleLabels={'admin':'Administrador','tutor':'Professor/Tutor','aluno-interno':'Aluno Interno','aluno-externo':'Aluno Externo','aluno':'Aluno'};
+  document.getElementById('topbar-role').textContent=roleLabels[u.role]||u.role;
+  document.getElementById('topbar-avatar').textContent=u.name.charAt(0).toUpperCase();
+  document.getElementById('admin-nav-section').style.display=(u.role==='admin'||u.role==='tutor')?'block':'none';
+  renderCourseList();
+  // Ajustar visibilidade do menu conforme perfil
+  const isAdminUser = u.role==='admin';
+  const isTutorUser = u.role==='tutor';
+  ['nav-admin-dashboard','nav-admin-categories','nav-admin-courses'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.style.display=isAdminUser?'flex':'none';
+  });
+  // Usuários: admin vê todos, tutor vê só alunos dos seus cursos
+  const usersNav=document.getElementById('nav-admin-users');
+  if(usersNav) usersNav.style.display=(isAdminUser||isTutorUser)?'flex':'none';
+  show('main');
+  if(isAdminUser) renderDashboard();
+  else if(isTutorUser) renderAdminCatalog();
+  else renderCatalogView('');
+}
+document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+
+function doLogout(){
+  currentUser=null;currentCourse=null;
+  document.getElementById('login-email').value='';
+  document.getElementById('login-pass').value='';
+  show('login');
+}
+function show(s){
+  document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));
+  document.getElementById('screen-'+s).classList.add('active');
+}
+
+function getCourseProgress(cid){
+  const key=`${currentUser.id}_${cid}`;
+  const p=progress[key]||{};
+  let done=0;
+  if(p.materialDone)done++;
+  if(p.quizScore!==undefined)done++;
+  return Math.round((done/2)*100);
+}
+
+function renderCourseList(){
+  const el=document.getElementById('course-list');
+  el.innerHTML='';
+  cursosVisiveis().forEach(c=>{
+    const pct=getCourseProgress(c.id);
+    const div=document.createElement('div');
+    div.className='course-item'+(currentCourse&&currentCourse.id===c.id?' active':'');
+    div.id='course-nav-'+c.id;
+    div.innerHTML=`<span class="ci-icon">${c.icon||'📚'}</span>
+      <div class="ci-text">
+        <div class="ci-name">${c.name}</div>
+        <div class="ci-progress">${pct}% concluído</div>
+        <div class="mini-bar"><div class="mini-bar-fill" style="width:${pct}%"></div></div>
+      </div>`;
+    div.onclick=()=>selectCourse(c.id);
+    el.appendChild(div);
+  });
+}
+
+function selectCourse(id){
+  currentCourse=courses.find(c=>c.id===id);
+  activeTab='resumo';quizAnswers={};quizSubmitted=false;viewingPDF=null;
+  document.querySelectorAll('.course-item').forEach(x=>x.classList.remove('active'));
+  const nav=document.getElementById('course-nav-'+id);
+  if(nav)nav.classList.add('active');
+  renderCourse();
+}
+
+function renderCourse(){
+  const c=currentCourse;
+  const pct=getCourseProgress(c.id);
+  const key=`${currentUser.id}_${c.id}`;
+  const p=progress[key]||{};
+  const mats=(c.materiais||c.pdfs||[]);
+  const nPerg=(c.perguntas||[]).length;
+  const nPendente=(c.perguntas||[]).filter(q=>!q.resposta).length;
+  document.getElementById('main-content').innerHTML=`
+    <div class="course-header">
+      <span class="course-tag">${c.tag}</span>
+      <h1 class="course-title">${c.icon} ${c.name}</h1>
+      <div class="course-meta">
+        <span>📋 ${(c.modules||[]).length} módulos</span>
+        ${c.duracao?`<span>⏱ ${c.duracao}</span>`:''}
+        <span>📄 ${mats.length} material(is)</span>
+        <span>❓ ${c.quiz.length} questões</span>
+        ${nPerg?`<span>💬 ${nPerg} pergunta(s)${nPendente?' · '+nPendente+' pendente(s)':''}</span>`:''}
+      </div>
+    </div>
+    <div class="progress-section">
+      <div class="progress-header">
+        <span class="progress-label">Seu progresso</span>
+        <span class="progress-pct" id="prog-pct">${pct}%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:${pct}%"></div></div>
+      <div class="progress-steps">
+        <div class="step-dot ${p.materialDone?'done':'current'}" title="Material"></div>
+        <div class="step-dot ${p.quizScore!==undefined?'done':(p.materialDone?'current':'')}" title="Exercícios"></div>
+      </div>
+    </div>
+    <div class="tabs tabs-5">
+      <button class="tab ${activeTab==='resumo'?'active':''}" id="tab-btn-resumo" onclick="setTab('resumo')">📋 Resumo</button>
+      <button class="tab ${activeTab==='modulos'?'active':''}" id="tab-btn-modulos" onclick="setTab('modulos')">🗂️ Módulos</button>
+      <button class="tab ${activeTab==='material'?'active':''}" id="tab-btn-material" onclick="setTab('material')">📄 Material</button>
+      <button class="tab ${activeTab==='quiz'?'active':''}" id="tab-btn-quiz" onclick="setTab('quiz')">📝 Exercícios</button>
+      <button class="tab ${activeTab==='perguntas'?'active':''}" id="tab-btn-perguntas" onclick="setTab('perguntas')">💬 Perguntas${nPendente&&canManageCourse(currentUser,c.id)?' ('+nPendente+')':''}</button>
+    </div>
+    <div id="tab-content"></div>`;
+  renderTabContent();
+}
+
+function setTab(tab){
+  activeTab=tab;
+  ['resumo','modulos','material','quiz','perguntas'].forEach(t=>{
+    const btn=document.getElementById('tab-btn-'+t);
+    if(btn)btn.classList.toggle('active',t===tab);
+  });
+  renderTabContent();
+}
+
+function renderTabContent(){
+  const el=document.getElementById('tab-content');
+  if(!el)return;
+  if(activeTab==='resumo') el.innerHTML=renderResumo();
+  else if(activeTab==='modulos') el.innerHTML=renderModulos();
+  else if(activeTab==='material') el.innerHTML=renderMaterial();
+  else if(activeTab==='quiz') el.innerHTML=renderQuiz();
+  else if(activeTab==='perguntas') el.innerHTML=renderPerguntas();
+}
+
+function renderMaterial(){
+  const c=currentCourse;
+  const key=`${currentUser.id}_${c.id}`;
+  const p=progress[key]||{};
+  const mats=c.materiais||c.pdfs||[];
+
+  const matItems=mats.map((m,i)=>{
+    const isLink=m.tipo==='link';
+    const isViewing=viewingPDF===i;
+    let actions='';
+    if(isLink){
+      actions=`<a href="${m.url}" target="_blank" class="btn-view" style="text-decoration:none">Abrir</a>`;
+    } else if(m.url){
+      actions=`<button class="btn-view" onclick="event.stopPropagation();viewPDF(${i})">Ver</button>`;
+    }
+    return `<div class="material-item ${isViewing?'mat-viewing':''}" onclick="${isLink?'':('viewPDF('+i+')')}">
+      <span class="mat-icon">${isLink?'🔗':'📄'}</span>
+      <div class="mat-info">
+        <div class="mat-name">${m.name}</div>
+        <div class="mat-meta">${isLink?m.url:(m.size||'—')}</div>
+      </div>
+      <span class="mat-type ${isLink?'mat-link':'mat-pdf'}">${isLink?'LINK':'PDF'}</span>
+      ${actions}
+    </div>`;
+  }).join('');
+
+  const adminForm=canEditContent(c.id)?`
+    <div class="admin-section" style="margin-top:1rem">
+      <div class="admin-section-header">➕ Adicionar Material</div>
+      <div class="admin-section-body">
+        <div class="mat-type-toggle">
+          <button class="mat-type-btn active" id="mtype-pdf" onclick="toggleMatType('pdf')">📄 PDF</button>
+          <button class="mat-type-btn" id="mtype-link" onclick="toggleMatType('link')">🔗 Link</button>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Nome / título</label>
+            <input type="text" id="mat-name-input" placeholder="Ex: Apostila Módulo 1">
+          </div>
+        </div>
+        <div id="mat-pdf-area">
+          <input type="file" id="pdf-file-input" accept=".pdf" style="margin-bottom:.8rem;width:100%;font-size:.82rem">
+        </div>
+        <div id="mat-link-area" style="display:none">
+          <div class="form-group"><label>URL</label>
+            <input type="url" id="mat-link-input" placeholder="https://...">
+          </div>
+        </div>
+        <button class="btn-gold" onclick="addMaterial()">Adicionar material</button>
+      </div>
+    </div>`:'';
+
+  const viewerHtml=viewingPDF!==null&&mats[viewingPDF]&&mats[viewingPDF].url&&mats[viewingPDF].tipo!=='link'?`
+    <div class="pdf-section" style="margin-bottom:1rem">
+      <div class="pdf-toolbar">
+        <div class="pdf-toolbar-left">
+          <span class="pdf-badge">PDF</span>
+          <span class="pdf-filename">${mats[viewingPDF].name}</span>
+        </div>
+        <button class="btn-sm" style="border-color:#dde;background:#f5f5f5;color:var(--text)" onclick="viewingPDF=null;renderTabContent()">✕ Fechar</button>
+      </div>
+      <iframe class="pdf-viewer-frame" src="${mats[viewingPDF].url}"></iframe>
+    </div>`:'';
+
+  const markBtn=!p.materialDone
+    ?`<button class="btn-gold" style="margin-top:1rem" onclick="markMaterialDone(${c.id})">✓ Marcar material como concluído</button>`
+    :`<div style="color:var(--success);font-weight:600;font-size:.85rem;margin-top:.8rem">✓ Material concluído!</div>`;
+
+  return viewerHtml
+    +`<div class="pdf-section">
+      <div class="pdf-toolbar">
+        <div class="pdf-toolbar-left">
+          <span class="pdf-badge">MATERIAL</span>
+          <span class="pdf-filename">${mats.length} item(ns)</span>
+        </div>
+      </div>
+      ${mats.length?'<div class="material-list" style="padding:.5rem">'+matItems+'</div>':'<div class="pdf-no-files">Nenhum material adicionado ainda.</div>'}
+    </div>`
+    +adminForm+markBtn;
+}
+function viewPDF(i){viewingPDF=viewingPDF===i?null:i;renderTabContent();}
+
+let currentMatType='pdf';
+function toggleMatType(t){
+  currentMatType=t;
+  document.getElementById('mtype-pdf').classList.toggle('active',t==='pdf');
+  document.getElementById('mtype-link').classList.toggle('active',t==='link');
+  document.getElementById('mat-pdf-area').style.display=t==='pdf'?'block':'none';
+  document.getElementById('mat-link-area').style.display=t==='link'?'block':'none';
+}
+function addMaterial(){
+  const name=document.getElementById('mat-name-input').value.trim();
+  if(!name){alert('Informe um nome.');return;}
+  if(!currentCourse.materiais) currentCourse.materiais=[];
+  if(currentMatType==='link'){
+    const url=document.getElementById('mat-link-input').value.trim();
+    if(!url){alert('Informe a URL.');return;}
+    currentCourse.materiais.push({name,url,tipo:'link'});
+  } else {
+    const fileEl=document.getElementById('pdf-file-input');
+    const file=fileEl.files[0];
+    if(!file){alert('Selecione um arquivo PDF.');return;}
+    const url=URL.createObjectURL(file);
+    const size=(file.size/1024/1024).toFixed(1)+' MB';
+    currentCourse.materiais.push({name,url,size,tipo:'pdf'});
+    fileEl.value='';
+  }
+  courses=courses.map(c=>c.id===currentCourse.id?currentCourse:c);
+  save();
+  document.getElementById('mat-name-input').value='';
+  if(document.getElementById('mat-link-input')) document.getElementById('mat-link-input').value='';
+  renderTabContent();
+}
+
+function markMaterialDone(cid){
+  const key=`${currentUser.id}_${cid}`;
+  if(!progress[key])progress[key]={};
+  progress[key].materialDone=true;
+  save();renderCourseList();renderCourse();setTab('material');
+}
+
+function renderQuiz(){
+  const c=currentCourse;
+  const key=`${currentUser.id}_${c.id}`;
+  const p=progress[key]||{};
+  if(quizSubmitted||p.quizScore!==undefined){
+    const score=quizSubmitted?calcScore():p.quizScore;
+    const total=c.quiz.length;
+    const pct=Math.round((score/total)*100);
+    const pass=pct>=60;
+    const reviewHtml=c.quiz.map((q,i)=>{
+      const chosen=quizAnswers[i];
+      const correct=q.ans;
+      const isRight=chosen===correct;
+      return `<div class="question-card ${isRight?'correct':'wrong'}">
+        <div class="q-num">Questão ${i+1}</div>
+        <div class="q-text">${q.q}</div>
+        <div class="options">
+          ${q.opts.map((o,j)=>`<div class="option ${j===correct?'correct-ans':(chosen===j&&!isRight?'wrong-ans':'')}">
+            <input type="radio" disabled ${chosen===j?'checked':''}><span>${o}</span>
+          </div>`).join('')}
+        </div>
+        <div class="q-feedback ${isRight?'ok':'err'}">${isRight?'✓ Correto!':'✗ Incorreto — '+q.exp}</div>
+      </div>`;
+    }).join('');
+    return `<div class="quiz-wrap">
+      <div class="quiz-header"><div class="quiz-title">Resultado</div><div class="quiz-desc">${c.name}</div></div>
+      <div class="quiz-body">
+        <div class="quiz-result">
+          <div class="result-score">${score}/${total}</div>
+          <div class="result-label">${pct}% de aproveitamento</div>
+          <div class="result-msg ${pass?'pass':'fail'}">${pass?'🎉 Parabéns! Você passou!':'📚 Continue estudando e tente novamente!'}</div>
+        </div>
+        <hr style="border:none;border-top:1px solid #e8e0d4;margin:1rem 0">
+        ${reviewHtml}
+        <div class="quiz-actions"><button class="btn-secondary" onclick="retakeQuiz()">Tentar novamente</button></div>
+      </div>
+    </div>`;
+  }
+  const questionsHtml=c.quiz.map((q,i)=>`
+    <div class="question-card" id="qcard-${i}">
+      <div class="q-num">Questão ${i+1} de ${c.quiz.length}</div>
+      <div class="q-text">${q.q}</div>
+      <div class="options">
+        ${q.opts.map((o,j)=>`<div class="option ${quizAnswers[i]===j?'selected':''}" onclick="selectOpt(${i},${j})">
+          <input type="radio" name="q${i}" ${quizAnswers[i]===j?'checked':''} readonly><span>${o}</span>
+        </div>`).join('')}
+      </div>
+    </div>`).join('');
+  return `<div class="quiz-wrap">
+    <div class="quiz-header"><div class="quiz-title">Exercícios — ${c.name}</div><div class="quiz-desc">${c.quiz.length} questões · Mínimo 60% para aprovação</div></div>
+    <div class="quiz-body">${questionsHtml}
+      <div class="quiz-actions"><button class="btn-gold" onclick="submitQuiz()">Enviar respostas →</button></div>
+    </div>
+  </div>`;
+}
+
+function selectOpt(qi,oi){
+  quizAnswers[qi]=oi;
+  document.querySelectorAll(`#qcard-${qi} .option`).forEach((o,j)=>{
+    o.classList.toggle('selected',j===oi);
+    o.querySelector('input').checked=(j===oi);
+  });
+}
+function calcScore(){return currentCourse.quiz.filter((q,i)=>quizAnswers[i]===q.ans).length;}
+function submitQuiz(){
+  if(Object.keys(quizAnswers).length<currentCourse.quiz.length){alert('Responda todas as questões antes de enviar.');return;}
+  quizSubmitted=true;
+  const score=calcScore();
+  const key=`${currentUser.id}_${currentCourse.id}`;
+  if(!progress[key])progress[key]={};
+  if(progress[key].quizScore===undefined||score>progress[key].quizScore)progress[key].quizScore=score;
+  save();renderCourse();setTab('quiz');
+}
+function retakeQuiz(){
+  quizAnswers={};quizSubmitted=false;
+  const key=`${currentUser.id}_${currentCourse.id}`;
+  if(progress[key])delete progress[key].quizScore;
+  save();renderTabContent();
+}
+
+function showAdminPanel(panel){
+  document.querySelectorAll('.course-item[id^=nav-admin]').forEach(x=>x.classList.remove('active'));
+  const navEl=document.getElementById('nav-admin-'+panel);
+  if(navEl)navEl.classList.add('active');
+  if(currentCourse){document.querySelectorAll('.course-item[id^=course-nav]').forEach(x=>x.classList.remove('active'));currentCourse=null;}
+  if(panel==='users')renderAdminUsers();
+  else if(panel==='dashboard')renderDashboard();
+  else if(panel==='catalog')renderAdminCatalog();
+  else if(panel==='categories')renderAdminCategories();
+  else renderAdminCourses();
+}
+
+function renderAdminUsers(){
+  const canSeeAll = isAdmin(currentUser);
+  // Tutor vê apenas alunos matriculados nos seus cursos
+  const visibleUsers = canSeeAll ? users : users.filter(u=>{
+    if(!isAluno(u)) return false;
+    const tutorCursos = currentUser.cursos||[];
+    return tutorCursos.some(cid=>
+      (progress[u.id+'_'+cid])
+    );
+  });
+
+  const rows = visibleUsers.map(u=>`
+    <tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <span style="font-size:1rem">${roleIcon(u.role)}</span>
+          <div>
+            <div style="font-weight:500;font-size:.85rem;color:var(--navy)">${u.name}</div>
+            <div style="font-size:.72rem;color:var(--muted)">${u.email}</div>
+          </div>
+        </div>
+      </td>
+      <td>${roleBadge(u.role)}</td>
+      <td>
+        ${u.role==='tutor'?`<button class="btn-sm" style="border:1px solid var(--navy-light);color:var(--navy);background:white;font-size:.7rem" onclick="gerenciarCursosTutor(${u.id})">Vincular Cursos</button>`:'—'}
+      </td>
+      <td>${u.id!==currentUser.id?`<button class="btn-sm btn-danger-sm" onclick="removeUser(${u.id})">Remover</button>`:'<span style="font-size:.72rem;color:var(--muted)">Você</span>'}</td>
+    </tr>`).join('');
+
+  const rolesDisponiveis = canSeeAll
+    ? ['admin','tutor','aluno-interno','aluno-externo']
+    : [];
+
+  const formSection = canSeeAll ? `
+    <div class="admin-section">
+      <div class="admin-section-header">➕ Novo Usuário</div>
+      <div class="admin-section-body">
+        <div class="form-row">
+          <div class="form-group"><label>Nome completo</label><input type="text" id="new-name" placeholder="Nome completo"></div>
+          <div class="form-group"><label>E-mail</label><input type="email" id="new-email" placeholder="email@exemplo.com"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Senha</label><input type="text" id="new-pass" placeholder="Senha inicial"></div>
+          <div class="form-group"><label>Perfil</label>
+            <select id="new-role">
+              <option value="aluno-interno">✝️ Aluno Interno (membro da igreja)</option>
+              <option value="aluno-externo">👤 Aluno Externo (visitante)</option>
+              <option value="tutor">🎓 Professor / Tutor</option>
+              <option value="admin">🛡️ Administrador</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn-gold" onclick="addUser()">Cadastrar usuário</button>
+      </div>
+    </div>` : '<div class="admin-section"><div class="admin-section-body"><p style="font-size:.85rem;color:var(--muted)">Exibindo alunos dos seus cursos. Apenas admins podem cadastrar novos usuários.</p></div></div>';
+
+  // Cards de perfil explicando cada papel
+  const perfilCards = canSeeAll ? `
+    <div class="admin-section">
+      <div class="admin-section-header">📋 Perfis disponíveis</div>
+      <div class="admin-section-body" style="display:flex;flex-direction:column;gap:.6rem">
+        ${[
+          {role:'admin',     icon:'🛡️', bg:'#e8edf7', items:['Acesso total','Criar/remover cursos','Gerenciar usuários','Ver todos os relatórios']},
+          {role:'tutor',     icon:'🎓', bg:'#fff9e6', items:['Editar cursos vinculados','Adicionar materiais e módulos','Responder perguntas dos alunos','Ver progresso dos seus alunos']},
+          {role:'aluno-interno', icon:'✝️', bg:'#e8f4f6', items:['Acesso a todos os cursos','Fazer perguntas ao tutor','Acompanhar próprio progresso','Certificado ao concluir (em breve)']},
+          {role:'aluno-externo', icon:'👤', bg:'#f3e8ff', items:['Acesso a cursos públicos','Fazer perguntas ao tutor','Acompanhar próprio progresso']},
+        ].map(p=>`
+          <div class="perfil-card">
+            <div class="perfil-icon" style="background:${p.bg}">${p.icon}</div>
+            <div class="perfil-info" style="flex:1">
+              <h3>${roleBadge(p.role)} &nbsp;${p.role==='admin'?'Administrador':p.role==='tutor'?'Professor/Tutor':p.role==='aluno-interno'?'Aluno Interno':'Aluno Externo'}</h3>
+              <p>${roleDesc(p.role)}</p>
+              <div class="perfil-access">${p.items.map(i=>'<span class="access-chip ok">✓ '+i+'</span>').join('')}</div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>` : '';
+
+  document.getElementById('main-content').innerHTML =
+    '<div class="course-header"><span class="course-tag">Admin</span><h1 class="course-title">👥 Gerenciar Usuários</h1></div>'
+    + formSection
+    + `<div class="admin-section">
+      <div class="admin-section-header">Usuários cadastrados (${visibleUsers.length})</div>
+      <div class="admin-section-body" style="padding:0">
+        <table class="table-users">
+          <thead><tr><th>Usuário</th><th>Perfil</th><th>Cursos</th><th>Ação</th></tr></thead>
+          <tbody>${rows||'<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:1rem">Nenhum usuário.</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`
+    + perfilCards;
+}
+
+function gerenciarCursosTutor(uid){
+  const tutor = users.find(u=>u.id===uid);
+  if(!tutor) return;
+  const checkboxes = courses.map(c=>`
+    <label style="display:flex;align-items:center;gap:.5rem;padding:.4rem 0;font-size:.85rem;cursor:pointer">
+      <input type="checkbox" value="${c.id}" ${(tutor.cursos||[]).includes(c.id)?'checked':''}>
+      ${c.icon||'📚'} ${c.name} <span style="font-size:.7rem;color:var(--muted)">(${c.tag})</span>
+    </label>`).join('');
+  document.getElementById('main-content').innerHTML =
+    `<div class="course-header"><span class="course-tag">Admin</span><h1 class="course-title">🎓 Cursos de ${tutor.name}</h1></div>
+    <div class="admin-section">
+      <div class="admin-section-header">Vincular cursos ao tutor</div>
+      <div class="admin-section-body">
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:.8rem">Selecione os cursos pelos quais este professor é responsável:</p>
+        <div id="tutor-cursos-check">${checkboxes||'<p style="color:var(--muted);font-size:.85rem">Nenhum curso cadastrado.</p>'}</div>
+        <div style="display:flex;gap:.6rem;margin-top:1rem">
+          <button class="btn-gold" onclick="salvarCursosTutor(${uid})">Salvar vínculos</button>
+          <button class="btn-secondary" onclick="renderAdminUsers()">Cancelar</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function salvarCursosTutor(uid){
+  const checks = document.querySelectorAll('#tutor-cursos-check input[type=checkbox]');
+  const selecionados = [];
+  checks.forEach(c=>{ if(c.checked) selecionados.push(Number(c.value)); });
+  users = users.map(u=> u.id===uid ? {...u, cursos:selecionados} : u);
+  save();
+  renderAdminUsers();
+}
+
+function addUser(){
+  const name=document.getElementById('new-name').value.trim();
+  const email=document.getElementById('new-email').value.trim();
+  const pass=document.getElementById('new-pass').value.trim();
+  const role=document.getElementById('new-role').value;
+  if(!name||!email||!pass){alert('Preencha todos os campos.');return;}
+  if(users.find(u=>u.email.toLowerCase()===email.toLowerCase())){alert('E-mail já cadastrado.');return;}
+  const novo={id:Date.now(),name,email,pass,role};
+  if(role==='tutor') novo.cursos=[];
+  users.push(novo);save();renderAdminUsers();
+}
+function removeUser(id){if(!confirm('Remover este usuário?'))return;users=users.filter(u=>u.id!==id);save();renderAdminUsers();}
+
+function renderAdminCourses(){
+  document.getElementById('main-content').innerHTML=`
+    <div class="course-header"><span class="course-tag">Admin</span><h1 class="course-title">➕ Novo Curso</h1></div>
+    <div class="admin-section">
+      <div class="admin-section-header">Dados do curso</div>
+      <div class="admin-section-body">
+        <div class="form-row">
+          <div class="form-group"><label>Nome do Curso</label><input type="text" id="nc-name" placeholder="Ex: Estudo de Romanos"></div>
+          <div class="form-group"><label>Categoria</label><select id="nc-tag"><option value="">Selecionar...</option>${categories.map(c=>`<option>${c}</option>`).join('')}</select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="max-width:100px"><label>Ícone (emoji)</label><input type="text" id="nc-icon" placeholder="📖" maxlength="2"></div>
+          <div class="form-group"><label>Visibilidade</label>
+            <select id="nc-acesso">
+              <option value="interno">✝️ Alunos Internos e acima</option>
+              <option value="publico">🌐 Público (Externos também)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:.7rem">
+          <label>Descrição / resumo</label>
+          <textarea id="nc-resumo" placeholder="Breve descrição do curso..." style="min-height:60px"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group" style="max-width:140px"><label>Duração estimada</label>
+            <input type="text" id="nc-duracao" placeholder="Ex: 4 semanas">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:.8rem"><label>Módulos (um por linha)</label>
+          <textarea id="nc-modules" placeholder="Introdução&#10;Módulo 1&#10;Módulo 2"></textarea>
+        </div>
+        <button class="btn-gold" onclick="addCourse()">Criar curso</button>
+      </div>
+    </div>
+    <div class="admin-section">
+      <div class="admin-section-header">Cursos existentes (${courses.length})</div>
+      <div class="admin-section-body" style="padding:.5rem">
+        ${courses.map(c=>`<div class="pdf-item">
+          <span class="pdf-item-icon">${c.icon||'📚'}</span>
+          <div class="pdf-item-name">${c.name}</div>
+          <span class="badge-role badge-aluno" style="font-size:.65rem">${c.tag}</span>
+          <button class="btn-sm btn-danger-sm" onclick="removeCourse(${c.id})">Remover</button>
+        </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function addCourse(){
+  const name=document.getElementById('nc-name').value.trim();
+  const tag=document.getElementById('nc-tag').value.trim()||'Geral';
+  const icon=document.getElementById('nc-icon').value.trim()||'📚';
+  const modules=document.getElementById('nc-modules').value.split('\n').map(m=>m.trim()).filter(Boolean);
+  if(!name){alert('Informe o nome do curso.');return;}
+  const mods=document.getElementById('nc-modules').value.split('\n').map(m=>{const t=m.trim();return t?{nome:t,dur:''}:null}).filter(Boolean);const acesso=document.getElementById('nc-acesso')?document.getElementById('nc-acesso').value:'interno';courses.push({id:Date.now(),name,tag,icon,acesso,resumo:document.getElementById('nc-resumo').value.trim(),duracao:document.getElementById('nc-duracao').value.trim(),modules:mods,materiais:[],pdfs:[],quiz:[],perguntas:[]});
+  save();renderCourseList();renderAdminCourses();
+}
+function removeCourse(id){
+  if(!confirm('Remover este curso?'))return;
+  courses=courses.filter(c=>c.id!==id);
+  if(currentCourse&&currentCourse.id===id)currentCourse=null;
+  save();renderCourseList();renderAdminCourses();
+}
+
+// ─── CATEGORIAS ───
+let categories = JSON.parse(localStorage.getItem('ibc_categories')||'null') || ['Teologia','Crescimento','Bíblia','Formação','Evangelismo'];
+function saveCategories(){localStorage.setItem('ibc_categories',JSON.stringify(categories));}
+
+
+// ── RESUMO ──
+function renderResumo(){
+  const c=currentCourse;
+  const mats=c.materiais||c.pdfs||[];
+  const isAdmin=canEditContent(c.id);
+  const editForm=isAdmin?`
+    <div class="admin-section" style="margin-top:1rem">
+      <div class="admin-section-header">✏️ Editar Resumo do Curso</div>
+      <div class="admin-section-body">
+        <div class="form-group" style="margin-bottom:.7rem">
+          <label>Descrição / resumo</label>
+          <textarea id="edit-resumo" style="min-height:80px">${c.resumo||''}</textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Duração estimada</label>
+            <input type="text" id="edit-duracao" value="${c.duracao||''}" placeholder="Ex: 4 semanas">
+          </div>
+          <div class="form-group">
+            <label>Visibilidade</label>
+            <select id="edit-acesso">
+              <option value="interno" ${(!c.acesso||c.acesso==='interno')?'selected':''}>✝️ Interno (membros)</option>
+              <option value="publico" ${c.acesso==='publico'?'selected':''}>🌐 Público (externos)</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn-gold" onclick="saveResumo()">Salvar</button>
+      </div>
+    </div>`:'';
+  const tutorResp = users.find(u=>u.role==='tutor'&&(u.cursos||[]).includes(c.id));
+  const acessoBadge = c.acesso==='publico'
+    ? '<span style="font-size:.72rem;padding:.2rem .6rem;border-radius:4px;background:#e8f4f6;color:var(--navy);font-weight:600">🌐 Curso Público</span>'
+    : '<span style="font-size:.72rem;padding:.2rem .6rem;border-radius:4px;background:#f3f0ff;color:#5b21b6;font-weight:600">✝️ Alunos da Igreja</span>';
+  return `<div class="resumo-box">
+    <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.8rem;flex-wrap:wrap">
+      ${acessoBadge}
+      ${tutorResp?`<span style="font-size:.75rem;color:var(--muted)">🎓 Tutor: <strong style='color:var(--navy)'>${tutorResp.name}</strong></span>`:''}
+    </div>
+    <div class="resumo-desc">${c.resumo||'<em style="color:var(--muted)">Nenhuma descrição cadastrada.</em>'}</div>
+    <div class="resumo-stats">
+      <div class="resumo-stat">📋 <strong>${(c.modules||[]).length}</strong> módulos</div>
+      ${c.duracao?`<div class="resumo-stat">⏱ <strong>${c.duracao}</strong></div>`:''}
+      <div class="resumo-stat">📄 <strong>${mats.length}</strong> material(is)</div>
+      <div class="resumo-stat">❓ <strong>${c.quiz.length}</strong> questões</div>
+      <div class="resumo-stat">💬 <strong>${(c.perguntas||[]).length}</strong> pergunta(s)</div>
+    </div>
+  </div>`+editForm;
+}
+function saveResumo(){
+  currentCourse.resumo=document.getElementById('edit-resumo').value.trim();
+  currentCourse.duracao=document.getElementById('edit-duracao').value.trim();
+  const aEl=document.getElementById('edit-acesso');
+  if(aEl) currentCourse.acesso=aEl.value;
+  courses=courses.map(c=>c.id===currentCourse.id?currentCourse:c);
+  save();renderCourse();setTab('resumo');
+}
+
+// ── MÓDULOS ──
+function renderModulos(){
+  const c=currentCourse;
+  const isAdmin=canEditContent(c.id);
+  const mods=(c.modules||[]);
+  const modList=mods.map((m,i)=>{
+    const nome=typeof m==='string'?m:(m.nome||m);
+    const dur=typeof m==='object'?m.dur||'':'';
+    return `<div class="modulo-item">
+      <div class="modulo-num">${i+1}</div>
+      <div class="modulo-name">${nome}</div>
+      ${dur?`<div class="modulo-dur">⏱ ${dur}</div>`:''}
+      ${isAdmin?`<button class="btn-sm btn-danger-sm" onclick="removeModulo(${i})">✕</button>`:''}
+    </div>`;
+  }).join('');
+  const adminForm=isAdmin?`
+    <div class="admin-section" style="margin-top:1rem">
+      <div class="admin-section-header">➕ Adicionar Módulo</div>
+      <div class="admin-section-body">
+        <div class="form-row">
+          <div class="form-group"><label>Nome do módulo</label>
+            <input type="text" id="mod-nome" placeholder="Ex: Introdução à Fé">
+          </div>
+          <div class="form-group" style="max-width:120px"><label>Duração</label>
+            <input type="text" id="mod-dur" placeholder="30 min">
+          </div>
+        </div>
+        <button class="btn-gold" onclick="addModulo()">Adicionar módulo</button>
+      </div>
+    </div>`:'';
+  return `<div class="modulo-list">${modList||'<div class="pdf-no-files">Nenhum módulo cadastrado.</div>'}</div>`+adminForm;
+}
+function addModulo(){
+  const nome=document.getElementById('mod-nome').value.trim();
+  const dur=document.getElementById('mod-dur').value.trim();
+  if(!nome){alert('Informe o nome do módulo.');return;}
+  if(!currentCourse.modules) currentCourse.modules=[];
+  currentCourse.modules.push({nome,dur});
+  courses=courses.map(c=>c.id===currentCourse.id?currentCourse:c);
+  save();renderTabContent();
+  document.getElementById('mod-nome').value='';
+  document.getElementById('mod-dur').value='';
+}
+function removeModulo(i){
+  if(!confirm('Remover este módulo?'))return;
+  currentCourse.modules.splice(i,1);
+  courses=courses.map(c=>c.id===currentCourse.id?currentCourse:c);
+  save();renderTabContent();
+}
+
+// ── PERGUNTAS ──
+function renderPerguntas(){
+  const c=currentCourse;
+  const isAdmin=canEditContent(c.id)||isAdmin(currentUser);
+  const pergs=(c.perguntas||[]);
+  const pergCards=pergs.map((p,i)=>{
+    const autorInicial=p.autor?p.autor.charAt(0).toUpperCase():'?';
+    const respostaHtml=p.resposta
+      ?`<div class="resposta-area">
+          <div class="resposta-avatar">T</div>
+          <div class="resposta-texto"><strong>Tutor:</strong> ${p.resposta}</div>
+        </div>`
+      :(isAdmin?`<div class="resposta-form">
+          <div style="font-size:.75rem;font-weight:600;color:var(--navy);margin-bottom:.4rem">Responder como tutor:</div>
+          <textarea id="resp-input-${i}" placeholder="Digite sua resposta..."></textarea>
+          <div style="text-align:right;margin-top:.4rem">
+            <button class="btn-gold" style="padding:.35rem .9rem;font-size:.78rem" onclick="responderPergunta(${i})">Responder</button>
+          </div>
+        </div>`
+      :'<div class="resposta-area"><div class="resposta-texto" style="color:var(--muted);font-style:italic">Aguardando resposta do tutor...</div></div>');
+    return `<div class="pergunta-card">
+      <div class="pergunta-header">
+        <div class="pergunta-avatar">${autorInicial}</div>
+        <div class="pergunta-meta">
+          <div class="pergunta-autor">${p.autor||'Aluno'}</div>
+          <div class="pergunta-data">${p.data||''}</div>
+        </div>
+        <span class="badge-${p.resposta?'respondida':'pendente'}">${p.resposta?'Respondida':'Pendente'}</span>
+      </div>
+      <div class="pergunta-texto">${p.texto}</div>
+      ${respostaHtml}
+    </div>`;
+  }).join('');
+
+  const novaForm=`<div class="admin-section">
+    <div class="admin-section-header">💬 ${isAdmin?'Nova Pergunta de Teste':'Fazer uma Pergunta'}</div>
+    <div class="admin-section-body">
+      <div class="form-group" style="margin-bottom:.7rem">
+        <textarea id="nova-pergunta" placeholder="Digite sua dúvida sobre o conteúdo deste curso..." style="min-height:72px;width:100%;padding:.55rem .8rem;border:1.5px solid #dde;border-radius:8px;font-family:inherit;font-size:.85rem;resize:vertical"></textarea>
+      </div>
+      <button class="btn-gold" onclick="enviarPergunta()">Enviar pergunta</button>
+    </div>
+  </div>`;
+
+  return `${pergs.length?'<div class="pergunta-list">'+pergCards+'</div>':'<div class="pdf-no-files" style="margin-bottom:1rem">Nenhuma pergunta ainda. Seja o primeiro a perguntar!</div>'}`+novaForm;
+}
+
+function enviarPergunta(){
+  const texto=document.getElementById('nova-pergunta').value.trim();
+  if(!texto){alert('Digite uma pergunta.');return;}
+  if(!currentCourse.perguntas) currentCourse.perguntas=[];
+  const now=new Date();
+  const data=now.toLocaleDateString('pt-BR')+' '+now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  currentCourse.perguntas.push({texto,autor:currentUser.name,data,resposta:''});
+  courses=courses.map(c=>c.id===currentCourse.id?currentCourse:c);
+  save();renderTabContent();
+}
+
+function responderPergunta(i){
+  const txt=document.getElementById('resp-input-'+i).value.trim();
+  if(!txt){alert('Digite uma resposta.');return;}
+  currentCourse.perguntas[i].resposta=txt;
+  currentCourse.perguntas[i].respondidoPor=currentUser.name;
+  courses=courses.map(c=>c.id===currentCourse.id?currentCourse:c);
+  save();renderTabContent();
+}
+
+
+// ─── DASHBOARD ───
+function renderDashboard(){
+  const totalCourses=courses.length;
+  const activeKeys=Object.keys(progress).filter(k=>{
+    const p=progress[k];
+    return p.materialDone||p.quizScore!==undefined;
+  });
+  const activeStudents=new Set(activeKeys.map(k=>k.split('_')[0])).size;
+  const completedCourses=Object.values(progress).filter(p=>p.materialDone&&p.quizScore!==undefined).length;
+
+  const alunoRows=users.filter(u=>isAluno(u)).map(u=>{
+    const started=courses.filter(c=>{
+      const p=progress[u.id+'_'+c.id]||{};
+      return p.materialDone||p.quizScore!==undefined;
+    }).length;
+    const completed=courses.filter(c=>{
+      const p=progress[u.id+'_'+c.id]||{};
+      return p.materialDone&&p.quizScore!==undefined;
+    }).length;
+    return '<tr>'
+      +'<td><div style="font-weight:500">'+u.name+'</div><div style="font-size:.7rem;color:var(--muted)">'+u.email+'</div></td>'
+      +'<td>'+roleBadge(u.role)+'</td>'
+      +'<td style="text-align:center">'+started+'</td>'
+      +'<td style="text-align:center">'+completed+'</td>'
+      +'<td><div class="cc-bar" style="max-width:80px"><div class="cc-bar-fill" style="width:'+(courses.length?Math.round((completed/courses.length)*100):0)+'%"></div></div></td>'
+      +'</tr>';
+  }).join('');
+
+  const courseRows=courses.map(c=>{
+    const enrolls=users.filter(u=>isAluno(u)).filter(u=>{
+      const p=progress[u.id+'_'+c.id]||{};
+      return p.materialDone||p.quizScore!==undefined;
+    }).length;
+    const completes=users.filter(u=>isAluno(u)).filter(u=>{
+      const p=progress[u.id+'_'+c.id]||{};
+      return p.materialDone&&p.quizScore!==undefined;
+    }).length;
+    const tutorResp=users.find(u=>u.role==='tutor'&&(u.cursos||[]).includes(c.id));
+    return '<tr>'
+      +'<td>'+(c.icon||'📚')+' '+c.name+'</td>'
+      +'<td><span class="badge-cat">'+c.tag+'</span></td>'
+      +'<td style="font-size:.72rem;color:var(--muted)">'+(tutorResp?tutorResp.name:'—')+'</td>'
+      +'<td style="text-align:center">'+enrolls+'</td>'
+      +'<td style="text-align:center">'+completes+'</td>'
+      +'</tr>';
+  }).join('');
+
+  const nInternos=users.filter(u=>u.role==='aluno-interno').length;
+  const nExternos=users.filter(u=>u.role==='aluno-externo').length;
+  const nTutores=users.filter(u=>u.role==='tutor').length;
+
+  document.getElementById('main-content').innerHTML=
+    '<div class="course-header"><span class="course-tag">Admin</span><h1 class="course-title">📊 Dashboard</h1></div>'
+    +'<div class="dash-grid">'
+    +'<div class="dash-card highlight"><span class="dash-card-icon">✝️</span><div class="dash-card-value">'+nInternos+'</div><div class="dash-card-label">Alunos Internos</div></div>'
+    +'<div class="dash-card" style="border-color:#c4b5fd"><span class="dash-card-icon">👤</span><div class="dash-card-value">'+nExternos+'</div><div class="dash-card-label">Alunos Externos</div></div>'
+    +'<div class="dash-card" style="border-color:#fde68a"><span class="dash-card-icon">🎓</span><div class="dash-card-value">'+nTutores+'</div><div class="dash-card-label">Professores</div></div>'
+    +'<div class="dash-card"><span class="dash-card-icon">📚</span><div class="dash-card-value">'+totalCourses+'</div><div class="dash-card-label">Cursos ativos</div></div>'
+    +'<div class="dash-card"><span class="dash-card-icon">▶️</span><div class="dash-card-value">'+activeStudents+'</div><div class="dash-card-label">Com atividade</div></div>'
+    +'<div class="dash-card"><span class="dash-card-icon">✅</span><div class="dash-card-value">'+completedCourses+'</div><div class="dash-card-label">Concluídos</div></div>'
+    +'</div>'
+    +'<div class="admin-section"><div class="admin-section-header">📋 Progresso por aluno</div>'
+    +'<div class="admin-section-body" style="padding:0">'
+    +'<table class="table-users"><thead><tr><th>Aluno</th><th>Perfil</th><th style="text-align:center">Iniciados</th><th style="text-align:center">Concluídos</th><th>Progresso</th></tr></thead>'
+    +'<tbody>'+(alunoRows||'<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:1rem">Nenhum aluno com atividade ainda.</td></tr>')+'</tbody></table>'
+    +'</div></div>'
+    +'<div class="admin-section"><div class="admin-section-header">📚 Desempenho por curso</div>'
+    +'<div class="admin-section-body" style="padding:0">'
+    +'<table class="table-users"><thead><tr><th>Curso</th><th>Categoria</th><th>Tutor</th><th style="text-align:center">Iniciaram</th><th style="text-align:center">Concluíram</th></tr></thead>'
+    +'<tbody>'+(courseRows||'<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:1rem">Sem cursos.</td></tr>')+'</tbody></table>'
+    +'</div></div>';
+}
+
+// ─── CATÁLOGO (aluno) ───
+function showCatalog(){
+  currentCourse=null;
+  document.querySelectorAll('.course-item').forEach(x=>x.classList.remove('active'));
+  const nav=document.getElementById('nav-catalog');
+  if(nav)nav.classList.add('active');
+  renderCatalogView('');
+}
+
+
+function showCatalog(){
+  currentCourse=null;
+  document.querySelectorAll('.course-item').forEach(x=>x.classList.remove('active'));
+  const nav=document.getElementById('nav-catalog');
+  if(nav)nav.classList.add('active');
+  renderCatalogView('');
+}
+
+function renderCatalogView(filterCat){
+  if(!filterCat) filterCat = '';
+  const courses_vis=cursosVisiveis();
+  const allCats = ['', ...new Set(courses.map(c => c.tag))];
+  const filterHtml = allCats.map(c =>
+    '<button class="cat-filter ' + (filterCat === c ? 'active' : '') + '" onclick="renderCatalogView(\'' + c + '\')">' + (c === '' ? 'Todos' : c) + '</button>'
+  ).join('');
+  const filtered = filterCat ? courses.filter(c => c.tag === filterCat) : courses;
+  const cardsHtml = filtered.map(c => {
+    const pct = getCourseProgress(c.id);
+    const pctLabel = pct === 0 ? 'Não iniciado' : pct === 100 ? '✓ Concluído' : pct + '% concluído';
+    return '<div class="course-card" onclick="selectCourse(' + c.id + ')">'
+      + '<div class="course-card-banner">' + (c.icon || '📚') + '</div>'
+      + '<div class="course-card-body">'
+      + '<div class="course-card-tag">' + c.tag + '</div>'
+      + '<div class="course-card-name">' + c.name + '</div>'
+      + '<div class="course-card-meta">'
+      + '<span>📋 ' + c.modules.length + ' módulos</span>'
+      + '<span>❓ ' + c.quiz.length + ' questões</span>'
+      + '</div>'
+      + '<div class="course-card-progress">'
+      + '<div class="cc-bar"><div class="cc-bar-fill" style="width:' + pct + '%"></div></div>'
+      + '<div class="cc-pct">' + pctLabel + '</div>'
+      + '</div>'
+      + '</div></div>';
+  }).join('');
+  const noCoursesMsg = '<div style="text-align:center;padding:2rem;color:var(--muted)">Nenhum curso nesta categoria.</div>';
+  document.getElementById('main-content').innerHTML =
+    '<div class="course-header">'
+    + '<span class="course-tag">Catálogo</span>'
+    + '<h1 class="course-title">🗂️ Todos os Cursos</h1>'
+    + '<div class="course-meta"><span>' + courses.length + ' curso(s) disponível(is)</span></div>'
+    + '</div>'
+    + '<div class="catalog-filters">' + filterHtml + '</div>'
+    + (filtered.length ? '<div class="catalog-grid">' + cardsHtml + '</div>' : noCoursesMsg);
+}
+
+// ─── CATÁLOGO ADMIN ───
+let adminCatalogFilter = '';
+
+function renderAdminCatalog(filterCat){
+  if(filterCat === undefined) filterCat = adminCatalogFilter;
+  adminCatalogFilter = filterCat;
+  const allCats = ['', ...new Set(courses.map(c => c.tag))];
+  const filterHtml = allCats.map(c =>
+    '<button class="cat-filter ' + (filterCat === c ? 'active' : '') + '" onclick="renderAdminCatalog(\'' + c + '\')">' + (c === '' ? 'Todos' : c) + '</button>'
+  ).join('');
+  const filtered = filterCat ? courses.filter(c => c.tag === filterCat) : courses;
+  const cardsHtml = filtered.map(c => {
+    const totalAlunos = users.filter(u => isAluno(u)).length;
+    const started = users.filter(u => {
+      const p = progress[u.id + '_' + c.id] || {};
+      return p.materialDone || p.quizScore !== undefined;
+    }).length;
+    return '<div class="course-card">'
+      + '<div class="course-card-banner">' + (c.icon || '📚') + '</div>'
+      + '<div class="course-card-body">'
+      + '<div class="course-card-tag">' + c.tag + ' &nbsp;<span style="font-size:.6rem;padding:.1rem .4rem;border-radius:3px;background:' + (c.acesso==='publico'?'#e8f4f6':'#f3f0ff') + ';color:var(--navy)">' + (c.acesso==='publico'?'🌐 Público':'✝️ Interno') + '</span></div>'
+      + '<div class="course-card-name">' + c.name + '</div>'
+      + '<div class="course-card-meta">'
+      + '<span>📋 ' + c.modules.length + ' mód.</span>'
+      + '<span>📄 ' + c.pdfs.length + ' PDF(s)</span>'
+      + '<span>❓ ' + c.quiz.length + ' quest.</span>'
+      + '</div>'
+      + '<div class="course-card-progress">'
+      + '<div class="cc-pct" style="color:var(--navy-light);font-weight:600">' + started + '/' + totalAlunos + ' alunos iniciaram</div>'
+      + '</div>'
+      + '<div style="display:flex;gap:.4rem;margin-top:.6rem">'
+      + '<button class="btn-gold" style="flex:1;padding:.35rem;font-size:.72rem" onclick="event.stopPropagation();selectCourse(' + c.id + ')">Editar</button>'
+      + '<button class="btn-sm btn-danger-sm" onclick="event.stopPropagation();removeCourse(' + c.id + ')">Remover</button>'
+      + '</div>'
+      + '</div></div>';
+  }).join('');
+  const noCoursesMsg = '<div style="text-align:center;padding:2rem;color:var(--muted)">Nenhum curso nesta categoria.</div>';
+  document.getElementById('main-content').innerHTML =
+    '<div class="course-header">'
+    + '<span class="course-tag">Admin</span>'
+    + '<h1 class="course-title">🗂️ Catálogo de Cursos</h1>'
+    + '<div class="course-meta"><span>' + courses.length + ' curso(s)</span></div>'
+    + '</div>'
+    + '<div class="catalog-filters">' + filterHtml + '</div>'
+    + (filtered.length ? '<div class="catalog-grid">' + cardsHtml + '</div>' : noCoursesMsg);
+}
+
+// ─── CATEGORIAS ADMIN ───
+function renderAdminCategories(){
+  const chipsHtml=categories.map((cat,i)=>`
+    <div class="cat-chip">
+      ${cat}
+      <button onclick="removeCategory(${i})" title="Remover">✕</button>
+    </div>`).join('');
+  document.getElementById('main-content').innerHTML=`
+    <div class="course-header">
+      <span class="course-tag">Admin</span>
+      <h1 class="course-title">🏷️ Categorias</h1>
+    </div>
+    <div class="admin-section">
+      <div class="admin-section-header">Nova Categoria</div>
+      <div class="admin-section-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nome da categoria</label>
+            <input type="text" id="new-cat-name" placeholder="Ex: Liderança" maxlength="30">
+          </div>
+        </div>
+        <button class="btn-gold" onclick="addCategory()">Adicionar categoria</button>
+      </div>
+    </div>
+    <div class="admin-section">
+      <div class="admin-section-header">Categorias cadastradas (${categories.length})</div>
+      <div class="admin-section-body">
+        <div class="cat-list">${chipsHtml||'<span style="color:var(--muted);font-size:.85rem">Nenhuma categoria ainda.</span>'}</div>
+      </div>
+    </div>`;
+}
+function addCategory(){
+  const name=document.getElementById('new-cat-name').value.trim();
+  if(!name){alert('Informe um nome.');return;}
+  if(categories.includes(name)){alert('Categoria já existe.');return;}
+  categories.push(name);saveCategories();renderAdminCategories();
+}
+function removeCategory(i){
+  if(!confirm('Remover esta categoria?'))return;
+  categories.splice(i,1);saveCategories();renderAdminCategories();
+}
+
+</script>
+</body>
+</html>
