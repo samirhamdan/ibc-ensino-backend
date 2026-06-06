@@ -270,6 +270,49 @@
     </div>
     <button class="btn-primary" onclick="doLogin()">Entrar</button>
     <div class="login-error" id="login-error"></div>
+    <div style="text-align:center;margin-top:.8rem">
+      <a href="#" onclick="showForgotPassword()" style="font-size:.82rem;color:var(--navy-light);text-decoration:none">Esqueceu sua senha?</a>
+    </div>
+  </div>
+</div>
+
+<!-- FORGOT PASSWORD -->
+<div id="screen-forgot" class="screen" style="align-items:center;justify-content:center;background:var(--bg)">
+  <div class="login-box">
+    <div class="login-logo">🔑</div>
+    <div class="login-title">Recuperar Senha</div>
+    <div class="login-sub" id="forgot-sub">Digite seu email cadastrado e enviaremos as instruções.</div>
+    <div class="field" id="forgot-email-field">
+      <label>E-mail</label>
+      <input type="email" id="forgot-email" placeholder="seu@email.com">
+    </div>
+    <button class="btn-primary" id="forgot-btn" onclick="doForgotPassword()">Enviar instruções</button>
+    <div class="login-error" id="forgot-error"></div>
+    <div style="text-align:center;margin-top:.8rem">
+      <a href="#" onclick="show('login')" style="font-size:.82rem;color:var(--navy-light);text-decoration:none">← Voltar ao login</a>
+    </div>
+  </div>
+</div>
+
+<!-- RESET PASSWORD -->
+<div id="screen-reset" class="screen" style="align-items:center;justify-content:center;background:var(--bg)">
+  <div class="login-box">
+    <div class="login-logo">🔒</div>
+    <div class="login-title">Nova Senha</div>
+    <div class="login-sub">Digite e confirme sua nova senha.</div>
+    <div class="field">
+      <label>Nova senha</label>
+      <input type="password" id="reset-pass" placeholder="Mínimo 6 caracteres">
+    </div>
+    <div class="field">
+      <label>Confirmar senha</label>
+      <input type="password" id="reset-pass2" placeholder="Repita a senha">
+    </div>
+    <button class="btn-primary" onclick="doResetPassword()">Redefinir senha</button>
+    <div class="login-error" id="reset-error"></div>
+    <div style="text-align:center;margin-top:.8rem">
+      <a href="#" onclick="show('login')" style="font-size:.82rem;color:var(--navy-light);text-decoration:none">← Voltar ao login</a>
+    </div>
   </div>
 </div>
 
@@ -397,8 +440,19 @@ async function api(method, path, body){
 }
 
 // ── App init ──
+let resetToken = null;
+
 window.addEventListener('DOMContentLoaded', init);
 async function init(){
+  // Detecta token de reset na URL
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('reset_token');
+  if(token){
+    resetToken = token;
+    history.replaceState({}, '', '/');
+    show('reset');
+    return;
+  }
   try {
     const res = await api('GET','/auth/user');
     if(res.ok){
@@ -472,6 +526,51 @@ async function doLogin(){
   else renderCatalogView('');
 }
 document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+
+function showForgotPassword(){
+  document.getElementById('forgot-email').value='';
+  document.getElementById('forgot-error').textContent='';
+  document.getElementById('forgot-sub').textContent='Digite seu email cadastrado e enviaremos as instruções.';
+  document.getElementById('forgot-email-field').style.display='block';
+  document.getElementById('forgot-btn').style.display='block';
+  show('forgot');
+}
+
+async function doForgotPassword(){
+  const email=document.getElementById('forgot-email').value.trim().toLowerCase();
+  if(!email){document.getElementById('forgot-error').textContent='Informe seu email.';return;}
+  document.getElementById('forgot-btn').disabled=true;
+  document.getElementById('forgot-btn').textContent='Enviando...';
+  const res=await api('POST','/auth/forgot-password',{email});
+  document.getElementById('forgot-btn').disabled=false;
+  document.getElementById('forgot-btn').textContent='Enviar instruções';
+  if(res.ok){
+    document.getElementById('forgot-email-field').style.display='none';
+    document.getElementById('forgot-btn').style.display='none';
+    document.getElementById('forgot-sub').textContent='✅ Instruções enviadas! Verifique seu email (incluindo spam).';
+    document.getElementById('forgot-error').textContent='';
+  } else {
+    const d=await res.json();
+    document.getElementById('forgot-error').textContent=d.error||'Erro ao enviar email.';
+  }
+}
+
+async function doResetPassword(){
+  const pass=document.getElementById('reset-pass').value;
+  const pass2=document.getElementById('reset-pass2').value;
+  if(!pass||!pass2){document.getElementById('reset-error').textContent='Preencha os dois campos.';return;}
+  if(pass!==pass2){document.getElementById('reset-error').textContent='As senhas não coincidem.';return;}
+  if(pass.length<6){document.getElementById('reset-error').textContent='Mínimo 6 caracteres.';return;}
+  const res=await api('POST','/auth/reset-password-token',{token:resetToken,new_password:pass});
+  if(res.ok){
+    document.getElementById('reset-error').style.color='var(--success)';
+    document.getElementById('reset-error').textContent='✅ Senha redefinida! Redirecionando...';
+    setTimeout(()=>{ resetToken=null; show('login'); document.getElementById('reset-error').style.color=''; },2000);
+  } else {
+    const d=await res.json();
+    document.getElementById('reset-error').textContent=d.error||'Erro ao redefinir senha.';
+  }
+}
 
 async function doLogout(){
   await api('POST','/auth/logout');

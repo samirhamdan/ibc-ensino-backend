@@ -1,9 +1,10 @@
 """
 SQLAlchemy models for IBC Ensino
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from extensions import db
 import bcrypt
+import secrets
 
 
 class Category(db.Model):
@@ -179,3 +180,25 @@ class Question(db.Model):
             'respondido_por': self.respondido_por,
             'created_at': self.created_at.isoformat(),
         }
+
+
+class PasswordResetToken(db.Model):
+    __tablename__ = 'password_reset_tokens'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    token = db.Column(db.String(64), unique=True, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', foreign_keys=[user_id])
+
+    @staticmethod
+    def generate(user_id):
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(hours=1)
+        return PasswordResetToken(user_id=user_id, token=token, expires_at=expires_at)
+
+    def is_valid(self):
+        return not self.used and datetime.utcnow() < self.expires_at

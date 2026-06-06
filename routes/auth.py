@@ -1,9 +1,13 @@
 """
 Auth routes: signup, login, logout, user info, password reset
 """
+import os
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from flask import Blueprint, request, jsonify, session
 from extensions import db
-from models import User
+from models import User, PasswordResetToken
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -125,3 +129,98 @@ def delete_user(user_id):
     db.session.delete(target)
     db.session.commit()
     return jsonify({'message': 'Usuário removido'}), 200
+
+
+def _send_reset_email(to_email, to_name, reset_url):
+    """Send password reset email via SMTP (Gmail)."""
+    smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
+    smtp_port = int(os.getenv('SMTP_PORT', 587))
+    smtp_user = os.getenv('SMTP_USER', '')
+    smtp_pass = os.getenv('SMTP_PASS', '')
+    from_name = os.getenv('EMAIL_FROM_NAME', 'IBC Ensino')
+
+    if not smtp_user or not smtp_pass:
+        return False, 'Email não configurado no servidor'
+
+    html = f"""
+    <div style="font-family:sans-serif;max-width:500px;margin:auto;padding:2rem">
+      <h2 style="color:#1a2e52">🔑 Redefinição de Senha</h2>
+      <p>Olá, <strong>{to_name}</strong>!</p>
+      <p>Recebemos uma solicitação para redefinir sua senha na plataforma <strong>IBC Ensino</strong>.</p>
+      <div style="text-align:center;margin:2rem 0">
+        <a href="{reset_url}" style="background:#c9a84c;color:#fff;padding:.9rem 2rem;border-radius:8px;text-decoration:none;font-weight:bold;font-size:1rem">
+          Redefinir minha senha
+        </a>
+      </div>
+      <p style="color:#666;font-size:.85rem">Este link expira em <strong>1 hora</strong>. Se você não solicitou, ignore este email.</p>
+      <hr style="border:none;border-top:1px solid #eee;margin:1.5rem 0">
+      <p style="color:#999;font-size:.75rem;text-align:center">IBC Ensino — Igreja Batista Central</p>
+    </div>
+    """
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = 'Redefinição de senha — IBC Ensino'
+    msg['From'] = f'{from_name} <{smtp_user}>'
+    msg['To'] = to_email
+    msg.attach(MIMEText(html, 'html'))
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_user, to_email, msg.as_string())
+        return True, 'OK'
+    except Exception as e:
+        return False, str(e)
+
+
+@auth_bp.route('/forgot-password', methods=['POST'])
+def forgot_password():
+    data = request.get_json(silent=True) or {}
+    email = (data.get('email') or '').strip().lower()
+    if not email:
+        return jsonify({'error': 'Email é obrigatório'}), 400
+
+    user = User.query.filter_by(email=email).first()
+    # Always return success to avoid email enumeration
+    if not user:
+        return jsonify({'message': 'Se o email existir, você receberá as instruções.'}), 200
+
+    # Invalidate old tokens
+    PasswordResetToken.query.filter_by(user_id=user.id, used=False).update({'used': True})
+
+    token_obj = PasswordResetToken.generate(user.id)
+    db.session.add(token_obj)
+    db.session.commit()
+
+    base_url = os.getenv('APP_URL', 'http://localhost:5000')
+    reset_url = f"{base_url}/?reset_token={token_obj.token}"
+
+    ok, msg = _send_reset_email(user.email, user.name, reset_url)
+    if not ok:
+        return jsonify({'error': f'Erro ao enviar email: {msg}'}), 500
+
+    return jsonify({'message': 'Se o email existir, você receberá as instruções.'}), 200
+
+
+@auth_bp.route('/reset-password-token', methods=['POST'])
+def reset_password_token():
+    data = request.get_json(silent=True) or {}
+    token = (data.get('token') or '').strip()
+    new_password = data.get('new_password') or ''
+
+    if not token or not new_password:
+        return jsonify({'error': 'token e new_password são obrigatórios'}), 400
+
+    if len(new_password) < 6:
+        return jsonify({'error': 'A senha deve ter ao menos 6 caracteres'}), 400
+
+    token_obj = PasswordResetToken.query.filter_by(token=token).first()
+    if not token_obj or not token_obj.is_valid():
+        return jsonify({'error': 'Token inválido ou expirado'}), 400
+
+    token_obj.user.set_password(new_password)
+    token_obj.used = True
+    db.session.commit()
+
+    return jsonify({'message': 'Senha redefinida com sucesso!'}), 200
