@@ -3,7 +3,7 @@ IBC Ensino Backend — Flask App
 Autenticação real com SQLite, permissões por perfil, API REST
 """
 import os
-from flask import Flask, jsonify, session, request
+from flask import Flask, jsonify, session, request, send_from_directory
 from flask_cors import CORS
 from datetime import timedelta
 from extensions import db
@@ -68,10 +68,16 @@ def create_app(config_name='development'):
         def health():
             return jsonify({'status': 'ok', 'db': 'connected'}), 200
         
+        # Serve frontend
+        @app.route('/index.html', methods=['GET'])
+        @app.route('/app', methods=['GET'])
+        def frontend():
+            return send_from_directory(basedir, 'index.html')
+
         # Home
         @app.route('/', methods=['GET'])
         def home():
-            return jsonify({
+            return send_from_directory(basedir, 'index.html')
                 'app': 'IBC Ensino Backend',
                 'version': '2.0-beta',
                 'endpoints': [
