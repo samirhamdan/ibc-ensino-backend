@@ -78,22 +78,6 @@ def create_app(config_name='development'):
         @app.route('/', methods=['GET'])
         def home():
             return send_from_directory(basedir, 'index.html')
-                'app': 'IBC Ensino Backend',
-                'version': '2.0-beta',
-                'endpoints': [
-                    'GET  /health',
-                    'POST /api/auth/signup',
-                    'POST /api/auth/login',
-                    'POST /api/auth/logout',
-                    'GET  /api/user',
-                    'GET  /api/courses',
-                    'POST /api/courses',
-                    'GET  /api/progress/<courseId>',
-                    'POST /api/progress/<courseId>',
-                    'GET  /api/questions/<courseId>',
-                    'POST /api/questions/<courseId>',
-                ]
-            }), 200
     
     return app
 
