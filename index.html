@@ -667,6 +667,15 @@ let currentAula = null;
 let aulaQuizAnswers = {};
 let aulaQuizSubmitted = false;
 let aulaQuizFeedback = null;
+const MAX_QUIZ_ATTEMPTS = 3;
+
+function _materialReadKey(moduleId){ return `aula_lida_${currentUser.id}_${moduleId}`; }
+function _attemptsKey(moduleId){ return `aula_tentativas_${currentUser.id}_${moduleId}`; }
+function isMaterialRead(moduleId){ return localStorage.getItem(_materialReadKey(moduleId))==='1'; }
+function markMaterialRead(moduleId){ localStorage.setItem(_materialReadKey(moduleId),'1'); }
+function getAttempts(moduleId){ return parseInt(localStorage.getItem(_attemptsKey(moduleId))||'0',10); }
+function incAttempts(moduleId){ const n=getAttempts(moduleId)+1; localStorage.setItem(_attemptsKey(moduleId),String(n)); return n; }
+function resetAttempts(moduleId){ localStorage.removeItem(_attemptsKey(moduleId)); }
 
 async function renderCourseResume(){
   const c=currentCourse;
@@ -743,9 +752,48 @@ function renderAulaPage(){
   const pct=Math.round((num/total)*100);
   const mat=(a.materiais||[])[0];
   const passed = a.progress && a.progress.passed;
+  const moduleId = a.id;
+  const matRead = passed || isMaterialRead(moduleId);
+  const attempts = getAttempts(moduleId);
+  const attemptsLeft = Math.max(0, MAX_QUIZ_ATTEMPTS - attempts);
+  const outOfAttempts = !passed && attempts >= MAX_QUIZ_ATTEMPTS;
 
-  let quizHtml;
-  if(aulaQuizSubmitted && aulaQuizFeedback){
+  // ── Step 1: Material ──
+  const materialHtml = `
+    <div class="admin-section" style="border-color:${matRead?'#2d6a4f':'#e8e0d4'}">
+      <div class="admin-section-header" style="display:flex;align-items:center;gap:.5rem;${matRead?'background:var(--success-bg);color:var(--success)':''}">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:${matRead?'var(--success)':'var(--navy)'};color:white;font-size:.7rem;flex-shrink:0">${matRead?'✓':'1'}</span>
+        📄 Material da Aula ${matRead?'<span style="margin-left:auto;font-size:.7rem;font-weight:700">CONCLUÍDO</span>':''}
+      </div>
+      <div class="admin-section-body">
+        ${mat?`<div class="material-list" style="margin-bottom:.8rem">
+          <div class="material-item">
+            <span class="mat-icon">📄</span>
+            <div class="mat-info"><div class="mat-name">${mat.name}</div><div class="mat-meta">${mat.tipo==='pdf'?'PDF':'Link'}</div></div>
+            <a class="btn-view" href="${mat.url}" target="_blank" rel="noopener">${mat.tipo==='pdf'?'Baixar':'Abrir'}</a>
+          </div>
+        </div>`:'<div class="pdf-no-files" style="margin-bottom:.8rem">Nenhum material cadastrado para esta aula.</div>'}
+        <label style="display:flex;align-items:center;gap:.5rem;cursor:${matRead?'default':'pointer'};font-size:.85rem;font-weight:500;color:var(--navy)">
+          <input type="checkbox" ${matRead?'checked disabled':''} onchange="confirmMaterialRead(${moduleId})" style="accent-color:var(--success);width:17px;height:17px">
+          ${matRead?'✓ Material lido e concluído':'Marcar como lido para liberar o exercício'}
+        </label>
+      </div>
+    </div>`;
+
+  // ── Step 2: Quiz ──
+  let quizInner;
+  const quizLocked = !matRead;
+  if(quizLocked){
+    quizInner = `<div class="admin-section-body" style="text-align:center;color:var(--muted);padding:2rem 1rem">
+      🔒 Marque o material como lido para liberar o exercício.
+    </div>`;
+  } else if(outOfAttempts && !passed){
+    quizInner = `<div class="admin-section-body" style="text-align:center;padding:1.5rem 1rem">
+      <div style="font-size:1.6rem">😕</div>
+      <div class="result-msg fail" style="margin-top:.6rem">Você esgotou suas ${MAX_QUIZ_ATTEMPTS} tentativas para esta aula.</div>
+      <p style="font-size:.82rem;color:var(--muted);margin-top:.6rem">Revise o material com atenção e entre em contato com o tutor através do botão "Fazer Pergunta" para liberar uma nova tentativa.</p>
+    </div>`;
+  } else if(aulaQuizSubmitted && aulaQuizFeedback){
     const fb=aulaQuizFeedback;
     const pass=fb.passed;
     const reviewHtml = fb.feedback ? fb.feedback.map((f,i)=>`
@@ -758,22 +806,20 @@ function renderAulaPage(){
         </div>
         <div class="q-feedback ${f.is_correct?'ok':'err'}">${f.is_correct?'✓ Correto!':'✗ Incorreto — '+f.explanation}</div>
       </div>`).join('') : '';
-    quizHtml=`<div class="quiz-wrap">
-      <div class="quiz-header"><div class="quiz-title">Resultado do Exercício</div></div>
-      <div class="quiz-body">
+    const remainingMsg = pass ? '' : `<p style="font-size:.8rem;color:var(--muted);margin-top:.5rem">Tentativas restantes: <strong>${attemptsLeft}</strong> de ${MAX_QUIZ_ATTEMPTS}</p>`;
+    quizInner = `<div class="quiz-body">
         <div class="quiz-result">
           <div class="result-score">${fb.score}/${fb.total}</div>
           <div class="result-label">${fb.percentage}% de aproveitamento</div>
-          <div class="result-msg ${pass?'pass':'fail'}">${pass?'🎉 Você foi aprovado nesta aula!':'📚 Você precisa de pelo menos 60% para avançar. Tente novamente!'}</div>
+          <div class="result-msg ${pass?'pass':'fail'}">${pass?'🎉 Você foi aprovado nesta aula!':'📚 Você precisa de pelo menos 60% para avançar.'}</div>
+          ${remainingMsg}
         </div>
         ${reviewHtml?`<hr style="border:none;border-top:1px solid #e8e0d4;margin:1rem 0">${reviewHtml}`:''}
-        <div class="quiz-actions"><button class="btn-secondary" onclick="retakeAulaQuiz()">Tentar novamente</button></div>
-      </div>
-    </div>`;
+        <div class="quiz-actions">${pass?'':`<button class="btn-secondary" ${attemptsLeft<=0?'disabled':''} onclick="retakeAulaQuiz()">Tentar novamente (${attemptsLeft} restante${attemptsLeft===1?'':'s'})</button>`}</div>
+      </div>`;
   } else {
-    quizHtml=`<div class="quiz-wrap">
-      <div class="quiz-header"><div class="quiz-title">Exercício</div><div class="quiz-desc">${a.quiz.length} questão(ões) · Mínimo 60% para avançar</div></div>
-      <div class="quiz-body">
+    quizInner = `<div class="quiz-body">
+        <p style="font-size:.8rem;color:var(--muted);margin-bottom:.8rem">Tentativa ${attempts+1} de ${MAX_QUIZ_ATTEMPTS} · Mínimo 60% para avançar</p>
         ${a.quiz.map((q,i)=>`
           <div class="question-card" id="aqcard-${i}">
             <div class="q-num">Questão ${i+1} de ${a.quiz.length}</div>
@@ -784,14 +830,25 @@ function renderAulaPage(){
             </div>
           </div>`).join('')}
         <div class="quiz-actions"><button class="btn-gold" onclick="submitAulaQuiz()">Enviar respostas →</button></div>
-      </div>
-    </div>`;
+      </div>`;
   }
+  const quizStepDone = passed;
+  const quizHtml = `
+    <div class="quiz-wrap" style="${quizLocked?'opacity:.55':''}">
+      <div class="quiz-header" style="display:flex;align-items:center;gap:.5rem">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:${quizStepDone?'var(--success)':(quizLocked?'rgba(255,255,255,.25)':'var(--gold)')};color:${quizStepDone?'white':'var(--navy)'};font-size:.7rem;flex-shrink:0">${quizStepDone?'✓':(quizLocked?'🔒':'2')}</span>
+        <div>
+          <div class="quiz-title">📝 Exercício</div>
+          <div class="quiz-desc">${a.quiz.length} questão(ões) ${quizLocked?'· bloqueado até concluir o material':`· ${MAX_QUIZ_ATTEMPTS} tentativas`}</div>
+        </div>
+      </div>
+      ${quizInner}
+    </div>`;
 
   document.getElementById('main-content').innerHTML=`
     <div class="course-header">
       <span class="course-tag" style="cursor:pointer" onclick="selectCourse(${a.course.id})">← ${a.course.icon} ${a.course.name}</span>
-      <h1 class="course-title">${a.nome}</h1>
+      <h1 class="course-title">Aula ${num}: ${a.nome}</h1>
       <div class="course-meta">${a.dur?`<span>⏱ ${a.dur}</span>`:''}</div>
     </div>
     <div class="progress-section">
@@ -801,14 +858,12 @@ function renderAulaPage(){
       </div>
       <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
     </div>
-    ${mat?`<div class="material-list" style="margin-bottom:1.2rem">
-      <div class="material-item">
-        <span class="mat-icon">📄</span>
-        <div class="mat-info"><div class="mat-name">${mat.name}</div><div class="mat-meta">${mat.tipo==='pdf'?'PDF':'Link'}</div></div>
-        <a class="btn-view" href="${mat.url}" target="_blank" rel="noopener">${mat.tipo==='pdf'?'Baixar':'Abrir'}</a>
-      </div>
-    </div>`:''}
-    ${quizHtml}
+    <div style="font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Mapa de Progresso</div>
+    <div style="display:flex;flex-direction:column;gap:.8rem;margin-bottom:1.2rem">
+      ${materialHtml}
+      <div style="text-align:center;color:var(--muted);font-size:.8rem">${matRead?'↓':'🔒 ↓'}</div>
+      ${quizHtml}
+    </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1.2rem;flex-wrap:wrap;gap:.6rem">
       <button class="btn-secondary" ${num<=1?'disabled':''} onclick="loadAula(${a.course.id},${num-1})">← Voltar</button>
       <button class="btn-secondary" onclick="openAskQuestionModal(${a.course.id})">💬 Fazer Pergunta</button>
@@ -816,6 +871,11 @@ function renderAulaPage(){
         ? `<button class="btn-primary" style="width:auto;padding:.7rem 1.4rem" ${passed?'':'disabled'} onclick="loadAula(${a.course.id},${num+1})">Próxima Aula →</button>`
         : `<button class="btn-primary" style="width:auto;padding:.7rem 1.4rem" ${passed?'':'disabled'} onclick="renderConclusion()">Concluir Curso 🎓</button>`}
     </div>`;
+}
+
+function confirmMaterialRead(moduleId){
+  markMaterialRead(moduleId);
+  renderAulaPage();
 }
 
 function selectAulaOpt(qi,oi){
@@ -834,13 +894,17 @@ function retakeAulaQuiz(){
 async function submitAulaQuiz(){
   const quiz=currentAula.quiz||[];
   if(Object.keys(aulaQuizAnswers).length<quiz.length){alert('Responda todas as questões antes de enviar.');return;}
+  const moduleId = currentAula.id;
+  if(getAttempts(moduleId) >= MAX_QUIZ_ATTEMPTS){ alert('Você esgotou suas tentativas para esta aula.'); return; }
   const answers=quiz.map((_,i)=>aulaQuizAnswers[i]??null);
   const res=await api('POST',`/courses/${currentAula.course.id}/aulas/${currentAula.aula_num}/submit-quiz`,{answers});
   if(res.ok){
     aulaQuizFeedback=await res.json();
     aulaQuizSubmitted=true;
+    incAttempts(moduleId);
     if(currentAula.progress){ currentAula.progress.passed = currentAula.progress.passed || aulaQuizFeedback.passed; }
     else currentAula.progress = {passed: aulaQuizFeedback.passed, score: aulaQuizFeedback.score, total: aulaQuizFeedback.total};
+    if(aulaQuizFeedback.passed) resetAttempts(moduleId);
     renderAulaPage();
   } else {
     alert('Erro ao enviar respostas.');
