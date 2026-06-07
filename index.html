@@ -335,6 +335,10 @@
     <div class="sidebar" id="sidebar">
       <div class="sidebar-section">
         <div class="sidebar-label">Menu</div>
+        <div class="course-item" id="nav-student-dash" onclick="showStudentDashboard()" style="display:none">
+          <span class="ci-icon">📊</span>
+          <div class="ci-text"><div class="ci-name">Meu Painel</div></div>
+        </div>
         <div class="course-item" id="nav-catalog" onclick="showCatalog()">
           <span class="ci-icon">🗂️</span>
           <div class="ci-text"><div class="ci-name">Catálogo de Cursos</div></div>
@@ -349,6 +353,10 @@
         <div class="course-item" id="nav-admin-dashboard" onclick="showAdminPanel('dashboard')" style="display:none">
           <span class="ci-icon">📊</span>
           <div class="ci-text"><div class="ci-name">Dashboard</div></div>
+        </div>
+        <div class="course-item" id="nav-tutor-dash" onclick="showTutorDashboard()" style="display:none">
+          <span class="ci-icon">📊</span>
+          <div class="ci-text"><div class="ci-name">Painel do Tutor</div></div>
         </div>
         <div class="course-item" id="nav-admin-catalog" onclick="showAdminPanel('catalog')">
           <span class="ci-icon">🗂️</span>
@@ -462,8 +470,8 @@ async function init(){
       setupUI();
       show('main');
       if(isAdmin()) renderDashboard();
-      else if(isTutor()) renderAdminCatalog();
-      else renderCatalogView('');
+      else if(isTutor()) showTutorDashboard();
+      else showStudentDashboard();
     } else {
       show('login');
     }
@@ -503,6 +511,10 @@ function setupUI(){
   });
   const usersNav=document.getElementById('nav-admin-users');
   if(usersNav) usersNav.style.display = (isAdminUser||isTutorUser) ? 'flex' : 'none';
+  const tutorDashNav=document.getElementById('nav-tutor-dash');
+  if(tutorDashNav) tutorDashNav.style.display = isTutorUser ? 'flex' : 'none';
+  const studentDashNav=document.getElementById('nav-student-dash');
+  if(studentDashNav) studentDashNav.style.display = isAluno() ? 'flex' : 'none';
   renderCourseList();
 }
 
@@ -1605,6 +1617,230 @@ function renderDashboard(){
     +'<table class="table-users"><thead><tr><th>Curso</th><th>Categoria</th><th>Acesso</th></tr></thead>'
     +'<tbody>'+courses.map(c=>'<tr><td>'+(c.icon||'📚')+' '+c.name+'</td><td><span class="badge-cat">'+(c.tag||'—')+'</span></td><td>'+(c.acesso==='publico'?'🌐 Público':'✝️ Interno')+'</td></tr>').join('')+'</tbody></table>'
     +'</div></div>';
+}
+
+// ── Student Dashboard ──
+let studentDashTab = 'cursos';
+
+async function showStudentDashboard(){
+  currentCourse=null;
+  document.querySelectorAll('.course-item').forEach(x=>x.classList.remove('active'));
+  const nav=document.getElementById('nav-student-dash');
+  if(nav) nav.classList.add('active');
+  studentDashTab='cursos';
+  await renderStudentDashboard();
+}
+
+async function renderStudentDashboard(){
+  const [coursesRes, questRes] = await Promise.all([
+    api('GET','/courses'),
+    api('GET','/questions/me'),
+  ]);
+  const myCourses = coursesRes.ok ? (await coursesRes.json()).map(c=>({...c, tag:c.category||'Geral'})) : [];
+  const myQuestions = questRes.ok ? await questRes.json() : [];
+  courses = myCourses;
+
+  // fetch progress per course (best-effort, parallel)
+  const progresses = await Promise.all(myCourses.map(c=>api('GET',`/courses/${c.id}/aulas`).then(r=>r.ok?r.json():[])));
+  const enriched = myCourses.map((c,i)=>{
+    const aulas=progresses[i]||[];
+    const total=aulas.length;
+    const passed=aulas.filter(a=>a.progress&&a.progress.passed).length;
+    const pct = total ? Math.round(passed/total*100) : 0;
+    return {...c, _total:total, _passed:passed, _pct:pct};
+  });
+  const inProgress = enriched.filter(c=>c._pct>0 && c._pct<100);
+  const completed = enriched.filter(c=>c._pct===100 && c._total>0);
+  const notStarted = enriched.filter(c=>c._pct===0 || c._total===0);
+
+  document.getElementById('main-content').innerHTML=`
+    <div class="course-header">
+      <span class="course-tag">Meu Painel</span>
+      <h1 class="course-title">📊 Olá, ${currentUser.name.split(' ')[0]}!</h1>
+    </div>
+    <div class="tabs">
+      <button class="tab ${studentDashTab==='cursos'?'active':''}" onclick="setStudentDashTab('cursos')">📚 Meus Cursos</button>
+      <button class="tab ${studentDashTab==='duvidas'?'active':''}" onclick="setStudentDashTab('duvidas')">💬 Minhas Dúvidas ${myQuestions.filter(q=>!q.resposta).length?'<span style="background:var(--gold);color:var(--navy);border-radius:10px;padding:.05rem .4rem;font-size:.65rem;margin-left:.3rem">'+myQuestions.filter(q=>!q.resposta).length+'</span>':''}</button>
+    </div>
+    <div id="student-dash-content"></div>`;
+
+  const el=document.getElementById('student-dash-content');
+  if(studentDashTab==='cursos'){
+    const cardHtml=(c)=>`
+      <div class="course-card" onclick="selectCourse(${c.id})">
+        <div class="course-card-banner">${c.icon||'📚'}</div>
+        <div class="course-card-body">
+          <div class="course-card-tag">${c.tag}</div>
+          <div class="course-card-name">${c.name}</div>
+          <div class="course-card-meta"><span>📋 ${c._total} aula(s)</span></div>
+          <div class="course-card-progress">
+            <div class="cc-bar"><div class="cc-bar-fill" style="width:${c._pct}%"></div></div>
+            <div class="cc-pct">${c._total ? c._pct+'% concluído · '+c._passed+'/'+c._total+' aulas' : 'Sem aulas cadastradas'}</div>
+          </div>
+          ${c._pct===100?'<div style="margin-top:.5rem"><span class="badge-respondida">🏆 Concluído</span></div>':(c._pct>0?'<button class="btn-gold" style="margin-top:.5rem;width:100%;padding:.4rem;font-size:.78rem">Continuar</button>':'<button class="btn-secondary" style="margin-top:.5rem;width:100%;padding:.4rem;font-size:.78rem">Começar curso</button>')}
+        </div>
+      </div>`;
+    let html='';
+    if(inProgress.length) html+=`<h3 style="font-size:.85rem;color:var(--navy);margin:0 0 .6rem">Em andamento</h3><div class="catalog-grid" style="margin-bottom:1.4rem">${inProgress.map(cardHtml).join('')}</div>`;
+    if(completed.length) html+=`<h3 style="font-size:.85rem;color:var(--navy);margin:0 0 .6rem">Concluídos</h3><div class="catalog-grid" style="margin-bottom:1.4rem">${completed.map(cardHtml).join('')}</div>`;
+    html+=`<h3 style="font-size:.85rem;color:var(--navy);margin:0 0 .6rem">Cursos disponíveis</h3>`;
+    html+= notStarted.length ? `<div class="catalog-grid">${notStarted.map(cardHtml).join('')}</div>` : '<div class="pdf-no-files">Nenhum curso disponível no momento.</div>';
+    el.innerHTML=html;
+  } else {
+    const pendentes=myQuestions.filter(q=>!q.resposta);
+    const respondidas=myQuestions.filter(q=>q.resposta);
+    const card=(q)=>`<div class="pergunta-card">
+      <div class="pergunta-header">
+        <div class="pergunta-avatar">${(q.course_icon||'📚')}</div>
+        <div class="pergunta-meta">
+          <div class="pergunta-autor">${q.course_name||''}</div>
+          <div class="pergunta-data">${q.created_at?new Date(q.created_at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):''}</div>
+        </div>
+        <span class="badge-${q.resposta?'respondida':'pendente'}">${q.resposta?'Respondida':'Pendente'}</span>
+      </div>
+      <div class="pergunta-texto">${q.texto}</div>
+      ${q.resposta?`<div class="resposta-area"><div class="resposta-avatar">T</div><div class="resposta-texto"><strong>${q.respondido_por||'Tutor'}:</strong> ${q.resposta}</div></div>`:''}
+    </div>`;
+    let html='';
+    html+=`<h3 style="font-size:.85rem;color:var(--navy);margin:0 0 .6rem">Pendentes (${pendentes.length})</h3>`;
+    html+= pendentes.length ? `<div class="pergunta-list">${pendentes.map(card).join('')}</div>` : '<div class="pdf-no-files" style="margin-bottom:1rem">Nenhuma dúvida pendente.</div>';
+    html+=`<h3 style="font-size:.85rem;color:var(--navy);margin:1rem 0 .6rem">Respondidas (${respondidas.length})</h3>`;
+    html+= respondidas.length ? `<div class="pergunta-list">${respondidas.map(card).join('')}</div>` : '<div class="pdf-no-files">Nenhuma dúvida respondida ainda.</div>';
+    el.innerHTML=html;
+  }
+}
+
+function setStudentDashTab(tab){
+  studentDashTab=tab;
+  renderStudentDashboard();
+}
+
+// ── Tutor Dashboard ──
+let tutorDashTab = 'cursos';
+
+async function showTutorDashboard(){
+  currentCourse=null;
+  document.querySelectorAll('.course-item').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.course-item[id^=nav-admin]').forEach(x=>x.classList.remove('active'));
+  const nav=document.getElementById('nav-tutor-dash');
+  if(nav) nav.classList.add('active');
+  tutorDashTab='cursos';
+  await renderTutorDashboard();
+}
+
+async function renderTutorDashboard(){
+  const [coursesRes, questRes] = await Promise.all([
+    api('GET','/courses'),
+    api('GET','/questions/tutor/dashboard'),
+  ]);
+  const allCourses = coursesRes.ok ? (await coursesRes.json()).map(c=>({...c, tag:c.category||'Geral'})) : [];
+  const myCourses = isAdmin() ? allCourses : allCourses.filter(c=>c.tutor_id===currentUser.id);
+  const dashQuestions = questRes.ok ? await questRes.json() : [];
+  const semResposta = dashQuestions.filter(q=>!q.resposta);
+  const respondidas = dashQuestions.filter(q=>q.resposta);
+
+  document.getElementById('main-content').innerHTML=`
+    <div class="course-header">
+      <span class="course-tag">Painel do Tutor</span>
+      <h1 class="course-title">🎓 Olá, ${currentUser.name.split(' ')[0]}!</h1>
+    </div>
+    <div class="tabs">
+      <button class="tab ${tutorDashTab==='cursos'?'active':''}" onclick="setTutorDashTab('cursos')">📚 Meus Cursos</button>
+      <button class="tab ${tutorDashTab==='duvidas'?'active':''}" onclick="setTutorDashTab('duvidas')">💬 Dúvidas dos Alunos ${semResposta.length?'<span style="background:var(--danger);color:white;border-radius:10px;padding:.05rem .45rem;font-size:.65rem;margin-left:.3rem">'+semResposta.length+'</span>':''}</button>
+    </div>
+    <div id="tutor-dash-content"></div>`;
+
+  const el=document.getElementById('tutor-dash-content');
+  if(tutorDashTab==='cursos'){
+    if(!myCourses.length){ el.innerHTML='<div class="pdf-no-files">Nenhum curso vinculado a você.</div>'; return; }
+    const cardsHtml = myCourses.map(c=>{
+      const cQuestions = dashQuestions.filter(q=>q.course_id===c.id);
+      const pend = cQuestions.filter(q=>!q.resposta).length;
+      return `<div class="course-card" onclick="selectCourse(${c.id})">
+        <div class="course-card-banner">${c.icon||'📚'}</div>
+        <div class="course-card-body">
+          <div class="course-card-tag">${c.tag}</div>
+          <div class="course-card-name">${c.name}</div>
+          <div class="course-card-meta">
+            <span>📋 ${(c.modules||[]).length} aula(s)</span>
+            <span>💬 ${cQuestions.length} pergunta(s)${pend?' · '+pend+' pendente(s)':''}</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    el.innerHTML=`<div class="catalog-grid">${cardsHtml}</div>`;
+  } else {
+    const card=(q)=>`<div class="pergunta-card">
+      <div class="pergunta-header">
+        <div class="pergunta-avatar">${q.autor?q.autor.charAt(0).toUpperCase():'?'}</div>
+        <div class="pergunta-meta">
+          <div class="pergunta-autor">${q.autor||'Aluno'} · <span style="font-weight:400;color:var(--muted)">${q.course_icon||''} ${q.course_name||''}</span></div>
+          <div class="pergunta-data">${q.created_at?new Date(q.created_at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):''}</div>
+        </div>
+        <span class="badge-${q.resposta?'respondida':'pendente'}">${q.resposta?'Respondida':'Pendente'}</span>
+      </div>
+      <div class="pergunta-texto">${q.texto}</div>
+      ${q.resposta
+        ? `<div class="resposta-area"><div class="resposta-avatar">T</div><div class="resposta-texto"><strong>${q.respondido_por||'Tutor'}:</strong> ${q.resposta}</div></div>`
+        : `<div class="resposta-area"><div class="resposta-texto" style="color:var(--muted)"><button class="btn-gold" style="padding:.35rem .9rem;font-size:.78rem" onclick='openAnswerModal(${q.id}, ${JSON.stringify(q.texto)}, ${JSON.stringify(q.autor||"Aluno")})'>Responder</button></div></div>`}
+    </div>`;
+    let html='';
+    html+=`<h3 style="font-size:.85rem;color:var(--navy);margin:0 0 .6rem">Sem resposta (${semResposta.length})</h3>`;
+    html+= semResposta.length ? `<div class="pergunta-list">${semResposta.map(card).join('')}</div>` : '<div class="pdf-no-files" style="margin-bottom:1rem">Nenhuma dúvida pendente. 🎉</div>';
+    html+=`<h3 style="font-size:.85rem;color:var(--navy);margin:1rem 0 .6rem">Respondidas (${respondidas.length})</h3>`;
+    html+= respondidas.length ? `<div class="pergunta-list">${respondidas.map(card).join('')}</div>` : '<div class="pdf-no-files">Nenhuma dúvida respondida ainda.</div>';
+    el.innerHTML=html;
+  }
+}
+
+function setTutorDashTab(tab){
+  tutorDashTab=tab;
+  renderTutorDashboard();
+}
+
+// ── Answer Question Modal (tutor) ──
+function openAnswerModal(qid, texto, autor){
+  const existing=document.getElementById('answer-question-modal');
+  if(existing) existing.remove();
+  const modal=document.createElement('div');
+  modal.id='answer-question-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:1000';
+  modal.innerHTML=`
+    <div style="background:white;border-radius:var(--radius);padding:1.4rem;width:100%;max-width:460px;margin:1rem">
+      <h3 style="font-family:'Playfair Display',serif;color:var(--navy);margin-bottom:.6rem">📩 Responder Pergunta</h3>
+      <div style="background:var(--cream);border-radius:8px;padding:.7rem;margin-bottom:.8rem">
+        <div style="font-size:.75rem;font-weight:600;color:var(--navy);margin-bottom:.3rem">${autor} perguntou:</div>
+        <div style="font-size:.85rem;color:var(--text)">${texto}</div>
+      </div>
+      <div class="form-group" style="margin-bottom:.7rem">
+        <label>Sua resposta</label>
+        <textarea id="answer-text" placeholder="Digite sua resposta para o aluno..." style="min-height:90px"></textarea>
+      </div>
+      <div id="answer-msg" style="font-size:.82rem;margin-bottom:.6rem"></div>
+      <div style="display:flex;justify-content:flex-end;gap:.6rem">
+        <button class="btn-secondary" onclick="document.getElementById('answer-question-modal').remove()">Cancelar</button>
+        <button class="btn-gold" onclick="sendAnswer(${qid})">Enviar resposta</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+async function sendAnswer(qid){
+  const resposta=document.getElementById('answer-text').value.trim();
+  const msgEl=document.getElementById('answer-msg');
+  if(!resposta){ msgEl.style.color='var(--danger)'; msgEl.textContent='Digite uma resposta.'; return; }
+  const res=await api('POST',`/questions/${qid}/responder`,{resposta});
+  if(res.ok){
+    msgEl.style.color='var(--success)';
+    msgEl.textContent='✅ Resposta enviada!';
+    setTimeout(async ()=>{
+      const m=document.getElementById('answer-question-modal'); if(m) m.remove();
+      await renderTutorDashboard();
+    },1000);
+  } else {
+    msgEl.style.color='var(--danger)';
+    msgEl.textContent='Erro ao enviar resposta.';
+  }
 }
 
 // ── Catalog (aluno view) ──
