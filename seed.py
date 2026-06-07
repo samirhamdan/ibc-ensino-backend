@@ -3,7 +3,7 @@ Seed the database with initial demo data from BRIEFING.md.
 Run once: python seed.py
 """
 from app import create_app, db
-from models import User, Category, Course, Module, Quiz
+from models import User, Category, Course, Module, Quiz, Material
 
 
 def seed():
@@ -47,17 +47,19 @@ def seed():
                 'resumo': 'Um estudo introdutório sobre os pilares da fé cristã...',
                 'duracao': '4 semanas',
                 'category': 'Teologia',
-                'modules': [
-                    ('O que é fé?', '30 min'),
-                    ('A Bíblia como fundamento', '45 min'),
-                    ('Deus Trino', '40 min'),
-                    ('Salvação e Graça', '35 min'),
-                ],
-                'quiz': [
-                    ('O que define a fé cristã?', ['Obras', 'Confiança em Deus', 'Tradição', 'Sentimento'], 1, 'Hebreus 11:1'),
-                    ('Quantas pessoas há na Trindade?', ['1', '2', '3', '4'], 2, 'Pai, Filho e Espírito Santo'),
-                    ('O que é graça?', ['Mérito humano', 'Favor imerecido de Deus', 'Lei mosaica', 'Penitência'], 1, 'Efésios 2:8'),
-                    ('Qual livro contém o Salmo 23?', ['Provérbios', 'Jó', 'Salmos', 'Isaías'], 2, 'Salmo 23 está no livro de Salmos'),
+                'aulas': [
+                    {'nome': 'O que é fé?', 'dur': '30 min',
+                     'material': ('Apostila — O que é fé?', 'https://example.com/fe.pdf', 'link'),
+                     'quiz': [('O que define a fé cristã?', ['Obras', 'Confiança em Deus', 'Tradição', 'Sentimento'], 1, 'Hebreus 11:1')]},
+                    {'nome': 'A Bíblia como fundamento', 'dur': '45 min',
+                     'material': ('Apostila — A Bíblia', 'https://example.com/biblia.pdf', 'link'),
+                     'quiz': [('Qual livro contém o Salmo 23?', ['Provérbios', 'Jó', 'Salmos', 'Isaías'], 2, 'Salmo 23 está no livro de Salmos')]},
+                    {'nome': 'Deus Trino', 'dur': '40 min',
+                     'material': ('Apostila — Deus Trino', 'https://example.com/trindade.pdf', 'link'),
+                     'quiz': [('Quantas pessoas há na Trindade?', ['1', '2', '3', '4'], 2, 'Pai, Filho e Espírito Santo')]},
+                    {'nome': 'Salvação e Graça', 'dur': '35 min',
+                     'material': ('Apostila — Salvação', 'https://example.com/salvacao.pdf', 'link'),
+                     'quiz': [('O que é graça?', ['Mérito humano', 'Favor imerecido de Deus', 'Lei mosaica', 'Penitência'], 1, 'Efésios 2:8')]},
                 ],
             },
             {
@@ -67,16 +69,19 @@ def seed():
                 'resumo': 'Como crescer na fé e discipular outros...',
                 'duracao': '4 semanas',
                 'category': 'Crescimento',
-                'modules': [
-                    ('O chamado ao discipulado', '30 min'),
-                    ('Vida de oração', '40 min'),
-                    ('Leitura bíblica diária', '35 min'),
-                    ('Comunidade cristã', '30 min'),
-                ],
-                'quiz': [
-                    ('Qual é a Grande Comissão?', ['Amar ao próximo', 'Ir e fazer discípulos', 'Guardar o sábado', 'Jejuar'], 1, 'Mateus 28:19-20'),
-                    ('O que caracteriza um discípulo?', ['Conhecimento teológico', 'Imitar Jesus', 'Frequentar cultos', 'Pagar dízimos'], 1, 'João 13:35'),
-                    ('Com que frequência devemos orar?', ['Apenas domingos', 'Uma vez por dia', 'Incessantemente', 'Quando necessário'], 2, '1 Tessalonicenses 5:17'),
+                'aulas': [
+                    {'nome': 'O chamado ao discipulado', 'dur': '30 min',
+                     'material': ('Apostila — Discipulado', 'https://example.com/discipulado.pdf', 'link'),
+                     'quiz': [('Qual é a Grande Comissão?', ['Amar ao próximo', 'Ir e fazer discípulos', 'Guardar o sábado', 'Jejuar'], 1, 'Mateus 28:19-20')]},
+                    {'nome': 'Vida de oração', 'dur': '40 min',
+                     'material': ('Apostila — Oração', 'https://example.com/oracao.pdf', 'link'),
+                     'quiz': [('Com que frequência devemos orar?', ['Apenas domingos', 'Uma vez por dia', 'Incessantemente', 'Quando necessário'], 2, '1 Tessalonicenses 5:17')]},
+                    {'nome': 'Leitura bíblica diária', 'dur': '35 min',
+                     'material': ('Apostila — Leitura bíblica', 'https://example.com/leitura.pdf', 'link'),
+                     'quiz': [('O que caracteriza um discípulo?', ['Conhecimento teológico', 'Imitar Jesus', 'Frequentar cultos', 'Pagar dízimos'], 1, 'João 13:35')]},
+                    {'nome': 'Comunidade cristã', 'dur': '30 min',
+                     'material': ('Apostila — Comunidade', 'https://example.com/comunidade.pdf', 'link'),
+                     'quiz': [('Por que a comunhão é importante?', ['Tradição', 'Edificação mútua', 'Obrigação', 'Status social'], 1, 'Hebreus 10:24-25')]},
                 ],
             },
             {
@@ -86,16 +91,19 @@ def seed():
                 'resumo': 'Uma jornada pelos salmos mais amados da Bíblia...',
                 'duracao': '4 semanas',
                 'category': 'Bíblia',
-                'modules': [
-                    ('Introdução ao livro de Salmos', '25 min'),
-                    ('Salmos de louvor', '40 min'),
-                    ('Salmos de lamento', '35 min'),
-                    ('Salmos messiânicos', '45 min'),
-                ],
-                'quiz': [
-                    ('Quantos salmos há na Bíblia?', ['100', '120', '150', '175'], 2, 'O livro de Salmos tem 150 salmos'),
-                    ('Quem escreveu a maioria dos salmos?', ['Moisés', 'Salomão', 'Davi', 'Asafe'], 2, 'Davi escreveu cerca de 73 salmos'),
-                    ('"O Senhor é meu pastor" — qual salmo é este?', ['Salmo 1', 'Salmo 23', 'Salmo 91', 'Salmo 119'], 1, 'Salmo 23'),
+                'aulas': [
+                    {'nome': 'Introdução ao livro de Salmos', 'dur': '25 min',
+                     'material': ('Apostila — Introdução', 'https://example.com/salmos-intro.pdf', 'link'),
+                     'quiz': [('Quantos salmos há na Bíblia?', ['100', '120', '150', '175'], 2, 'O livro de Salmos tem 150 salmos')]},
+                    {'nome': 'Salmos de louvor', 'dur': '40 min',
+                     'material': ('Apostila — Louvor', 'https://example.com/louvor.pdf', 'link'),
+                     'quiz': [('Quem escreveu a maioria dos salmos?', ['Moisés', 'Salomão', 'Davi', 'Asafe'], 2, 'Davi escreveu cerca de 73 salmos')]},
+                    {'nome': 'Salmos de lamento', 'dur': '35 min',
+                     'material': ('Apostila — Lamento', 'https://example.com/lamento.pdf', 'link'),
+                     'quiz': [('"O Senhor é meu pastor" — qual salmo é este?', ['Salmo 1', 'Salmo 23', 'Salmo 91', 'Salmo 119'], 1, 'Salmo 23')]},
+                    {'nome': 'Salmos messiânicos', 'dur': '45 min',
+                     'material': ('Apostila — Messiânicos', 'https://example.com/messianicos.pdf', 'link'),
+                     'quiz': [('Qual salmo é citado como messiânico no Novo Testamento?', ['Salmo 22', 'Salmo 100', 'Salmo 136', 'Salmo 150'], 0, 'Salmo 22 é citado na crucificação de Jesus')]},
                 ],
             },
         ]
@@ -114,11 +122,18 @@ def seed():
             db.session.add(course)
             db.session.flush()
 
-            for i, (nome, dur) in enumerate(cd['modules']):
-                db.session.add(Module(course_id=course.id, nome=nome, dur=dur, position=i))
+            for i, aula in enumerate(cd['aulas']):
+                module = Module(course_id=course.id, nome=aula['nome'], dur=aula['dur'], position=i)
+                db.session.add(module)
+                db.session.flush()
 
-            for i, (q, opts, ans, exp) in enumerate(cd['quiz']):
-                db.session.add(Quiz(course_id=course.id, q=q, opts=opts, ans=ans, exp=exp, position=i))
+                mat_name, mat_url, mat_tipo = aula['material']
+                db.session.add(Material(course_id=course.id, module_id=module.id,
+                                        name=mat_name, url=mat_url, tipo=mat_tipo))
+
+                for j, (q, opts, ans, exp) in enumerate(aula['quiz']):
+                    db.session.add(Quiz(course_id=course.id, module_id=module.id,
+                                        q=q, opts=opts, ans=ans, exp=exp, position=j))
 
         db.session.commit()
         print("Seed concluído com sucesso!")

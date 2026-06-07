@@ -62,11 +62,13 @@ def create_app(config_name='development'):
         from routes.courses import courses_bp
         from routes.progress import progress_bp
         from routes.questions import questions_bp
-        
+        from routes.lessons import lessons_bp
+
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
         app.register_blueprint(courses_bp, url_prefix='/api/courses')
         app.register_blueprint(progress_bp, url_prefix='/api/progress')
         app.register_blueprint(questions_bp, url_prefix='/api/questions')
+        app.register_blueprint(lessons_bp, url_prefix='/api/courses')
 
         # Convenience alias so GET /api/user works alongside /api/auth/user
         @app.route('/api/user', methods=['GET'])

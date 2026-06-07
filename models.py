@@ -99,6 +99,10 @@ class Module(db.Model):
     dur = db.Column(db.String(50), default='')
     position = db.Column(db.Integer, default=0)
 
+    materials = db.relationship('Material', backref='module', lazy=True, cascade='all, delete-orphan')
+    quiz = db.relationship('Quiz', backref='module', lazy=True, cascade='all, delete-orphan',
+                           order_by='Quiz.position')
+
     def to_dict(self):
         return {'id': self.id, 'nome': self.nome, 'dur': self.dur, 'position': self.position}
 
@@ -108,13 +112,15 @@ class Material(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
+    module_id = db.Column(db.Integer, db.ForeignKey('modules.id'), nullable=True)
     name = db.Column(db.String(200), nullable=False)
     url = db.Column(db.Text, nullable=False)
     tipo = db.Column(db.String(10), default='link')  # pdf | link
     size = db.Column(db.String(20), default='')
 
     def to_dict(self):
-        return {'id': self.id, 'name': self.name, 'url': self.url, 'tipo': self.tipo, 'size': self.size}
+        return {'id': self.id, 'name': self.name, 'url': self.url, 'tipo': self.tipo, 'size': self.size,
+                'module_id': self.module_id}
 
 
 class Quiz(db.Model):
@@ -122,6 +128,7 @@ class Quiz(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
+    module_id = db.Column(db.Integer, db.ForeignKey('modules.id'), nullable=True)
     q = db.Column(db.Text, nullable=False)
     opts = db.Column(db.JSON, nullable=False)   # list of strings
     ans = db.Column(db.Integer, nullable=False)  # index of correct option
@@ -129,10 +136,36 @@ class Quiz(db.Model):
     position = db.Column(db.Integer, default=0)
 
     def to_dict(self, hide_answer=True):
-        data = {'id': self.id, 'q': self.q, 'opts': self.opts, 'exp': self.exp}
+        data = {'id': self.id, 'q': self.q, 'opts': self.opts, 'exp': self.exp, 'module_id': self.module_id}
         if not hide_answer:
             data['ans'] = self.ans
         return data
+
+
+class LessonProgress(db.Model):
+    __tablename__ = 'lesson_progress'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
+    module_id = db.Column(db.Integer, db.ForeignKey('modules.id'), nullable=False)
+    score = db.Column(db.Integer, default=0)
+    total = db.Column(db.Integer, default=0)
+    passed = db.Column(db.Boolean, default=False)
+    completed_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'module_id', name='uq_user_module'),)
+
+    def to_dict(self):
+        return {
+            'user_id': self.user_id,
+            'course_id': self.course_id,
+            'module_id': self.module_id,
+            'score': self.score,
+            'total': self.total,
+            'passed': self.passed,
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+        }
 
 
 class Progress(db.Model):
