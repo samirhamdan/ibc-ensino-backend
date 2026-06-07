@@ -641,7 +641,257 @@ async function selectCourse(id){
   currentQuestions = questRes.ok ? await questRes.json() : [];
 
   updateCourseNavProgress(id, currentProgress);
-  renderCourse();
+
+  if(isAluno(currentUser)){
+    await renderCourseResume();
+  } else {
+    renderCourse();
+  }
+}
+
+// ── LINEAR LESSON FLOW (students) ──
+let currentAulas = [];
+let currentAula = null;
+let aulaQuizAnswers = {};
+let aulaQuizSubmitted = false;
+let aulaQuizFeedback = null;
+
+async function renderCourseResume(){
+  const c=currentCourse;
+  const res = await api('GET',`/courses/${c.id}/aulas`);
+  currentAulas = res.ok ? await res.json() : [];
+  const total = currentAulas.length;
+  const passedCount = currentAulas.filter(a=>a.progress&&a.progress.passed).length;
+  const pct = total ? Math.round((passedCount/total)*100) : 0;
+  const allDone = total>0 && passedCount===total;
+  const nextIdx = currentAulas.findIndex(a=>!(a.progress&&a.progress.passed));
+  const continueNum = nextIdx===-1 ? total : nextIdx+1;
+
+  document.getElementById('main-content').innerHTML=`
+    <div class="course-header">
+      <span class="course-tag">${c.tag}</span>
+      <h1 class="course-title">${c.icon} ${c.name}</h1>
+      <div class="course-meta">
+        <span>👨‍🏫 ${c.tutor_id&&currentCourse.tutor_name?currentCourse.tutor_name:'Professor IBC'}</span>
+        ${c.duracao?`<span>⏱ ${c.duracao}</span>`:''}
+        <span>📋 ${total} aula(s)</span>
+        <span>✅ Nota mínima: 60%</span>
+      </div>
+    </div>
+    <div class="progress-section">
+      <div class="progress-header">
+        <span class="progress-label">Seu progresso</span>
+        <span class="progress-pct">${pct}%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+    </div>
+    <div class="resumo-box">
+      <div class="resumo-desc">${c.resumo||'<em style="color:var(--muted)">Nenhuma descrição cadastrada.</em>'}</div>
+    </div>
+    <div class="modulo-list" style="margin-bottom:1.2rem">
+      ${currentAulas.map((a,i)=>`
+        <div class="modulo-item" style="${a.unlocked?'cursor:pointer':'opacity:.6'}" ${a.unlocked?`onclick="loadAula(${c.id},${i+1})"`:''}>
+          <div class="modulo-num">${a.progress&&a.progress.passed?'✓':(i+1)}</div>
+          <div class="modulo-name">${a.nome}</div>
+          ${a.dur?`<div class="modulo-dur">⏱ ${a.dur}</div>`:''}
+          ${!a.unlocked?'<span style="font-size:.8rem">🔒</span>':''}
+        </div>`).join('')}
+    </div>
+    <div style="text-align:center">
+      <button class="btn-primary" style="max-width:260px" onclick="loadAula(${c.id},${continueNum||1})">
+        ${allDone?'Revisar curso':(passedCount>0?'Continuar de onde parei →':'COMECE AGORA →')}
+      </button>
+      <div style="margin-top:.8rem">
+        <button class="btn-secondary" onclick="openAskQuestionModal(${c.id})">💬 Fazer Pergunta</button>
+      </div>
+    </div>`;
+}
+
+async function loadAula(courseId, aulaNum){
+  aulaQuizAnswers={}; aulaQuizSubmitted=false; aulaQuizFeedback=null;
+  const res = await api('GET',`/courses/${courseId}/aulas/${aulaNum}`);
+  if(!res.ok){
+    const d=await res.json().catch(()=>({}));
+    alert(d.error||'Não foi possível carregar esta aula.');
+    return;
+  }
+  currentAula = await res.json();
+  if(currentAula.progress){
+    aulaQuizSubmitted = true;
+    aulaQuizFeedback = {score:currentAula.progress.score, total:currentAula.progress.total,
+      percentage: currentAula.progress.total ? Math.round(currentAula.progress.score/currentAula.progress.total*100):0,
+      passed: currentAula.progress.passed, feedback:null};
+  }
+  renderAulaPage();
+}
+
+function renderAulaPage(){
+  const a=currentAula;
+  const total=a.total_aulas, num=a.aula_num;
+  const pct=Math.round((num/total)*100);
+  const mat=(a.materiais||[])[0];
+  const passed = a.progress && a.progress.passed;
+
+  let quizHtml;
+  if(aulaQuizSubmitted && aulaQuizFeedback){
+    const fb=aulaQuizFeedback;
+    const pass=fb.passed;
+    const reviewHtml = fb.feedback ? fb.feedback.map((f,i)=>`
+      <div class="question-card ${f.is_correct?'correct':'wrong'}">
+        <div class="q-num">Questão ${i+1}</div>
+        <div class="q-text">${f.question}</div>
+        <div class="options">
+          ${a.quiz[i]&&a.quiz[i].opts?a.quiz[i].opts.map((o,j)=>`<div class="option ${j===f.correct_answer?'correct-ans':(f.selected===j&&!f.is_correct?'wrong-ans':'')}">
+            <input type="radio" disabled ${f.selected===j?'checked':''}><span>${o}</span></div>`).join(''):''}
+        </div>
+        <div class="q-feedback ${f.is_correct?'ok':'err'}">${f.is_correct?'✓ Correto!':'✗ Incorreto — '+f.explanation}</div>
+      </div>`).join('') : '';
+    quizHtml=`<div class="quiz-wrap">
+      <div class="quiz-header"><div class="quiz-title">Resultado do Exercício</div></div>
+      <div class="quiz-body">
+        <div class="quiz-result">
+          <div class="result-score">${fb.score}/${fb.total}</div>
+          <div class="result-label">${fb.percentage}% de aproveitamento</div>
+          <div class="result-msg ${pass?'pass':'fail'}">${pass?'🎉 Você foi aprovado nesta aula!':'📚 Você precisa de pelo menos 60% para avançar. Tente novamente!'}</div>
+        </div>
+        ${reviewHtml?`<hr style="border:none;border-top:1px solid #e8e0d4;margin:1rem 0">${reviewHtml}`:''}
+        <div class="quiz-actions"><button class="btn-secondary" onclick="retakeAulaQuiz()">Tentar novamente</button></div>
+      </div>
+    </div>`;
+  } else {
+    quizHtml=`<div class="quiz-wrap">
+      <div class="quiz-header"><div class="quiz-title">Exercício</div><div class="quiz-desc">${a.quiz.length} questão(ões) · Mínimo 60% para avançar</div></div>
+      <div class="quiz-body">
+        ${a.quiz.map((q,i)=>`
+          <div class="question-card" id="aqcard-${i}">
+            <div class="q-num">Questão ${i+1} de ${a.quiz.length}</div>
+            <div class="q-text">${q.q}</div>
+            <div class="options">
+              ${q.opts.map((o,j)=>`<div class="option ${aulaQuizAnswers[i]===j?'selected':''}" onclick="selectAulaOpt(${i},${j})">
+                <input type="radio" name="aq${i}" ${aulaQuizAnswers[i]===j?'checked':''} readonly><span>${o}</span></div>`).join('')}
+            </div>
+          </div>`).join('')}
+        <div class="quiz-actions"><button class="btn-gold" onclick="submitAulaQuiz()">Enviar respostas →</button></div>
+      </div>
+    </div>`;
+  }
+
+  document.getElementById('main-content').innerHTML=`
+    <div class="course-header">
+      <span class="course-tag" style="cursor:pointer" onclick="selectCourse(${a.course.id})">← ${a.course.icon} ${a.course.name}</span>
+      <h1 class="course-title">${a.nome}</h1>
+      <div class="course-meta">${a.dur?`<span>⏱ ${a.dur}</span>`:''}</div>
+    </div>
+    <div class="progress-section">
+      <div class="progress-header">
+        <span class="progress-label">Aula ${num}/${total}</span>
+        <span class="progress-pct">${pct}%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+    </div>
+    ${mat?`<div class="material-list" style="margin-bottom:1.2rem">
+      <div class="material-item">
+        <span class="mat-icon">📄</span>
+        <div class="mat-info"><div class="mat-name">${mat.name}</div><div class="mat-meta">${mat.tipo==='pdf'?'PDF':'Link'}</div></div>
+        <a class="btn-view" href="${mat.url}" target="_blank" rel="noopener">${mat.tipo==='pdf'?'Baixar':'Abrir'}</a>
+      </div>
+    </div>`:''}
+    ${quizHtml}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1.2rem;flex-wrap:wrap;gap:.6rem">
+      <button class="btn-secondary" ${num<=1?'disabled':''} onclick="loadAula(${a.course.id},${num-1})">← Voltar</button>
+      <button class="btn-secondary" onclick="openAskQuestionModal(${a.course.id})">💬 Fazer Pergunta</button>
+      ${num<total
+        ? `<button class="btn-primary" style="width:auto;padding:.7rem 1.4rem" ${passed?'':'disabled'} onclick="loadAula(${a.course.id},${num+1})">Próxima Aula →</button>`
+        : `<button class="btn-primary" style="width:auto;padding:.7rem 1.4rem" ${passed?'':'disabled'} onclick="renderConclusion()">Concluir Curso 🎓</button>`}
+    </div>`;
+}
+
+function selectAulaOpt(qi,oi){
+  aulaQuizAnswers[qi]=oi;
+  document.querySelectorAll(`#aqcard-${qi} .option`).forEach((o,j)=>{
+    o.classList.toggle('selected',j===oi);
+    o.querySelector('input').checked=(j===oi);
+  });
+}
+
+function retakeAulaQuiz(){
+  aulaQuizAnswers={}; aulaQuizSubmitted=false; aulaQuizFeedback=null;
+  renderAulaPage();
+}
+
+async function submitAulaQuiz(){
+  const quiz=currentAula.quiz||[];
+  if(Object.keys(aulaQuizAnswers).length<quiz.length){alert('Responda todas as questões antes de enviar.');return;}
+  const answers=quiz.map((_,i)=>aulaQuizAnswers[i]??null);
+  const res=await api('POST',`/courses/${currentAula.course.id}/aulas/${currentAula.aula_num}/submit-quiz`,{answers});
+  if(res.ok){
+    aulaQuizFeedback=await res.json();
+    aulaQuizSubmitted=true;
+    if(currentAula.progress){ currentAula.progress.passed = currentAula.progress.passed || aulaQuizFeedback.passed; }
+    else currentAula.progress = {passed: aulaQuizFeedback.passed, score: aulaQuizFeedback.score, total: aulaQuizFeedback.total};
+    renderAulaPage();
+  } else {
+    alert('Erro ao enviar respostas.');
+  }
+}
+
+function renderConclusion(){
+  const c=currentCourse;
+  const passedScores = currentAulas.map(a=>a.progress).filter(p=>p&&p.total);
+  const totalScore = passedScores.reduce((s,p)=>s+p.score,0);
+  const totalMax = passedScores.reduce((s,p)=>s+p.total,0);
+  const pct = totalMax ? Math.round(totalScore/totalMax*100) : 0;
+  document.getElementById('main-content').innerHTML=`
+    <div style="text-align:center;padding:2.5rem 1rem">
+      <div style="font-size:3.5rem">🎉</div>
+      <h1 class="course-title" style="margin-top:.5rem">Parabéns, ${currentUser.name.split(' ')[0]}!</h1>
+      <p style="color:var(--muted);margin-top:.4rem">Você concluiu o curso <strong>${c.name}</strong></p>
+      <div class="result-score" style="margin-top:1rem">${pct}%</div>
+      <div class="result-label">aproveitamento médio</div>
+      <div style="margin-top:1.5rem;display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap">
+        <button class="btn-gold" onclick="alert('Certificado em geração — funcionalidade em breve!')">🏆 Baixar Certificado</button>
+        <button class="btn-secondary" onclick="selectCourse(${c.id})">Voltar ao curso</button>
+        <button class="btn-secondary" onclick="showCatalog()">Ver outros cursos</button>
+      </div>
+    </div>`;
+}
+
+// ── Ask Question Modal ──
+function openAskQuestionModal(courseId){
+  const existing=document.getElementById('ask-question-modal');
+  if(existing) existing.remove();
+  const modal=document.createElement('div');
+  modal.id='ask-question-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:1000';
+  modal.innerHTML=`
+    <div style="background:white;border-radius:var(--radius);padding:1.4rem;width:100%;max-width:420px;margin:1rem">
+      <h3 style="font-family:'Playfair Display',serif;color:var(--navy);margin-bottom:.8rem">💬 Fazer Pergunta</h3>
+      <div class="form-group" style="margin-bottom:.7rem">
+        <label>Sua dúvida</label>
+        <textarea id="ask-question-text" placeholder="Digite sua pergunta para o tutor..." style="min-height:90px"></textarea>
+      </div>
+      <div id="ask-question-msg" style="font-size:.82rem;margin-bottom:.6rem"></div>
+      <div style="display:flex;justify-content:flex-end;gap:.6rem">
+        <button class="btn-secondary" onclick="document.getElementById('ask-question-modal').remove()">Cancelar</button>
+        <button class="btn-gold" onclick="sendQuestion(${courseId})">Enviar pergunta</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+async function sendQuestion(courseId){
+  const texto=document.getElementById('ask-question-text').value.trim();
+  const msgEl=document.getElementById('ask-question-msg');
+  if(!texto){ msgEl.style.color='var(--danger)'; msgEl.textContent='Digite sua pergunta.'; return; }
+  const res=await api('POST',`/questions/${courseId}`,{texto});
+  if(res.ok){
+    msgEl.style.color='var(--success)';
+    msgEl.textContent='✅ Pergunta enviada! O tutor responderá em breve.';
+    setTimeout(()=>{ const m=document.getElementById('ask-question-modal'); if(m) m.remove(); },1500);
+  } else {
+    msgEl.style.color='var(--danger)';
+    msgEl.textContent='Erro ao enviar pergunta.';
+  }
 }
 
 function renderCourse(){
