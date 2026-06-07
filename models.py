@@ -244,3 +244,56 @@ class PasswordResetToken(db.Model):
 
     def is_valid(self):
         return not self.used and datetime.utcnow() < self.expires_at
+
+
+class Badge(db.Model):
+    __tablename__ = 'badge'
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(50), unique=True, nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    icon = db.Column(db.String(10), nullable=False)
+    rarity = db.Column(db.String(20))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'code': self.code,
+            'name': self.name,
+            'description': self.description,
+            'icon': self.icon,
+            'rarity': self.rarity,
+        }
+
+
+class UserBadge(db.Model):
+    __tablename__ = 'user_badge'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    badge_id = db.Column(db.Integer, db.ForeignKey('badge.id'), nullable=False)
+    unlocked_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    badge = db.relationship('Badge')
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'badge_id', name='uq_user_badge'),)
+
+
+class UserPoints(db.Model):
+    __tablename__ = 'user_points'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
+    total_points = db.Column(db.Integer, default=0)
+    current_level = db.Column(db.Integer, default=1)
+    points_in_level = db.Column(db.Integer, default=0)
+    last_activity_date = db.Column(db.Date)
+
+    def to_dict(self):
+        return {
+            'total_points': self.total_points,
+            'current_level': self.current_level,
+            'points_in_level': self.points_in_level,
+        }

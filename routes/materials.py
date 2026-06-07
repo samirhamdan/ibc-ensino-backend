@@ -82,8 +82,11 @@ def save_read_progress(material_id):
     prog.material_pages_viewed = sorted(existing)
     prog.material_time_spent = (prog.material_time_spent or 0) + time_spent
     prog.material_read_at = datetime.utcnow()
+    crossed_50 = False
     if total_pages:
+        before = prog.material_percentage or 0.0
         prog.material_percentage = round(len(existing) / total_pages * 100, 1)
+        crossed_50 = before < 50 and prog.material_percentage >= 50
 
     db.session.commit()
-    return jsonify({'saved': True}), 200
+    return jsonify({'saved': True, 'crossed_50': crossed_50}), 200

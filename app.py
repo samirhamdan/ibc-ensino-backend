@@ -64,6 +64,7 @@ def create_app(config_name='development'):
         from routes.questions import questions_bp
         from routes.lessons import lessons_bp
         from routes.materials import materials_bp
+        from routes.gamification import gamification_bp
 
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
         app.register_blueprint(courses_bp, url_prefix='/api/courses')
@@ -71,6 +72,7 @@ def create_app(config_name='development'):
         app.register_blueprint(questions_bp, url_prefix='/api/questions')
         app.register_blueprint(lessons_bp, url_prefix='/api/courses')
         app.register_blueprint(materials_bp, url_prefix='/api/materiais')
+        app.register_blueprint(gamification_bp, url_prefix='/api/gamification')
 
         # Convenience alias so GET /api/user works alongside /api/auth/user
         @app.route('/api/user', methods=['GET'])

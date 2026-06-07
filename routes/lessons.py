@@ -132,6 +132,8 @@ def submit_aula_quiz(course_id, aula_num):
     passed = percentage >= PASS_THRESHOLD
 
     prog = LessonProgress.query.filter_by(user_id=user.id, module_id=module.id).first()
+    is_first_attempt = prog is None
+    already_passed = bool(prog and prog.passed)
     if not prog:
         prog = LessonProgress(user_id=user.id, course_id=course_id, module_id=module.id)
         db.session.add(prog)

@@ -1011,12 +1011,16 @@ async function closePdfViewer(){
   const timeSpent = Math.floor((Date.now()-st.startTime)/1000);
   const pagesViewed = [...st.pagesViewed].sort((a,b)=>a-b);
   try{
-    await api('POST', `/materiais/${st.materialId}/read-progress`, {
+    const r = await api('POST', `/materiais/${st.materialId}/read-progress`, {
       pages_viewed: pagesViewed,
       time_spent: timeSpent,
       current_page: st.pageNum,
       total_pages: st.totalPages,
     });
+    if(r.ok){
+      const rd = await r.json();
+      if(rd.crossed_50 && currentAula) gamiAddPoints('material_read', {course_id: currentAula.course.id});
+    }
   } catch(e){}
   const modal=document.getElementById('pdf-viewer-modal');
   if(modal) modal.remove();
@@ -1049,9 +1053,14 @@ async function submitAulaQuiz(){
     aulaQuizFeedback=await res.json();
     aulaQuizSubmitted=true;
     incAttempts(moduleId);
+    const wasPassedBefore = !!(currentAula.progress && currentAula.progress.passed);
     if(currentAula.progress){ currentAula.progress.passed = currentAula.progress.passed || aulaQuizFeedback.passed; }
     else currentAula.progress = {passed: aulaQuizFeedback.passed, score: aulaQuizFeedback.score, total: aulaQuizFeedback.total};
     if(aulaQuizFeedback.passed) resetAttempts(moduleId);
+    gamiAddPoints('quiz_attempted', {course_id: currentAula.course.id});
+    if(aulaQuizFeedback.passed && !wasPassedBefore){
+      gamiAddPoints('quiz_passed', {course_id: currentAula.course.id, attempts: getAttempts(moduleId)});
+    }
     renderAulaPage();
   } else {
     alert('Erro ao enviar respostas.');
@@ -1110,6 +1119,7 @@ async function sendQuestion(courseId){
   if(res.ok){
     msgEl.style.color='var(--success)';
     msgEl.textContent='✅ Pergunta enviada! O tutor responderá em breve.';
+    gamiAddPoints('question_asked', {course_id: courseId});
     setTimeout(()=>{ const m=document.getElementById('ask-question-modal'); if(m) m.remove(); },1500);
   } else {
     msgEl.style.color='var(--danger)';
@@ -1614,6 +1624,7 @@ async function responderPergunta(qid){
   if(res.ok){
     const updated=await res.json();
     currentQuestions=currentQuestions.map(q=>q.id===qid?updated:q);
+    api('POST','/gamification/add-points', {action:'question_answered', question_id: qid}).catch(()=>{});
     renderTabContent();
   } else { alert('Erro ao responder.'); }
 }
@@ -1869,12 +1880,14 @@ async function renderStudentDashboard(){
       <span class="course-tag">Meu Painel</span>
       <h1 class="course-title">📊 Olá, ${currentUser.name.split(' ')[0]}!</h1>
     </div>
+    <div id="gami-widget"></div>
     <div class="tabs">
       <button class="tab ${studentDashTab==='cursos'?'active':''}" onclick="setStudentDashTab('cursos')">📚 Meus Cursos</button>
       <button class="tab ${studentDashTab==='duvidas'?'active':''}" onclick="setStudentDashTab('duvidas')">💬 Minhas Dúvidas ${myQuestions.filter(q=>!q.resposta).length?'<span style="background:var(--gold);color:var(--navy);border-radius:10px;padding:.05rem .4rem;font-size:.65rem;margin-left:.3rem">'+myQuestions.filter(q=>!q.resposta).length+'</span>':''}</button>
     </div>
     <div id="student-dash-content"></div>`;
 
+  renderGamiWidget();
   const el=document.getElementById('student-dash-content');
   if(studentDashTab==='cursos'){
     const cardHtml=(c)=>`
@@ -1924,6 +1937,126 @@ async function renderStudentDashboard(){
 function setStudentDashTab(tab){
   studentDashTab=tab;
   renderStudentDashboard();
+}
+
+// ── Gamification ──
+const GAMI_LEVEL_NAMES = {1:'Iniciante',2:'Aprendiz',3:'Estudioso',4:'Conhecedor',5:'Mestre',6:'Especialista',7:'Guru'};
+
+async function renderGamiWidget(){
+  const el = document.getElementById('gami-widget');
+  if(!el) return;
+  const res = await api('GET','/gamification/user-stats');
+  if(!res.ok) return;
+  const s = await res.json();
+  const target = s.current_level >= 7 ? s.points_in_level || 1 : 100;
+  const pct = Math.min(100, Math.round((s.points_in_level/target)*100));
+  const filled = Math.round(pct/10);
+  const bar = '▓'.repeat(filled)+'░'.repeat(10-filled);
+  const icons = s.badges_unlocked.slice(0,8).map(b=>`<span title="${b.name}" style="font-size:1.3rem">${b.icon}</span>`).join(' ');
+  el.innerHTML = `
+    <div style="background:white;border:1px solid #e8e0d4;border-radius:var(--radius);padding:1rem 1.2rem;margin-bottom:1rem">
+      <div style="font-family:'Playfair Display',serif;color:var(--navy);font-weight:700;margin-bottom:.5rem">🎮 Seu Progresso</div>
+      <div style="font-size:.85rem;color:var(--navy);font-weight:600">⭐ Level ${s.current_level}: ${GAMI_LEVEL_NAMES[s.current_level]||''}</div>
+      <div style="font-size:.78rem;color:var(--muted);margin:.2rem 0">${s.points_in_level} / ${target} XP (Total: ${s.total_points})</div>
+      <div style="font-family:monospace;font-size:.85rem;color:var(--gold)">${bar} ${pct}%</div>
+      <div style="margin-top:.7rem;font-size:.8rem;color:var(--navy);font-weight:600">🏆 Suas badges:</div>
+      <div style="margin:.3rem 0">${icons||'<span style="color:var(--muted);font-size:.78rem">Nenhuma badge ainda — continue estudando!</span>'}</div>
+      <div style="font-size:.75rem;color:var(--muted);margin-bottom:.6rem">(${s.badges_count} de ${s.badges_count + s.badges_locked.length} conquistadas)</div>
+      <button class="btn-secondary" style="padding:.35rem .8rem;font-size:.78rem" onclick="showBadgesPage()">Ver Todas as Badges</button>
+    </div>`;
+}
+
+function gamiToast(message){
+  const existing = document.getElementById('gami-toast');
+  if(existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = 'gami-toast';
+  toast.textContent = message;
+  toast.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;background:var(--navy);color:white;padding:.6rem 1.1rem;border-radius:8px;font-size:.82rem;box-shadow:0 4px 14px rgba(0,0,0,.25);z-index:1100;opacity:0;transition:opacity .25s';
+  document.body.appendChild(toast);
+  requestAnimationFrame(()=>{ toast.style.opacity='1'; });
+  setTimeout(()=>{
+    toast.style.opacity='0';
+    setTimeout(()=>toast.remove(), 300);
+  }, 3000);
+}
+
+function showBadgeModal(badge){
+  const existing=document.getElementById('badge-modal');
+  if(existing) existing.remove();
+  const modal=document.createElement('div');
+  modal.id='badge-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:1200;padding:1rem';
+  modal.innerHTML=`
+    <div style="background:white;border-radius:var(--radius);padding:1.6rem;text-align:center;max-width:340px">
+      <div style="font-size:1.6rem;margin-bottom:.3rem">✨ Parabéns! ✨</div>
+      <div style="font-size:.85rem;color:var(--muted);margin-bottom:.6rem">Você conquistou a badge:</div>
+      <div style="font-size:2.4rem">${badge.icon}</div>
+      <div style="font-family:'Playfair Display',serif;font-weight:700;color:var(--navy);margin:.3rem 0 1rem">${badge.name}</div>
+      <div style="display:flex;gap:.6rem;justify-content:center">
+        <button class="btn-secondary" style="padding:.4rem .9rem;font-size:.8rem" onclick="document.getElementById('badge-modal').remove();showBadgesPage()">Ver Minha Coleção</button>
+        <button class="btn-gold" style="padding:.4rem .9rem;font-size:.8rem" onclick="document.getElementById('badge-modal').remove()">Fechar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function showLevelUpModal(level){
+  const existing=document.getElementById('levelup-modal');
+  if(existing) existing.remove();
+  const modal=document.createElement('div');
+  modal.id='levelup-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:1200;padding:1rem';
+  modal.innerHTML=`
+    <div style="background:white;border-radius:var(--radius);padding:1.6rem;text-align:center;max-width:340px">
+      <div style="font-size:1.6rem;margin-bottom:.3rem">🎉 Parabéns! 🎉</div>
+      <div style="font-size:.85rem;color:var(--muted);margin-bottom:.4rem">Você subiu para:</div>
+      <div style="font-family:'Playfair Display',serif;font-weight:700;color:var(--navy);font-size:1.1rem">Level ${level}: ${GAMI_LEVEL_NAMES[level]||''}</div>
+      <div style="margin:.4rem 0 1rem;color:var(--gold)">${'⭐'.repeat(Math.min(level,7))}</div>
+      <button class="btn-gold" style="padding:.4rem .9rem;font-size:.8rem" onclick="document.getElementById('levelup-modal').remove()">Fechar</button>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+async function gamiAddPoints(action, extra){
+  try{
+    const res = await api('POST','/gamification/add-points', {action, ...(extra||{})});
+    if(!res.ok) return;
+    const r = await res.json();
+    if(r.points_awarded) gamiToast(`✓ +${r.points_awarded} XP! (Total: ${r.total_points})`);
+    if(r.badge_unlocked) setTimeout(()=>showBadgeModal(r.badge_unlocked), 600);
+    if(r.level_up) setTimeout(()=>showLevelUpModal(r.new_level), r.badge_unlocked ? 1300 : 600);
+    return r;
+  } catch(e){}
+}
+
+async function showBadgesPage(){
+  const modal=document.getElementById('badge-modal'); if(modal) modal.remove();
+  document.querySelectorAll('.course-item').forEach(x=>x.classList.remove('active'));
+  const res = await api('GET','/gamification/badges');
+  const badges = res.ok ? await res.json() : [];
+  const unlocked = badges.filter(b=>b.unlocked);
+  const locked = badges.filter(b=>!b.unlocked);
+  const card=(b)=>`
+    <div style="background:white;border:1px solid #e8e0d4;border-radius:8px;padding:.8rem 1rem;display:flex;gap:.8rem;align-items:flex-start;margin-bottom:.6rem;${b.unlocked?'':'opacity:.6'}">
+      <div style="font-size:1.8rem">${b.unlocked?'✅':'❌'} ${b.icon}</div>
+      <div>
+        <div style="font-weight:700;color:var(--navy);font-family:'Playfair Display',serif">${b.name}</div>
+        <div style="font-size:.78rem;color:var(--muted)">${b.description||''}</div>
+        <div style="font-size:.75rem;color:${b.unlocked?'var(--gold)':'var(--muted)'};margin-top:.2rem">${b.unlocked?'Conquistada: '+new Date(b.unlocked_at).toLocaleDateString('pt-BR'):'Progresso: '+b.progress}</div>
+      </div>
+    </div>`;
+  document.getElementById('main-content').innerHTML=`
+    <div class="course-header">
+      <span class="course-tag">Gamificação</span>
+      <h1 class="course-title">🏆 Coleção de Badges (${unlocked.length}/${badges.length})</h1>
+    </div>
+    <button class="btn-secondary" style="margin-bottom:1rem;padding:.4rem .9rem;font-size:.8rem" onclick="showStudentDashboard()">‹ Voltar ao Painel</button>
+    <h3 style="font-size:.85rem;color:var(--navy);margin:0 0 .6rem">Desbloqueadas (${unlocked.length})</h3>
+    ${unlocked.length ? unlocked.map(card).join('') : '<div class="pdf-no-files" style="margin-bottom:1rem">Nenhuma badge conquistada ainda.</div>'}
+    <h3 style="font-size:.85rem;color:var(--navy);margin:1rem 0 .6rem">Bloqueadas (${locked.length})</h3>
+    ${locked.length ? locked.map(card).join('') : ''}
+  `;
 }
 
 // ── Tutor Dashboard ──

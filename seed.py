@@ -3,13 +3,34 @@ Seed the database with initial demo data from BRIEFING.md.
 Run once: python seed.py
 """
 from app import create_app, db
-from models import User, Category, Course, Module, Quiz, Material
+from models import User, Category, Course, Module, Quiz, Material, Badge
+
+BADGES = [
+    ('iniciante', 'Iniciante', 'Seu primeiro curso começado', '🎓', 'comum'),
+    ('leitor_assiduo', 'Leitor Assíduo', 'Leu 5 materiais completos (≥50%)', '📚', 'comum'),
+    ('quizmaster', 'Quizmaster', 'Passou em 3 quizzes de primeira', '🎯', 'raro'),
+    ('perguntador', 'Perguntador', 'Fez 5 perguntas no curso', '❓', 'comum'),
+    ('resposta_brilhante', 'Resposta Brilhante', 'Sua pergunta recebeu resposta do tutor', '💡', 'raro'),
+    ('mestre', 'Mestre', 'Concluiu 3 cursos completos', '🏆', 'épico'),
+    ('velocista', 'Velocista', 'Concluiu curso em 7 dias', '⚡', 'comum'),
+    ('consistente', 'Consistente', 'Estudou 7 dias seguidos', '🌟', 'raro'),
+]
+
+
+def seed_badges():
+    if Badge.query.first():
+        return
+    for code, name, desc, icon, rarity in BADGES:
+        db.session.add(Badge(code=code, name=name, description=desc, icon=icon, rarity=rarity))
+    db.session.commit()
+    print("Badges criadas.")
 
 
 def seed():
     app = create_app()
     with app.app_context():
         db.create_all()
+        seed_badges()
 
         if User.query.first():
             print("Database already seeded — skipping.")
