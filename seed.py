@@ -6,14 +6,14 @@ from app import create_app, db
 from models import User, Category, Course, Module, Quiz, Material, Badge
 
 BADGES = [
-    ('iniciante', 'Iniciante', 'Seu primeiro curso começado', '🎓', 'comum'),
-    ('leitor_assiduo', 'Leitor Assíduo', 'Leu 5 materiais completos (≥50%)', '📚', 'comum'),
-    ('quizmaster', 'Quizmaster', 'Passou em 3 quizzes de primeira', '🎯', 'raro'),
-    ('perguntador', 'Perguntador', 'Fez 5 perguntas no curso', '❓', 'comum'),
-    ('resposta_brilhante', 'Resposta Brilhante', 'Sua pergunta recebeu resposta do tutor', '💡', 'raro'),
-    ('mestre', 'Mestre', 'Concluiu 3 cursos completos', '🏆', 'épico'),
-    ('velocista', 'Velocista', 'Concluiu curso em 7 dias', '⚡', 'comum'),
-    ('consistente', 'Consistente', 'Estudou 7 dias seguidos', '🌟', 'raro'),
+    ('novo_discipulo', 'Novo Discípulo', 'Seu primeiro curso começado', '👶', 'comum'),
+    ('estudioso_palavra', 'Estudioso da Palavra', 'Leu 5 materiais completos (≥50%)', '📖', 'comum'),
+    ('guerreiro_palavra', 'Guerreiro da Palavra', 'Passou em 3 quizzes de primeira', '⚔️', 'raro'),
+    ('buscador_verdade', 'Buscador de Verdade', 'Fez 5+ perguntas no curso', '💡', 'comum'),
+    ('iluminado_graca', 'Iluminado pela Graça', 'Sua pergunta recebeu resposta do tutor', '✨', 'raro'),
+    ('edificador', 'Edificador', 'Concluiu 3 cursos completos', '👑', 'épico'),
+    ('corredor_incansavel', 'Corredor Incansável', 'Concluiu curso em 7 dias', '🔥', 'comum'),
+    ('servo_fiel', 'Servo Fiel', 'Estudou 7 dias seguidos', '💪', 'raro'),
 ]
 
 

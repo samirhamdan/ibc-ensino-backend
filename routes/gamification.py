@@ -68,30 +68,30 @@ def unlock_badge(user_id, badge_code):
 
 def _badge_progress(user_id, code):
     """Returns (current, target) progress for a badge"""
-    if code == 'iniciante':
+    if code == 'novo_discipulo':
         count = LessonProgress.query.filter_by(user_id=user_id).distinct(LessonProgress.course_id).count()
         return min(count, 1), 1
-    if code == 'leitor_assiduo':
+    if code == 'estudioso_palavra':
         count = LessonProgress.query.filter(LessonProgress.user_id == user_id,
                                              LessonProgress.material_percentage >= 50).count()
         return min(count, 5), 5
-    if code == 'quizmaster':
+    if code == 'guerreiro_palavra':
         count = LessonProgress.query.filter(LessonProgress.user_id == user_id,
                                              LessonProgress.passed == True,
                                              LessonProgress.score == LessonProgress.total).count()
         return min(count, 3), 3
-    if code == 'perguntador':
+    if code == 'buscador_verdade':
         count = Question.query.filter_by(user_id=user_id).count()
         return min(count, 5), 5
-    if code == 'resposta_brilhante':
+    if code == 'iluminado_graca':
         count = Question.query.filter(Question.user_id == user_id, Question.resposta != '').count()
         return min(count, 1), 1
-    if code == 'mestre':
+    if code == 'edificador':
         course_count = _completed_courses_count(user_id)
         return min(course_count, 3), 3
-    if code == 'velocista':
+    if code == 'corredor_incansavel':
         return 0, 1
-    if code == 'consistente':
+    if code == 'servo_fiel':
         up = UserPoints.query.filter_by(user_id=user_id).first()
         return (1, 1) if (up and _consecutive_days(up) >= 7) else (_consecutive_days(up) if up else 0, 7)
     return 0, 1
