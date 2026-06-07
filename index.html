@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IBC Ensino — Plataforma EAD</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
@@ -770,9 +771,11 @@ function renderAulaPage(){
           <div class="material-item">
             <span class="mat-icon">📄</span>
             <div class="mat-info"><div class="mat-name">${mat.name}</div><div class="mat-meta">${mat.tipo==='pdf'?'PDF':'Link'}</div></div>
-            <a class="btn-view" href="${mat.url}" target="_blank" rel="noopener">${mat.tipo==='pdf'?'Baixar':'Abrir'}</a>
+            ${mat.tipo==='pdf'?`<button class="btn-view" onclick="openPdfViewer(${mat.id},'${mat.name.replace(/'/g,"\\'")}')">📖 Abrir Viewer</button>`:''}
+            <a class="btn-view" style="margin-left:.4rem" href="${mat.url}" target="_blank" rel="noopener" download>${mat.tipo==='pdf'?'📥 Baixar':'Abrir'}</a>
           </div>
-        </div>`:'<div class="pdf-no-files" style="margin-bottom:.8rem">Nenhum material cadastrado para esta aula.</div>'}
+        </div>
+        ${mat.tipo==='pdf'?renderMaterialReadStatus(a.progress):''}`:'<div class="pdf-no-files" style="margin-bottom:.8rem">Nenhum material cadastrado para esta aula.</div>'}
         <label style="display:flex;align-items:center;gap:.5rem;cursor:${matRead?'default':'pointer'};font-size:.85rem;font-weight:500;color:var(--navy)">
           <input type="checkbox" ${matRead?'checked disabled':''} onchange="confirmMaterialRead(${moduleId})" style="accent-color:var(--success);width:17px;height:17px">
           ${matRead?'✓ Material lido e concluído':'Marcar como lido para liberar o exercício'}
@@ -876,6 +879,150 @@ function renderAulaPage(){
 function confirmMaterialRead(moduleId){
   markMaterialRead(moduleId);
   renderAulaPage();
+}
+
+function fmtTime(sec){
+  sec = Math.floor(sec||0);
+  const m=Math.floor(sec/60), s=sec%60;
+  return `${m} min ${s}s`;
+}
+
+function renderMaterialReadStatus(progress){
+  const timeSpent = progress ? (progress.material_time_spent||0) : 0;
+  const pagesViewed = progress ? (progress.material_pages_viewed||[]) : [];
+  const pct = progress ? Math.round(progress.material_percentage||0) : 0;
+  if(!timeSpent && !pagesViewed.length) return '';
+  const filled=Math.round(pct/10);
+  const bar='▓'.repeat(filled)+'░'.repeat(10-filled);
+  return `<div style="background:var(--cream);border-radius:8px;padding:.6rem .8rem;font-size:.78rem;color:var(--muted);display:flex;flex-direction:column;gap:.2rem">
+    <span>⏱ Tempo lido: <strong style="color:var(--navy)">${fmtTime(timeSpent)}</strong></span>
+    <span>📄 Páginas vistas: <strong style="color:var(--navy)">${pagesViewed.length}</strong>${pagesViewed.length?' ('+pagesViewed.join(', ')+')':''}</span>
+    <span style="font-family:monospace">${bar} ${pct}%</span>
+  </div>`;
+}
+
+// ── PDF Viewer Modal (PDF.js) ──
+if(window.pdfjsLib){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+let pdfViewerState = null;
+
+async function openPdfViewer(materialId, materialName){
+  const res = await api('GET', `/materiais/${materialId}`);
+  if(!res.ok){ alert('Não foi possível carregar o material.'); return; }
+  const meta = await res.json();
+
+  const existing=document.getElementById('pdf-viewer-modal');
+  if(existing) existing.remove();
+
+  const modal=document.createElement('div');
+  modal.id='pdf-viewer-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem';
+  modal.innerHTML=`
+    <div style="background:white;border-radius:var(--radius);width:100%;max-width:720px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden">
+      <div style="background:var(--navy);color:white;padding:.8rem 1.1rem;display:flex;align-items:center;justify-content:space-between">
+        <strong style="font-family:'Playfair Display',serif">📖 ${materialName}</strong>
+        <button onclick="closePdfViewer()" style="background:none;border:none;color:white;font-size:1.2rem;cursor:pointer">✕</button>
+      </div>
+      <div style="flex:1;overflow:auto;background:#525659;display:flex;justify-content:center;padding:1rem">
+        <canvas id="pdf-canvas" style="box-shadow:0 4px 18px rgba(0,0,0,.4);background:white"></canvas>
+      </div>
+      <div style="padding:.8rem 1.1rem;border-top:1px solid #e8e0d4;display:flex;flex-direction:column;gap:.6rem">
+        <div style="display:flex;align-items:center;justify-content:center;gap:.5rem;flex-wrap:wrap">
+          <button class="btn-secondary" style="padding:.35rem .7rem" onclick="pdfPrevPage()">‹ Anterior</button>
+          <span id="pdf-page-label" style="font-size:.82rem;color:var(--navy);font-weight:600">Página 1 de ?</span>
+          <button class="btn-secondary" style="padding:.35rem .7rem" onclick="pdfNextPage()">Próxima ›</button>
+          <input type="number" id="pdf-goto-input" min="1" style="width:60px;padding:.3rem .4rem;border:1.5px solid #dde;border-radius:6px;font-size:.8rem" placeholder="Pág.">
+          <button class="btn-secondary" style="padding:.35rem .6rem;font-size:.78rem" onclick="pdfGotoPage()">Ir</button>
+          <button class="btn-secondary" style="padding:.35rem .6rem" onclick="pdfZoom(-0.25)">－</button>
+          <span id="pdf-zoom-label" style="font-size:.78rem;color:var(--muted)">100%</span>
+          <button class="btn-secondary" style="padding:.35rem .6rem" onclick="pdfZoom(0.25)">＋</button>
+        </div>
+        <div style="font-size:.78rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:1rem;justify-content:center">
+          <span>⏱ Tempo lendo: <strong id="pdf-timer" style="color:var(--navy)">0:00</strong></span>
+          <span>📄 Páginas vistas: <strong id="pdf-pages-viewed" style="color:var(--navy)">—</strong></span>
+        </div>
+        <div style="display:flex;justify-content:center;gap:.6rem">
+          <a class="btn-secondary" href="${meta.file_url}" download target="_blank" rel="noopener">📥 Baixar PDF</a>
+          <button class="btn-gold" onclick="closePdfViewer()">Fechar Viewer</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  pdfViewerState = {
+    materialId, fileUrl: meta.file_url, pdf: null, pageNum: 1, scale: 1.5,
+    pagesViewed: new Set(), startTime: Date.now(), timerInterval: null,
+  };
+
+  pdfViewerState.timerInterval = setInterval(()=>{
+    const sec = Math.floor((Date.now()-pdfViewerState.startTime)/1000);
+    const m=Math.floor(sec/60), s=sec%60;
+    const lbl=document.getElementById('pdf-timer');
+    if(lbl) lbl.textContent = `${m}:${String(s).padStart(2,'0')}`;
+  },1000);
+
+  try{
+    const loadingTask = pdfjsLib.getDocument(meta.file_url);
+    pdfViewerState.pdf = await loadingTask.promise;
+    pdfViewerState.totalPages = pdfViewerState.pdf.numPages;
+    document.getElementById('pdf-goto-input').max = pdfViewerState.totalPages;
+    await pdfRenderPage(1);
+  } catch(e){
+    document.querySelector('#pdf-viewer-modal .btn-gold') && (document.getElementById('pdf-canvas').outerHTML = '<div style="color:white;padding:2rem">Não foi possível renderizar o PDF. Use o botão "Baixar PDF".</div>');
+  }
+}
+
+async function pdfRenderPage(num){
+  const st=pdfViewerState;
+  if(!st || !st.pdf) return;
+  num = Math.max(1, Math.min(num, st.totalPages));
+  st.pageNum = num;
+  st.pagesViewed.add(num);
+  const page = await st.pdf.getPage(num);
+  const canvas = document.getElementById('pdf-canvas');
+  const context = canvas.getContext('2d');
+  const viewport = page.getViewport({scale: st.scale});
+  canvas.height = viewport.height;
+  canvas.width = viewport.width;
+  await page.render({canvasContext: context, viewport}).promise;
+  document.getElementById('pdf-page-label').textContent = `Página ${num} de ${st.totalPages}`;
+  document.getElementById('pdf-zoom-label').textContent = Math.round(st.scale/1.5*100)+'%';
+  const sortedPages = [...st.pagesViewed].sort((a,b)=>a-b);
+  document.getElementById('pdf-pages-viewed').textContent = sortedPages.join(', ');
+}
+
+function pdfPrevPage(){ if(pdfViewerState) pdfRenderPage(pdfViewerState.pageNum-1); }
+function pdfNextPage(){ if(pdfViewerState) pdfRenderPage(pdfViewerState.pageNum+1); }
+function pdfGotoPage(){
+  const v=parseInt(document.getElementById('pdf-goto-input').value,10);
+  if(v) pdfRenderPage(v);
+}
+function pdfZoom(delta){
+  if(!pdfViewerState) return;
+  pdfViewerState.scale = Math.max(0.5, Math.min(3, pdfViewerState.scale + delta*1.5));
+  pdfRenderPage(pdfViewerState.pageNum);
+}
+
+async function closePdfViewer(){
+  const st=pdfViewerState;
+  if(!st) return;
+  clearInterval(st.timerInterval);
+  const timeSpent = Math.floor((Date.now()-st.startTime)/1000);
+  const pagesViewed = [...st.pagesViewed].sort((a,b)=>a-b);
+  try{
+    await api('POST', `/materiais/${st.materialId}/read-progress`, {
+      pages_viewed: pagesViewed,
+      time_spent: timeSpent,
+      current_page: st.pageNum,
+      total_pages: st.totalPages,
+    });
+  } catch(e){}
+  const modal=document.getElementById('pdf-viewer-modal');
+  if(modal) modal.remove();
+  pdfViewerState = null;
+  // Refresh aula data so the read-status reflects the saved progress
+  if(currentAula) await loadAula(currentAula.course.id, currentAula.aula_num);
 }
 
 function selectAulaOpt(qi,oi){

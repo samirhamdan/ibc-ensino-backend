@@ -154,6 +154,11 @@ class LessonProgress(db.Model):
     passed = db.Column(db.Boolean, default=False)
     completed_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    material_pages_viewed = db.Column(db.JSON, default=list)
+    material_time_spent = db.Column(db.Integer, default=0)
+    material_read_at = db.Column(db.DateTime, nullable=True)
+    material_percentage = db.Column(db.Float, default=0.0)
+
     __table_args__ = (db.UniqueConstraint('user_id', 'module_id', name='uq_user_module'),)
 
     def to_dict(self):
@@ -161,6 +166,10 @@ class LessonProgress(db.Model):
             'user_id': self.user_id,
             'course_id': self.course_id,
             'module_id': self.module_id,
+            'material_pages_viewed': self.material_pages_viewed or [],
+            'material_time_spent': self.material_time_spent or 0,
+            'material_read_at': self.material_read_at.isoformat() if self.material_read_at else None,
+            'material_percentage': self.material_percentage or 0.0,
             'score': self.score,
             'total': self.total,
             'passed': self.passed,
