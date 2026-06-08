@@ -131,3 +131,30 @@
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
 }
+
+/* ── Compatibility: apply base .btn props when used without the .btn base class ── */
+.btn-primary:not(.btn),
+.btn-secondary:not(.btn),
+.btn-gold:not(.btn),
+.btn-success:not(.btn),
+.btn-danger:not(.btn),
+.btn-outline:not(.btn),
+.btn-view:not(.btn) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: .65rem 1.25rem;
+  min-height: 40px;
+  font-family: var(--font-body);
+  font-weight: var(--fw-semibold);
+  font-size: var(--text-sm);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-base),
+              transform var(--transition-fast),
+              box-shadow var(--transition-base);
+  text-decoration: none;
+  white-space: nowrap;
+}

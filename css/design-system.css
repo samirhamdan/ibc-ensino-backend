@@ -73,4 +73,16 @@
   --transition-fast: 150ms ease;
   --transition-base: 250ms ease;
   --transition-slow: 350ms ease;
+
+  /* ── Legacy variable aliases (backward-compat with JS-generated HTML) ── */
+  --navy:        #006b85;
+  --navy-light:  #008ea8;
+  --cream:       #f9f6f0;
+  --cream2:      #f0ebe0;
+  --text:        #2c3e50;
+  --muted:       #7f8c8d;
+  --radius:      var(--radius-lg);
+  --gold-light:  #33adc0;
+  --success-bg:  #d4edda;
+  --danger-bg:   #f8d7da;
 }
