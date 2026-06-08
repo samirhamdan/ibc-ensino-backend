@@ -1,0 +1,76 @@
+/* ─── Design System: Tokens ─────────────────────────────────── */
+:root {
+  /* Primary */
+  --primary:         #008ea8;
+  --primary-dark:    #006b85;
+  --primary-light:   #1ba3c2;
+  --primary-lighter: #e8f4f8;
+
+  /* Semantic */
+  --success: #27ae60;
+  --warning: #f39c12;
+  --danger:  #e74c3c;
+  --info:    #3498db;
+
+  /* Grays */
+  --dark:          #2c3e50;
+  --gray-dark:     #34495e;
+  --gray:          #7f8c8d;
+  --gray-light:    #ecf0f1;
+  --gray-lighter:  #f5f7fa;
+  --white:         #ffffff;
+
+  /* Decorative */
+  --gold:   #f1c40f;
+  --silver: #95a5a6;
+  --bronze: #cd7f32;
+
+  /* Typography */
+  --font-display: 'Playfair Display', serif;
+  --font-body:    'DM Sans', sans-serif;
+
+  --text-2xl: 2.5rem;
+  --text-xl:  2rem;
+  --text-lg:  1.5rem;
+  --text-base:1rem;
+  --text-sm:  0.875rem;
+  --text-xs:  0.75rem;
+
+  --fw-regular:  400;
+  --fw-medium:   500;
+  --fw-semibold: 600;
+  --fw-bold:     700;
+
+  --lh-tight:   1.2;
+  --lh-snug:    1.3;
+  --lh-normal:  1.4;
+  --lh-relaxed: 1.6;
+  --lh-loose:   1.8;
+
+  /* Spacing (8px scale) */
+  --space-xs:  0.25rem;
+  --space-sm:  0.5rem;
+  --space-md:  1rem;
+  --space-lg:  1.5rem;
+  --space-xl:  2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+
+  /* Radius */
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.05);
+  --shadow-md: 0 4px 6px rgba(0,0,0,.1);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,.1);
+  --shadow-xl: 0 20px 25px rgba(0,0,0,.15);
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 350ms ease;
+}

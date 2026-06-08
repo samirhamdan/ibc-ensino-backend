@@ -1,0 +1,144 @@
+/* ─── Dashboard Widgets ──────────────────────────────────────── */
+
+/* KPI grid */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-lg);
+  margin-bottom: var(--space-xl);
+}
+
+/* Progress / gamification widget */
+.dashboard-card {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-xl);
+  box-shadow: var(--shadow-md);
+}
+
+.dashboard-title {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  color: var(--dark);
+  margin: 0 0 var(--space-lg);
+}
+
+/* Level display row */
+.level-display {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-lg);
+}
+
+.level-name {
+  font-size: var(--text-sm);
+  color: var(--gray-dark);
+}
+
+/* XP numbers */
+.xp-label {
+  font-size: var(--text-sm);
+  color: var(--gray);
+  margin-top: var(--space-xs);
+  margin-bottom: var(--space-sm);
+}
+
+/* Trophy grid (icons) */
+.trophy-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.trophy {
+  font-size: 2rem;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+  display: inline-block;
+}
+
+.trophy:hover {
+  transform: scale(1.2) rotate(5deg);
+}
+
+/* Activity list */
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  font-size: var(--text-sm);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--gray-light);
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+}
+
+.activity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--primary);
+  margin-top: .3rem;
+  flex-shrink: 0;
+}
+
+.activity-text {
+  flex: 1;
+  color: var(--dark);
+}
+
+.activity-time {
+  font-size: var(--text-xs);
+  color: var(--gray);
+  white-space: nowrap;
+}
+
+/* Alert list (admin) */
+.alert-list-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.alert-list-item-high   { background: #f8d7da; color: #721c24; }
+.alert-list-item-warn   { background: #fff3cd; color: #856404; }
+.alert-list-item-info   { background: #d1ecf1; color: #0c5460; }
+
+/* Upcoming task row */
+.task-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--gray-light);
+  font-size: var(--text-sm);
+}
+
+.task-row:last-child {
+  border-bottom: none;
+}
+
+/* Quick action bar */
+.quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+}

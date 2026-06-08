@@ -1,0 +1,190 @@
+/* ─── Course Cards ───────────────────────────────────────────── */
+.course-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-lg);
+  margin-bottom: var(--space-xl);
+}
+
+.course-card-new {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow var(--transition-base), transform var(--transition-base);
+  cursor: pointer;
+  animation: slideUp .4s ease both;
+}
+
+.course-card-new:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-4px);
+}
+
+.course-image {
+  position: relative;
+  height: 160px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4rem;
+}
+
+.course-image-badge {
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  background: var(--warning);
+  color: var(--white);
+  padding: .2rem .65rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-bold);
+}
+
+.course-body {
+  padding: var(--space-lg);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.course-category {
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--primary);
+}
+
+.course-name {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: var(--fw-bold);
+  color: var(--dark);
+  line-height: var(--lh-snug);
+}
+
+.course-meta-row {
+  display: flex;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  font-size: var(--text-xs);
+  color: var(--gray);
+}
+
+.course-footer {
+  padding: var(--space-md) var(--space-lg);
+  border-top: 1px solid var(--gray-light);
+  background: var(--gray-lighter);
+}
+
+/* Progress bar inside card */
+.course-progress-row {
+  margin-bottom: var(--space-sm);
+}
+
+.course-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: var(--gray);
+  margin-bottom: var(--space-xs);
+}
+
+/* Question card (Q&A) */
+.question-card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-md);
+  border: 1px solid var(--gray-light);
+  transition: box-shadow var(--transition-base);
+}
+
+.question-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.question-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.question-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background: var(--primary-lighter);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--fw-bold);
+  font-size: var(--text-sm);
+  flex-shrink: 0;
+}
+
+.question-body {
+  flex: 1;
+}
+
+.question-author {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--dark);
+}
+
+.question-time {
+  font-size: var(--text-xs);
+  color: var(--gray);
+}
+
+.question-text {
+  font-size: var(--text-sm);
+  color: var(--gray-dark);
+  line-height: var(--lh-relaxed);
+}
+
+.answer-area {
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  background: var(--primary-lighter);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--primary);
+  display: flex;
+  gap: var(--space-md);
+}
+
+.answer-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-full);
+  background: var(--primary);
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-xs);
+  font-weight: var(--fw-bold);
+  flex-shrink: 0;
+}
+
+.answer-text {
+  font-size: var(--text-sm);
+  color: var(--dark);
+  line-height: var(--lh-relaxed);
+}
+
+@media (max-width: 768px) {
+  .course-card-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,110 @@
+/* ─── Cards ─────────────────────────────────────────────────── */
+.card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  transition: box-shadow var(--transition-base);
+  animation: slideUp .4s ease both;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+.card-header {
+  padding: var(--space-lg);
+  border-bottom: 1px solid var(--gray-light);
+}
+
+.card-title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--fw-bold);
+  color: var(--dark);
+  margin: 0;
+}
+
+.card-subtitle {
+  font-size: var(--text-sm);
+  color: var(--gray);
+  margin-top: var(--space-xs);
+}
+
+.card-body {
+  padding: var(--space-lg);
+}
+
+.card-footer {
+  padding: var(--space-lg);
+  background: var(--gray-lighter);
+  display: flex;
+  gap: var(--space-md);
+  justify-content: flex-end;
+  border-top: 1px solid var(--gray-light);
+}
+
+/* Flat variant (no shadow, border only) */
+.card-flat {
+  box-shadow: none;
+  border: 1px solid var(--gray-light);
+}
+
+/* Colored header variants */
+.card-header-primary {
+  background: var(--primary);
+  color: var(--white);
+  border-bottom: none;
+}
+
+.card-header-primary .card-title {
+  color: var(--white);
+}
+
+/* Stat card (KPI) */
+.stat-card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow var(--transition-base), transform var(--transition-base);
+}
+
+.stat-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--primary);
+}
+
+.stat-value {
+  font-size: var(--text-2xl);
+  font-weight: var(--fw-bold);
+  color: var(--dark);
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: var(--text-sm);
+  color: var(--gray);
+  font-weight: var(--fw-medium);
+}
+
+.stat-trend {
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+}
+
+.stat-trend-up   { color: var(--success); }
+.stat-trend-down { color: var(--danger); }

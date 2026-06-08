@@ -1,0 +1,208 @@
+/* ─── Navigation: Topbar + Sidebar ──────────────────────────── */
+
+/* ── Topbar ── */
+.topbar {
+  height: 60px;
+  background: var(--white);
+  border-bottom: 1px solid var(--gray-light);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-xl);
+  gap: var(--space-md);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: var(--shadow-sm);
+}
+
+.topbar-brand {
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  font-size: var(--text-base);
+  color: var(--dark);
+  letter-spacing: .02em;
+}
+
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.topbar-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-full);
+  background: var(--primary);
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--fw-bold);
+  font-size: var(--text-sm);
+}
+
+.topbar-name {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--dark);
+  line-height: 1.2;
+}
+
+.topbar-role {
+  font-size: var(--text-xs);
+  color: var(--gray);
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 240px;
+  min-width: 240px;
+  background: var(--dark);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow-y: auto;
+}
+
+.sidebar-logo {
+  padding: var(--space-lg) var(--space-lg) var(--space-md);
+  border-bottom: 1px solid rgba(255,255,255,.1);
+}
+
+.sidebar-logo-text {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: var(--fw-bold);
+  color: var(--white);
+  letter-spacing: .02em;
+}
+
+.sidebar-section {
+  padding: var(--space-md) var(--space-md) 0;
+}
+
+.sidebar-label {
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: rgba(255,255,255,.4);
+  padding: 0 var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: .6rem var(--space-sm);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  color: rgba(255,255,255,.7);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-medium);
+  margin-bottom: 2px;
+  user-select: none;
+}
+
+.nav-item:hover {
+  background: rgba(255,255,255,.08);
+  color: var(--white);
+}
+
+.nav-item.active {
+  background: var(--primary);
+  color: var(--white);
+}
+
+.nav-item-icon {
+  width: 18px;
+  text-align: center;
+  font-size: .95rem;
+  flex-shrink: 0;
+}
+
+.nav-item-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Course list in sidebar */
+.sidebar-course-list {
+  padding: 0 var(--space-md);
+  overflow-y: auto;
+  max-height: 35vh;
+}
+
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--gray-light);
+  margin-bottom: var(--space-xl);
+}
+
+.tab {
+  padding: .65rem var(--space-lg);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--gray);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.tab:hover {
+  color: var(--primary);
+}
+
+.tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+/* ── Breadcrumb ── */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-sm);
+  color: var(--gray);
+  margin-bottom: var(--space-lg);
+}
+
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.breadcrumb-item a {
+  color: var(--primary);
+}
+
+.breadcrumb-separator {
+  color: var(--gray-light);
+}
+
+.breadcrumb-item.active {
+  color: var(--dark);
+  font-weight: var(--fw-medium);
+}
