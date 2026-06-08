@@ -110,6 +110,12 @@ def create_app(config_name='development'):
         def serve_upload(filename):
             return send_from_directory(uploads_dir, filename)
 
+        # Serve CSS design system files
+        @app.route('/css/<path:filename>', methods=['GET'])
+        def serve_css(filename):
+            css_dir = os.path.join(basedir, 'css')
+            return send_from_directory(css_dir, filename)
+
         # Health check
         @app.route('/health', methods=['GET'])
         def health():
