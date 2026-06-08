@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IBC Ensino — Plataforma EAD</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
@@ -336,7 +337,7 @@
     <div class="sidebar" id="sidebar">
       <div class="sidebar-section">
         <div class="sidebar-label">Menu</div>
-        <div class="course-item" id="nav-student-dash" onclick="showStudentDashboard()" style="display:none">
+        <div class="course-item" id="nav-student-dash" onclick="detectarPerfilEAtualizarDashboard()" style="display:none">
           <span class="ci-icon">📊</span>
           <div class="ci-text"><div class="ci-name">Meu Painel</div></div>
         </div>
@@ -351,11 +352,11 @@
       </div>
       <div class="sidebar-section" id="admin-nav-section" style="display:none">
         <div class="sidebar-label">Administração</div>
-        <div class="course-item" id="nav-admin-dashboard" onclick="showAdminPanel('dashboard')" style="display:none">
+        <div class="course-item" id="nav-admin-dashboard" onclick="detectarPerfilEAtualizarDashboard()" style="display:none">
           <span class="ci-icon">📊</span>
           <div class="ci-text"><div class="ci-name">Dashboard</div></div>
         </div>
-        <div class="course-item" id="nav-tutor-dash" onclick="showTutorDashboard()" style="display:none">
+        <div class="course-item" id="nav-tutor-dash" onclick="detectarPerfilEAtualizarDashboard()" style="display:none">
           <span class="ci-icon">📊</span>
           <div class="ci-text"><div class="ci-name">Painel do Tutor</div></div>
         </div>
@@ -470,9 +471,7 @@ async function init(){
       await loadCategories();
       setupUI();
       show('main');
-      if(isAdmin()) renderDashboard();
-      else if(isTutor()) showTutorDashboard();
-      else showStudentDashboard();
+      detectarPerfilEAtualizarDashboard();
     } else {
       show('login');
     }
@@ -534,9 +533,17 @@ async function doLogin(){
   await loadCategories();
   setupUI();
   show('main');
-  if(isAdmin()) renderDashboard();
-  else if(isTutor()) renderAdminCatalog();
-  else renderCatalogView('');
+  detectarPerfilEAtualizarDashboard();
+}
+
+// ── Profile-specific dashboard dispatcher ──
+function detectarPerfilEAtualizarDashboard(){
+  document.querySelectorAll('.course-item').forEach(x=>x.classList.remove('active'));
+  if(!currentUser){ renderAlunoExternoDashboard(); return; }
+  if(isAdmin()) renderAdminDashboard();
+  else if(isTutor()) renderTutorPanelDashboard();
+  else if(isAlunoInterno()) renderAlunoDashboard();
+  else renderAlunoExternoDashboard();
 }
 document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
@@ -2057,6 +2064,237 @@ async function showBadgesPage(){
     <h3 style="font-size:.85rem;color:var(--navy);margin:1rem 0 .6rem">Ainda não conquistados (${locked.length})</h3>
     ${locked.length ? locked.map(card).join('') : ''}
   `;
+}
+
+// ── Profile-specific dashboards ──────────────────────────────────────────
+
+function gKpiCard(value, label, sub){
+  return `<div style="background:white;border-radius:var(--radius);box-shadow:0 2px 10px rgba(0,0,0,.06);padding:1rem 1.2rem;flex:1;min-width:140px">
+    <div style="font-size:1.7rem;font-weight:700;color:var(--navy)">${value}</div>
+    <div style="font-size:.78rem;color:var(--muted)">${label}</div>
+    ${sub?`<div style="font-size:.72rem;color:var(--success);margin-top:.2rem">${sub}</div>`:''}
+  </div>`;
+}
+
+async function renderAdminDashboard(){
+  const el=document.getElementById('main-content');
+  el.innerHTML='<div class="course-header"><span class="course-tag">Admin</span><h1 class="course-title">📊 Dashboard Executivo</h1></div><div id="admin-dash-body">Carregando...</div>';
+  const res=await api('GET','/admin/dashboard');
+  if(!res.ok){ document.getElementById('admin-dash-body').innerHTML='<div class="pdf-no-files">Não foi possível carregar o dashboard.</div>'; return; }
+  const d=await res.json();
+  const body=document.getElementById('admin-dash-body');
+  body.innerHTML=`
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.2rem">
+      ${gKpiCard(d.total_users.total, '👥 Usuários', `${d.total_users.alunos} alunos · ${d.total_users.tutores} tutores`)}
+      ${gKpiCard(d.total_courses, '📚 Cursos')}
+      ${gKpiCard(d.completion_rate+'%', '📊 Taxa de conclusão média')}
+      ${gKpiCard(d.new_users_7d, '📈 Novos (7 dias)')}
+    </div>
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.2rem">
+      <div style="background:white;border-radius:var(--radius);box-shadow:0 2px 10px rgba(0,0,0,.06);padding:1rem;flex:2;min-width:280px">
+        <div style="font-weight:700;color:var(--navy);margin-bottom:.5rem">📈 Atividade (últimos 7 dias)</div>
+        <canvas id="admin-chart-line" height="140"></canvas>
+      </div>
+      <div style="background:white;border-radius:var(--radius);box-shadow:0 2px 10px rgba(0,0,0,.06);padding:1rem;flex:1;min-width:220px">
+        <div style="font-weight:700;color:var(--navy);margin-bottom:.5rem">🍰 Distribuição de usuários</div>
+        <canvas id="admin-chart-pie" height="140"></canvas>
+      </div>
+    </div>
+    <div class="admin-section" style="margin-bottom:1.2rem">
+      <div class="admin-section-header">🚨 Alertas</div>
+      <div class="admin-section-body">
+        ${d.alerts.map(a=>`<div style="padding:.4rem 0;font-size:.85rem">${a.severity==='high'?'❌':(a.severity==='warn'?'⚠️':'✅')} ${a.message}</div>`).join('')}
+      </div>
+    </div>
+    <div class="admin-section" style="margin-bottom:1.2rem">
+      <div class="admin-section-header">📋 Atividades recentes</div>
+      <div class="admin-section-body">
+        ${d.recent_activities.length ? d.recent_activities.map(a=>`<div style="padding:.35rem 0;font-size:.82rem;color:var(--navy)">• <strong>${a.user}</strong> ${a.action} — <span style="color:var(--muted)">${a.timestamp?new Date(a.timestamp).toLocaleString('pt-BR'):''}</span></div>`).join('') : '<div style="font-size:.82rem;color:var(--muted)">Nenhuma atividade recente.</div>'}
+      </div>
+    </div>
+    <div style="display:flex;gap:.7rem;flex-wrap:wrap">
+      <button class="btn-gold" onclick="showAdminPanel('catalog')">+ Novo Curso</button>
+      <button class="btn-secondary" onclick="showAdminPanel('users')">Gerenciar Tutores</button>
+      <button class="btn-secondary" onclick="showAdminPanel('catalog')">Ver Relatórios</button>
+    </div>`;
+
+  if(window.Chart){
+    new Chart(document.getElementById('admin-chart-line'), {
+      type:'line',
+      data:{labels:d.weekly_stats.map(w=>w.day), datasets:[{label:'Cadastros/Logins', data:d.weekly_stats.map(w=>w.logins), borderColor:'#1d3557', backgroundColor:'rgba(29,53,87,.15)', tension:.3, fill:true}]},
+      options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}
+    });
+    new Chart(document.getElementById('admin-chart-pie'), {
+      type:'pie',
+      data:{labels:['Alunos','Tutores','Admins'], datasets:[{data:[d.user_distribution.alunos,d.user_distribution.tutores,d.user_distribution.admins], backgroundColor:['#e9c46a','#2a9d8f','#e76f51']}]},
+      options:{plugins:{legend:{position:'bottom'}}}
+    });
+  }
+}
+
+async function renderTutorPanelDashboard(){
+  const el=document.getElementById('main-content');
+  el.innerHTML=`<div class="course-header"><span class="course-tag">Painel do Tutor</span><h1 class="course-title">👨‍🏫 Olá, ${currentUser.name.split(' ')[0]}!</h1></div><div id="tutor-panel-body">Carregando...</div>`;
+  const res=await api('GET','/tutor/dashboard');
+  if(!res.ok){ document.getElementById('tutor-panel-body').innerHTML='<div class="pdf-no-files">Não foi possível carregar o painel.</div>'; return; }
+  const d=await res.json();
+  const body=document.getElementById('tutor-panel-body');
+  const pend=d.pending_questions;
+  body.innerHTML=`
+    ${pend.length?`
+    <div style="background:#fdecea;border:1.5px solid var(--danger);border-radius:var(--radius);padding:1rem;margin-bottom:1.2rem">
+      <div style="font-weight:700;color:var(--danger);margin-bottom:.6rem">⚠️ ${pend.length} dúvida(s) sem resposta — responda agora!</div>
+      ${pend.map(q=>`<div style="background:white;border-radius:8px;padding:.6rem .8rem;margin-bottom:.5rem">
+        <div style="font-size:.85rem;color:var(--navy)"><strong>${q.author}:</strong> "${q.text}" <span style="color:var(--muted);font-size:.75rem">(${new Date(q.timestamp).toLocaleString('pt-BR')})</span></div>
+        <div style="font-size:.75rem;color:var(--muted);margin:.2rem 0">Curso: ${q.course}</div>
+        <button class="btn-gold" style="padding:.3rem .8rem;font-size:.78rem" onclick="setTutorDashTab('duvidas');showTutorDashboard()">Responder Agora</button>
+      </div>`).join('')}
+    </div>` : `<div style="background:#eaf7ee;border:1.5px solid var(--success);border-radius:var(--radius);padding:.8rem 1rem;margin-bottom:1.2rem;color:var(--success);font-size:.85rem">✅ Nenhuma dúvida pendente. Tudo em dia!</div>`}
+
+    <h3 style="font-size:.9rem;color:var(--navy);margin:0 0 .6rem">📚 Meus cursos</h3>
+    <div class="catalog-grid" style="margin-bottom:1.2rem">
+      ${d.my_courses.map(c=>`
+        <div class="course-card" onclick="selectCourse(${c.id})">
+          <div class="course-card-banner">${c.icon||'📚'}</div>
+          <div class="course-card-body">
+            <div class="course-card-name">${c.name}</div>
+            <div class="course-card-meta"><span>👥 ${c.students} aluno(s) inscrito(s)</span></div>
+            <div class="course-card-meta"><span>Progresso: ${c.completed}/${c.students} (${c.completion_rate}% conclusão)</span></div>
+            ${c.alerts.length?`<div style="font-size:.75rem;color:var(--danger);margin-top:.3rem">⚠️ ${c.alerts[0]}</div>`:`<div style="font-size:.75rem;color:var(--success);margin-top:.3rem">✅ Rodando bem</div>`}
+            <button class="btn-secondary" style="margin-top:.5rem;width:100%;padding:.35rem;font-size:.78rem" onclick="event.stopPropagation();selectCourse(${c.id})">Ver Alunos</button>
+          </div>
+        </div>`).join('')}
+    </div>
+
+    <h3 style="font-size:.9rem;color:var(--navy);margin:0 0 .6rem">📊 Atividade (últimos 7 dias)</h3>
+    <div style="background:white;border-radius:var(--radius);box-shadow:0 2px 10px rgba(0,0,0,.06);padding:.9rem 1.1rem;margin-bottom:1.2rem;font-size:.82rem;color:var(--navy);display:flex;flex-direction:column;gap:.3rem">
+      <span>💬 Dúvidas: ${d.weekly_activity.new_questions} novas (respondeu ${d.weekly_activity.answered})</span>
+      <span>👥 Novos alunos: ${d.weekly_activity.new_students}</span>
+    </div>
+
+    <div style="display:flex;gap:.7rem;flex-wrap:wrap">
+      <button class="btn-gold" onclick="showTutorDashboard()">Ver Todos Alunos</button>
+      <button class="btn-secondary" onclick="showAdminPanel('catalog')">Criar Aula</button>
+    </div>`;
+}
+
+async function renderAlunoDashboard(){
+  const el=document.getElementById('main-content');
+  el.innerHTML=`<div class="course-header"><span class="course-tag">Meu Painel</span><h1 class="course-title">🏠 Bem-vindo de volta, ${currentUser.name.split(' ')[0]}!</h1></div><div id="aluno-dash-body">Carregando...</div>`;
+  const res=await api('GET','/aluno/dashboard');
+  if(!res.ok){ document.getElementById('aluno-dash-body').innerHTML='<div class="pdf-no-files">Não foi possível carregar o painel.</div>'; return; }
+  const d=await res.json();
+  const body=document.getElementById('aluno-dash-body');
+  const s=d.user_stats;
+  const target = s.level>=7 ? (s.points_in_level||1) : 100;
+  const pct=Math.min(100,Math.round(s.points_in_level/target*100));
+  const filled=Math.round(pct/10);
+  const bar='▓'.repeat(filled)+'░'.repeat(10-filled);
+  const ip=d.in_progress_course;
+  body.innerHTML=`
+    <p style="color:var(--muted);font-style:italic;margin:-.6rem 0 1.2rem">"Continue sua jornada de fé" ✨</p>
+
+    <div style="background:white;border:1px solid #e8e0d4;border-radius:var(--radius);padding:1rem 1.2rem;margin-bottom:1.2rem">
+      <div style="font-family:'Playfair Display',serif;color:var(--navy);font-weight:700;margin-bottom:.4rem">🎮 Seu progresso</div>
+      <div style="font-size:.85rem;color:var(--navy);font-weight:600">⭐ Level ${s.level}: ${s.level_name}</div>
+      <div style="font-size:.78rem;color:var(--muted);margin:.2rem 0">${s.points_in_level} / ${target} XP</div>
+      <div style="font-family:monospace;color:var(--gold)">${bar} ${pct}%</div>
+      <div style="margin-top:.7rem;font-size:.85rem;color:var(--navy)">🏆 Seus Troféus: <strong>${d.trofeus_count}</strong> conquistado(s)</div>
+      <div style="margin:.3rem 0">${d.trofeus_unlocked.map(t=>`<span title="${t.name}" style="font-size:1.2rem">${t.icon}</span>`).join(' ')||'<span style="color:var(--muted);font-size:.78rem">Nenhum troféu ainda</span>'}</div>
+      <button class="btn-secondary" style="padding:.35rem .8rem;font-size:.78rem" onclick="showBadgesPage()">Ver Coleção Completa →</button>
+    </div>
+
+    ${ip?`
+    <h3 style="font-size:.9rem;color:var(--navy);margin:0 0 .6rem">🎯 Continue de onde parou</h3>
+    <div style="background:white;border-radius:var(--radius);box-shadow:0 2px 10px rgba(0,0,0,.08);padding:1.1rem;margin-bottom:1.2rem">
+      <div style="font-weight:700;color:var(--navy)">${ip.icon} ${ip.name} — Aula ${ip.aula_atual}/${ip.total_aulas}</div>
+      <div class="cc-bar" style="margin:.5rem 0"><div class="cc-bar-fill" style="width:${ip.percentage}%"></div></div>
+      <button class="btn-gold" style="padding:.6rem 1.4rem;font-size:.9rem;font-weight:700" onclick="selectCourse(${ip.id})">🚀 Continuar Aula</button>
+    </div>` : ''}
+
+    <h3 style="font-size:.9rem;color:var(--navy);margin:0 0 .6rem">✨ Próximas metas</h3>
+    <div style="background:white;border-radius:var(--radius);box-shadow:0 2px 10px rgba(0,0,0,.06);padding:.9rem 1.1rem;margin-bottom:1.2rem;font-size:.82rem;color:var(--navy);display:flex;flex-direction:column;gap:.35rem">
+      ${d.next_metas.length ? d.next_metas.map(m=>`<span>📌 ${m.description}</span>`).join('') : '<span style="color:var(--muted)">Nenhuma meta no momento — explore o catálogo!</span>'}
+    </div>
+
+    ${d.recent_trofeus.length?`
+    <h3 style="font-size:.9rem;color:var(--navy);margin:0 0 .6rem">🎖️ Últimas conquistas</h3>
+    <div style="background:white;border-radius:var(--radius);box-shadow:0 2px 10px rgba(0,0,0,.06);padding:.9rem 1.1rem;margin-bottom:1.2rem">
+      ${d.recent_trofeus.map(t=>`<div style="font-size:.82rem;color:var(--navy);margin-bottom:.3rem">✅ ${t.icon} <strong>${t.name}</strong> <span style="color:var(--muted);font-size:.74rem">(${new Date(t.date).toLocaleDateString('pt-BR')})</span></div>`).join('')}
+    </div>`:''}
+
+    <h3 style="font-size:.9rem;color:var(--navy);margin:0 0 .6rem">📚 Outros cursos</h3>
+    <div class="catalog-grid">
+      ${d.other_courses.map(c=>`
+        <div class="course-card" onclick="selectCourse(${c.id})">
+          <div class="course-card-banner">${c.icon||'📚'}</div>
+          <div class="course-card-body">
+            <div class="course-card-name">${c.name}</div>
+            ${c.status==='concluido'?`<span class="badge-respondida">✅ Concluído</span>`:(c.status==='em_andamento'?`<span style="font-size:.75rem;color:var(--gold)">Em andamento — ${c.percentage}%</span>`:`<button class="btn-secondary" style="margin-top:.4rem;width:100%;padding:.35rem;font-size:.78rem">Começar</button>`)}
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+async function renderAlunoExternoDashboard(){
+  const el=document.getElementById('main-content');
+  el.innerHTML=`<div class="course-header"><span class="course-tag">Plataforma</span><h1 class="course-title">🌍 Plataforma de Estudos Bíblicos</h1></div><div id="externo-dash-body">Carregando...</div>`;
+  const res=await api('GET','/aluno-externo/dashboard');
+  if(!res.ok){ document.getElementById('externo-dash-body').innerHTML='<div class="pdf-no-files">Não foi possível carregar.</div>'; return; }
+  const d=await res.json();
+  const body=document.getElementById('externo-dash-body');
+  const stars=(n)=>'⭐'.repeat(Math.round(n))+'☆'.repeat(5-Math.round(n));
+  body.innerHTML=`
+    <p style="color:var(--muted);font-style:italic;margin:-.6rem 0 1.2rem">${currentUser?`Bem-vindo, ${currentUser.name.split(' ')[0]}!`:'Bem-vindo, visitante!'} "Descubra uma comunidade de aprendizado cristão"</p>
+
+    ${d.user_stats?`
+    <div style="background:white;border:1px solid #e8e0d4;border-radius:var(--radius);padding:.9rem 1.1rem;margin-bottom:1.2rem;font-size:.85rem;color:var(--navy)">
+      🎮 Meu progresso — ⭐ Level ${d.user_stats.level}: ${d.user_stats.level_name} | ${d.user_stats.points_in_level} XP | 🏆 ${d.trofeus_count} troféu(s)
+    </div>`:''}
+
+    ${d.in_progress?`
+    <h3 style="font-size:.9rem;color:var(--navy);margin:0 0 .6rem">🚀 Continue estudando</h3>
+    <div style="background:white;border-radius:var(--radius);box-shadow:0 2px 10px rgba(0,0,0,.08);padding:1rem;margin-bottom:1.2rem">
+      <div style="font-weight:700;color:var(--navy)">${d.in_progress.icon} ${d.in_progress.name} — Aula ${d.in_progress.aula}/${d.in_progress.total}</div>
+      <div class="cc-bar" style="margin:.5rem 0"><div class="cc-bar-fill" style="width:${d.in_progress.percentage}%"></div></div>
+      <button class="btn-gold" onclick="selectCourse(${d.in_progress.id})">🚀 Continuar Aula</button>
+    </div>`:''}
+
+    <h3 style="font-size:.9rem;color:var(--navy);margin:0 0 .6rem">🌟 Descubra mais cursos</h3>
+    <div class="catalog-grid" style="margin-bottom:1.2rem">
+      ${d.featured_courses.map(c=>`
+        <div class="course-card" onclick="selectCourse(${c.id})">
+          <div class="course-card-banner">${c.icon||'📚'}</div>
+          <div class="course-card-body">
+            <div class="course-card-tag">${c.category}</div>
+            <div class="course-card-name">${c.name}</div>
+            <div style="font-size:.8rem;color:var(--gold)">${stars(c.rating)} (${c.review_count})</div>
+            <div class="course-card-meta"><span>📋 ${c.lessons} aula(s) · Gratuito ✅</span></div>
+            <button class="btn-gold" style="margin-top:.4rem;width:100%;padding:.35rem;font-size:.78rem">Começar</button>
+          </div>
+        </div>`).join('')}
+    </div>
+
+    ${d.trofeus_unlocked.length?`
+    <h3 style="font-size:.9rem;color:var(--navy);margin:0 0 .6rem">🎖️ Seus troféus</h3>
+    <div style="background:white;border-radius:var(--radius);box-shadow:0 2px 10px rgba(0,0,0,.06);padding:.9rem 1.1rem;margin-bottom:1.2rem">
+      ${d.trofeus_unlocked.map(t=>`<div style="font-size:.82rem;color:var(--navy);margin-bottom:.3rem">${t.icon} <strong>${t.name}</strong><br><span style="color:var(--muted);font-size:.75rem">"${t.description||''}" (${new Date(t.date).toLocaleDateString('pt-BR')})</span></div>`).join('')}
+    </div>`:''}
+
+    <h3 style="font-size:.9rem;color:var(--navy);margin:0 0 .6rem">📊 Nossa comunidade</h3>
+    <div style="background:white;border-radius:var(--radius);box-shadow:0 2px 10px rgba(0,0,0,.06);padding:.9rem 1.1rem;margin-bottom:1.2rem;font-size:.85rem;color:var(--navy);display:flex;gap:1.4rem;flex-wrap:wrap">
+      <span>👥 ${d.community_stats.total_users} alunos</span>
+      <span>📚 ${d.community_stats.total_courses} cursos</span>
+      <span>⭐ ${d.community_stats.avg_rating}/5.0</span>
+      <span>🎯 ${d.community_stats.completion_rate}% taxa de conclusão</span>
+    </div>
+
+    <h3 style="font-size:.9rem;color:var(--navy);margin:0 0 .6rem">💭 Depoimentos</h3>
+    <div style="background:white;border-radius:var(--radius);box-shadow:0 2px 10px rgba(0,0,0,.06);padding:.9rem 1.1rem;margin-bottom:1.2rem">
+      ${d.testimonials.map(t=>`<div style="font-size:.82rem;color:var(--navy);margin-bottom:.3rem">✨ "${t.text}" — ${t.author}, ${t.location}</div>`).join('')}
+    </div>
+
+    ${!currentUser?`<div style="display:flex;gap:.7rem"><button class="btn-gold" onclick="show('login')">Criar Conta</button><button class="btn-secondary" onclick="showCatalog()">Continuar Visitando</button></div>`:''}`;
 }
 
 // ── Tutor Dashboard ──
