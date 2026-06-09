@@ -1859,103 +1859,110 @@ function gKpiCard(value, label, sub){
 
 async function renderAdminDashboard(){
   const el=document.getElementById('main-content');
-  el.innerHTML='<div class="course-header"><span class="course-tag">Admin</span><h1 class="course-title">📊 Dashboard Executivo</h1></div><div id="admin-dash-body">Carregando...</div>';
+  el.innerHTML=`
+    <div class="dash-heading">📊 Dashboard Executivo</div>
+    <div id="admin-dash-body"><div class="alert alert-info"><span class="alert-icon">⏳</span><div class="alert-body">Carregando...</div></div></div>`;
   const res=await api('GET','/admin/dashboard');
-  if(!res.ok){ document.getElementById('admin-dash-body').innerHTML='<div class="pdf-no-files">Não foi possível carregar o dashboard.</div>'; return; }
+  if(!res.ok){ document.getElementById('admin-dash-body').innerHTML='<div class="alert alert-danger"><span class="alert-icon">❌</span><div class="alert-body">Não foi possível carregar o dashboard.</div></div>'; return; }
   const d=await res.json();
   const body=document.getElementById('admin-dash-body');
   body.innerHTML=`
-    <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.2rem">
-      ${gKpiCard(d.total_users.total, '👥 Usuários', `${d.total_users.alunos} alunos · ${d.total_users.tutores} tutores`)}
-      ${gKpiCard(d.total_courses, '📚 Cursos')}
-      ${gKpiCard(d.completion_rate+'%', '📊 Taxa de conclusão média')}
-      ${gKpiCard(d.new_users_7d, '📈 Novos (7 dias)')}
-    </div>
-    <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.2rem">
-      <div style="background:white;border-radius:var(--radius);box-shadow:0 2px 10px rgba(0,0,0,.06);padding:1rem;flex:2;min-width:280px">
-        <div style="font-weight:700;color:var(--navy);margin-bottom:.5rem">📈 Atividade (últimos 7 dias)</div>
-        <canvas id="admin-chart-line" height="140"></canvas>
+    <div class="kpi-grid">
+      <div class="stat-card">
+        <div class="stat-value">${d.total_users.total}</div>
+        <div class="stat-label">👥 Usuários</div>
+        <div style="font-size:var(--text-xs);color:var(--gray);margin-top:2px">${d.total_users.alunos} alunos · ${d.total_users.tutores} tutores</div>
+        ${d.new_users_7d>0?`<div class="stat-trend stat-trend-up">↑ ${d.new_users_7d} novos (7d)</div>`:''}
       </div>
-      <div style="background:white;border-radius:var(--radius);box-shadow:0 2px 10px rgba(0,0,0,.06);padding:1rem;flex:1;min-width:220px">
-        <div style="font-weight:700;color:var(--navy);margin-bottom:.5rem">🍰 Distribuição de usuários</div>
-        <canvas id="admin-chart-pie" height="140"></canvas>
+      <div class="stat-card">
+        <div class="stat-value">${d.total_courses}</div>
+        <div class="stat-label">📚 Cursos</div>
       </div>
-    </div>
-    <div class="admin-section" style="margin-bottom:1.2rem">
-      <div class="admin-section-header">🚨 Alertas</div>
-      <div class="admin-section-body">
-        ${d.alerts.map(a=>`<div style="padding:.4rem 0;font-size:.85rem">${a.severity==='high'?'❌':(a.severity==='warn'?'⚠️':'✅')} ${a.message}</div>`).join('')}
+      <div class="stat-card">
+        <div class="stat-value">${d.completion_rate}%</div>
+        <div class="stat-label">📊 Conclusão Média</div>
       </div>
-    </div>
-    <div class="admin-section" style="margin-bottom:1.2rem">
-      <div class="admin-section-header">📋 Atividades recentes</div>
-      <div class="admin-section-body">
-        ${d.recent_activities.length ? d.recent_activities.map(a=>`<div style="padding:.35rem 0;font-size:.82rem;color:var(--navy)">• <strong>${a.user}</strong> ${a.action} — <span style="color:var(--muted)">${a.timestamp?new Date(a.timestamp).toLocaleString('pt-BR'):''}</span></div>`).join('') : '<div style="font-size:.82rem;color:var(--muted)">Nenhuma atividade recente.</div>'}
+      <div class="stat-card">
+        <div class="stat-value">${d.new_users_7d}</div>
+        <div class="stat-label">📈 Novos (7 dias)</div>
+        ${d.new_users_7d>0?`<div class="stat-trend stat-trend-up">↑ Esta semana</div>`:''}
       </div>
     </div>
-    <div style="display:flex;gap:.7rem;flex-wrap:wrap">
-      <button class="btn-gold" onclick="showAdminPanel('catalog')">+ Novo Curso</button>
-      <button class="btn-secondary" onclick="showAdminPanel('users')">Gerenciar Tutores</button>
-      <button class="btn-secondary" onclick="showAdminPanel('catalog')">Ver Relatórios</button>
+    <div class="grid grid-cols-2 gap-lg" style="margin-bottom:var(--space-xl)">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">📈 Atividade (últimos 7 dias)</h3></div>
+        <div class="card-body"><canvas id="admin-chart-line" height="140"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">🍰 Distribuição de usuários</h3></div>
+        <div class="card-body"><canvas id="admin-chart-pie" height="140"></canvas></div>
+      </div>
+    </div>
+    <div class="dash-section">
+      <div class="dash-section-title">🚨 Alertas</div>
+      ${d.alerts.length?d.alerts.map(a=>`<div class="alert ${a.severity==='high'?'alert-danger':a.severity==='warn'?'alert-warning':'alert-info'}"><span class="alert-icon">${a.severity==='high'?'❌':a.severity==='warn'?'⚠️':'✅'}</span><div class="alert-body">${a.message}</div></div>`).join(''):'<div class="alert alert-success"><span class="alert-icon">✅</span><div class="alert-body">Nenhum alerta no momento.</div></div>'}
+    </div>
+    <div class="card" style="margin-bottom:var(--space-xl)">
+      <div class="card-header"><h3 class="card-title">📋 Atividades Recentes</h3></div>
+      <div class="card-body">
+        <div class="activity-list">
+          ${d.recent_activities.length?d.recent_activities.map(a=>`<div class="activity-item"><div class="activity-dot"></div><div class="activity-text"><strong>${a.user}</strong> ${a.action}</div><div class="activity-time">${a.timestamp?new Date(a.timestamp).toLocaleString('pt-BR'):''}</div></div>`).join(''):'<p style="color:var(--gray);font-size:var(--text-sm)">Nenhuma atividade recente.</p>'}
+        </div>
+      </div>
+    </div>
+    <div class="quick-actions">
+      <button class="btn btn-primary" onclick="showAdminPanel('catalog')">+ Novo Curso</button>
+      <button class="btn btn-outline" onclick="showAdminPanel('users')">Gerenciar Tutores</button>
+      <button class="btn btn-outline" onclick="showAdminPanel('catalog')">Ver Relatórios</button>
     </div>`;
-
   if(window.Chart){
-    new Chart(document.getElementById('admin-chart-line'), {
-      type:'line',
-      data:{labels:d.weekly_stats.map(w=>w.day), datasets:[{label:'Cadastros/Logins', data:d.weekly_stats.map(w=>w.logins), borderColor:'#1d3557', backgroundColor:'rgba(29,53,87,.15)', tension:.3, fill:true}]},
-      options:{plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}
-    });
-    new Chart(document.getElementById('admin-chart-pie'), {
-      type:'pie',
-      data:{labels:['Alunos','Tutores','Admins'], datasets:[{data:[d.user_distribution.alunos,d.user_distribution.tutores,d.user_distribution.admins], backgroundColor:['#e9c46a','#2a9d8f','#e76f51']}]},
-      options:{plugins:{legend:{position:'bottom'}}}
-    });
+    new Chart(document.getElementById('admin-chart-line'),{type:'line',data:{labels:d.weekly_stats.map(w=>w.day),datasets:[{label:'Logins',data:d.weekly_stats.map(w=>w.logins),borderColor:'#008ea8',backgroundColor:'rgba(0,142,168,.12)',tension:.4,fill:true,pointBackgroundColor:'#008ea8'}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.05)'}},x:{grid:{color:'rgba(0,0,0,.05)'}}}}});
+    new Chart(document.getElementById('admin-chart-pie'),{type:'pie',data:{labels:['Alunos','Tutores','Admins'],datasets:[{data:[d.user_distribution.alunos,d.user_distribution.tutores,d.user_distribution.admins],backgroundColor:['#008ea8','#27ae60','#f39c12'],borderWidth:0}]},options:{plugins:{legend:{position:'bottom',labels:{padding:16,font:{size:12}}}}}});
   }
 }
 
 async function renderTutorPanelDashboard(){
   const el=document.getElementById('main-content');
-  el.innerHTML=`<div class="course-header"><span class="course-tag">Painel do Tutor</span><h1 class="course-title">👨‍🏫 Olá, ${currentUser.name.split(' ')[0]}!</h1></div><div id="tutor-panel-body">Carregando...</div>`;
+  el.innerHTML=`
+    <div class="dash-heading">👨‍🏫 Painel do Tutor</div>
+    <div class="dash-subtitle">Olá, ${currentUser.name.split(' ')[0]}! Aqui está seu resumo.</div>
+    <div id="tutor-panel-body"><div class="alert alert-info"><span class="alert-icon">⏳</span><div class="alert-body">Carregando...</div></div></div>`;
   const res=await api('GET','/tutor/dashboard');
-  if(!res.ok){ document.getElementById('tutor-panel-body').innerHTML='<div class="pdf-no-files">Não foi possível carregar o painel.</div>'; return; }
+  if(!res.ok){ document.getElementById('tutor-panel-body').innerHTML='<div class="alert alert-danger"><span class="alert-icon">❌</span><div class="alert-body">Não foi possível carregar.</div></div>'; return; }
   const d=await res.json();
   const body=document.getElementById('tutor-panel-body');
   const pend=d.pending_questions;
   body.innerHTML=`
     ${pend.length?`
-    <div style="background:#fdecea;border:1.5px solid var(--danger);border-radius:var(--radius);padding:1rem;margin-bottom:1.2rem">
-      <div style="font-weight:700;color:var(--danger);margin-bottom:.6rem">⚠️ ${pend.length} dúvida(s) sem resposta — responda agora!</div>
-      ${pend.map(q=>`<div style="background:white;border-radius:8px;padding:.6rem .8rem;margin-bottom:.5rem">
-        <div style="font-size:.85rem;color:var(--navy)"><strong>${q.author}:</strong> "${q.text}" <span style="color:var(--muted);font-size:.75rem">(${new Date(q.timestamp).toLocaleString('pt-BR')})</span></div>
-        <div style="font-size:.75rem;color:var(--muted);margin:.2rem 0">Curso: ${q.course}</div>
-        <button class="btn-gold" style="padding:.3rem .8rem;font-size:.78rem" onclick="setTutorDashTab('duvidas');showTutorDashboard()">Responder Agora</button>
-      </div>`).join('')}
-    </div>` : `<div style="background:#eaf7ee;border:1.5px solid var(--success);border-radius:var(--radius);padding:.8rem 1rem;margin-bottom:1.2rem;color:var(--success);font-size:.85rem">✅ Nenhuma dúvida pendente. Tudo em dia!</div>`}
-
-    <h3 style="font-size:.9rem;color:var(--navy);margin:0 0 .6rem">📚 Meus cursos</h3>
-    <div class="catalog-grid" style="margin-bottom:1.2rem">
-      ${d.my_courses.map(c=>`
-        <div class="course-card" onclick="selectCourse(${c.id})">
-          <div class="course-card-banner">${c.icon||'📚'}</div>
-          <div class="course-card-body">
-            <div class="course-card-name">${c.name}</div>
-            <div class="course-card-meta"><span>👥 ${c.students} aluno(s) inscrito(s)</span></div>
-            <div class="course-card-meta"><span>Progresso: ${c.completed}/${c.students} (${c.completion_rate}% conclusão)</span></div>
-            ${c.alerts.length?`<div style="font-size:.75rem;color:var(--danger);margin-top:.3rem">⚠️ ${c.alerts[0]}</div>`:`<div style="font-size:.75rem;color:var(--success);margin-top:.3rem">✅ Rodando bem</div>`}
-            <button class="btn-secondary" style="margin-top:.5rem;width:100%;padding:.35rem;font-size:.78rem" onclick="event.stopPropagation();selectCourse(${c.id})">Ver Alunos</button>
+    <div class="pending-questions-alert">
+      <div class="pending-questions-title">⚠️ ${pend.length} dúvida(s) sem resposta — responda agora!</div>
+      ${pend.map(q=>`<div class="question-item"><div class="question-item-header"><span><strong>${q.author}:</strong> "${q.text}"</span><span class="time-badge">${new Date(q.timestamp).toLocaleString('pt-BR')}</span></div><div class="question-course-tag">📚 ${q.course}</div><div><button class="btn btn-primary btn-sm" onclick="setTutorDashTab('duvidas');showTutorDashboard()">Responder Agora</button></div></div>`).join('')}
+    </div>`:`<div class="alert alert-success"><span class="alert-icon">✅</span><div class="alert-body">Nenhuma dúvida pendente — tudo em dia!</div></div>`}
+    <div class="dash-section">
+      <div class="dash-section-title">📚 Meus Cursos</div>
+      <div class="grid grid-cols-2 gap-lg">
+        ${d.my_courses.map(c=>`<div class="card"><div class="card-body"><h3 class="card-title">${c.icon||'📚'} ${c.name}</h3><div class="stat-row"><span>👥 ${c.students} aluno(s)</span><span style="color:var(--primary);font-weight:var(--fw-bold)">${c.completion_rate}% conclusão</span></div><div class="progress progress-sm" style="margin:var(--space-sm) 0"><div class="progress-bar" style="width:${c.completion_rate}%"></div></div><div style="font-size:var(--text-xs);color:var(--gray);margin-bottom:var(--space-md)">${c.completed}/${c.students} concluíram</div>${c.alerts.length?`<div class="alert alert-sm alert-warning" style="margin-bottom:var(--space-md)"><span>⚠️ ${c.alerts[0]}</span></div>`:`<div class="alert alert-sm alert-success" style="margin-bottom:var(--space-md)"><span>✅ Curso rodando bem</span></div>`}<button class="btn btn-outline btn-sm btn-full" onclick="selectCourse(${c.id})">Ver Alunos</button></div></div>`).join('')}
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:var(--space-xl)">
+      <div class="card-header"><h3 class="card-title">📊 Atividade (últimos 7 dias)</h3></div>
+      <div class="card-body">
+        <div class="kpi-grid">
+          <div class="stat-card" style="box-shadow:none;border:1px solid var(--gray-light)">
+            <div class="stat-value">${d.weekly_activity.new_questions}</div>
+            <div class="stat-label">💬 Novas dúvidas</div>
+            <div class="stat-trend stat-trend-up">↑ respondeu ${d.weekly_activity.answered}</div>
           </div>
-        </div>`).join('')}
+          <div class="stat-card" style="box-shadow:none;border:1px solid var(--gray-light)">
+            <div class="stat-value">${d.weekly_activity.new_students}</div>
+            <div class="stat-label">👥 Novos alunos</div>
+          </div>
+        </div>
+      </div>
     </div>
-
-    <h3 style="font-size:.9rem;color:var(--navy);margin:0 0 .6rem">📊 Atividade (últimos 7 dias)</h3>
-    <div style="background:white;border-radius:var(--radius);box-shadow:0 2px 10px rgba(0,0,0,.06);padding:.9rem 1.1rem;margin-bottom:1.2rem;font-size:.82rem;color:var(--navy);display:flex;flex-direction:column;gap:.3rem">
-      <span>💬 Dúvidas: ${d.weekly_activity.new_questions} novas (respondeu ${d.weekly_activity.answered})</span>
-      <span>👥 Novos alunos: ${d.weekly_activity.new_students}</span>
-    </div>
-
-    <div style="display:flex;gap:.7rem;flex-wrap:wrap">
-      <button class="btn-gold" onclick="showTutorDashboard()">Ver Todos Alunos</button>
-      <button class="btn-secondary" onclick="showAdminPanel('catalog')">Criar Aula</button>
+    <div class="quick-actions">
+      <button class="btn btn-primary" onclick="showTutorDashboard()">Ver Todos Alunos</button>
+      <button class="btn btn-outline" onclick="showAdminPanel('catalog')">Criar Aula</button>
     </div>`;
 }
 
