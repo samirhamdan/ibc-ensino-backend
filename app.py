@@ -110,6 +110,11 @@ def create_app(config_name='development'):
         def serve_upload(filename):
             return send_from_directory(uploads_dir, filename)
 
+        # Favicon
+        @app.route('/favicon.svg', methods=['GET'])
+        def favicon():
+            return send_from_directory(basedir, 'favicon.svg')
+
         # Serve CSS design system files
         @app.route('/css/<path:filename>', methods=['GET'])
         def serve_css(filename):

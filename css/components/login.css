@@ -1,0 +1,103 @@
+/* ─── Cinematic Login (split-screen) ─────────────────────────── */
+#screen-login {
+  padding: 0;
+  background: var(--gray-lighter);
+}
+
+#screen-login.active {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100vh;
+}
+
+.login-visual {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+}
+
+.login-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #006b85, #008ea8, #1ba3c2, #006b85);
+  background-size: 300% 300%;
+  animation: gradientShift 15s ease infinite;
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+.login-visual-content {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  color: var(--white);
+  animation: slideUp 0.8s ease;
+}
+
+.login-visual-logo {
+  width: 180px;
+  margin: 0 auto var(--space-xl);
+  filter: brightness(0) invert(1);
+  display: block;
+}
+
+.login-headline {
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  font-weight: 700;
+  margin-bottom: var(--space-xl);
+  line-height: 1.3;
+  color: var(--white);
+}
+
+.login-verse {
+  font-size: var(--text-base);
+  opacity: 0.9;
+  font-style: italic;
+  max-width: 380px;
+  margin: 0 auto var(--space-sm);
+}
+
+.login-verse-ref {
+  font-size: var(--text-sm);
+  opacity: 0.7;
+}
+
+.login-form-side {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gray-lighter);
+  padding: var(--space-xl);
+}
+
+/* Glassmorphism card (overrides legacy .login-card from app.css) */
+#screen-login .login-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: var(--radius-xl);
+  padding: var(--space-2xl);
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 8px 32px rgba(0, 142, 168, 0.15);
+  animation: scaleIn 0.5s ease 0.2s backwards;
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.94); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+
+@media (max-width: 900px) {
+  #screen-login.active { grid-template-columns: 1fr; }
+  .login-visual { min-height: 35vh; padding: var(--space-xl); }
+  .login-headline { font-size: 1.5rem; }
+}
