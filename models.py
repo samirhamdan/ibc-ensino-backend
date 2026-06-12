@@ -163,6 +163,10 @@ class LessonProgress(db.Model):
     material_read_at = db.Column(db.DateTime, nullable=True)
     material_percentage = db.Column(db.Float, default=0.0)
 
+    user = db.relationship('User', backref='lesson_progresses', lazy=True)
+    course = db.relationship('Course', backref='lesson_progresses', lazy=True)
+    module = db.relationship('Module', backref='lesson_progresses', lazy=True)
+
     __table_args__ = (db.UniqueConstraint('user_id', 'module_id', name='uq_user_module'),)
 
     def to_dict(self):
