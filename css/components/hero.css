@@ -121,6 +121,21 @@
   transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.level-hint { font-size: var(--text-sm); opacity: 0.95; margin: 6px 0 2px; }
+.level-hint strong { color: #f1c40f; }
+.level-tip { font-size: var(--text-xs); opacity: 0.75; margin: 0; }
+
+.hero-cta-empty {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  max-width: 220px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
 .hero-stats {
   display: flex;
   gap: var(--space-lg);

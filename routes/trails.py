@@ -62,13 +62,91 @@ def enroll_trail(trail_id):
     trail = Trail.query.get_or_404(trail_id)
 
     existing = UserTrail.query.filter_by(user_id=user.id, trail_id=trail_id).first()
+    already = bool(existing)
     if not existing:
         db.session.add(UserTrail(user_id=user.id, trail_id=trail_id))
 
+    # enrolling makes this the focused trail
     user.active_trail_id = trail_id
     db.session.commit()
 
-    return jsonify({'ok': True, 'trail': trail.to_dict(include_courses=True)})
+    return jsonify({'ok': True, 'already_enrolled': already,
+                    'trail': trail.to_dict(include_courses=True)})
+
+
+@trails_bp.route('/<int:trail_id>/focus', methods=['POST'])
+def focus_trail(trail_id):
+    user = _current_user()
+    if not user:
+        return jsonify({'error': 'Não autenticado'}), 401
+
+    enrolled = UserTrail.query.filter_by(user_id=user.id, trail_id=trail_id).first()
+    if not enrolled:
+        return jsonify({'error': 'Você não está inscrito nesta trilha'}), 400
+
+    user.active_trail_id = trail_id
+    db.session.commit()
+    return jsonify({'ok': True, 'focused_trail_id': trail_id})
+
+
+def _annotate_trail_progress(trail, user_id, progress_map=None):
+    """Return trail dict with per-course done/current/locked states."""
+    if progress_map is None:
+        progress_map = {p.course_id: p for p in Progress.query.filter_by(user_id=user_id).all()}
+
+    trail_dict = trail.to_dict(include_courses=True)
+    first_undone = None
+    for tc in trail_dict['courses']:
+        prog = progress_map.get(tc['course_id'])
+        done = bool(prog and prog.material_done and prog.quiz_total > 0
+                    and prog.quiz_score >= prog.quiz_total * 0.6)
+        tc['done'] = done
+        if not done and first_undone is None:
+            first_undone = tc['course_id']
+    for tc in trail_dict['courses']:
+        if tc['done']:
+            tc['state'] = 'done'
+        elif tc['course_id'] == first_undone:
+            tc['state'] = 'current'
+        else:
+            tc['state'] = 'locked'
+
+    trail_dict['current_course_id'] = first_undone
+    done_count = sum(1 for tc in trail_dict['courses'] if tc['done'])
+    total = len(trail_dict['courses'])
+    trail_dict['done_count'] = done_count
+    trail_dict['total_courses'] = total
+    trail_dict['percentage'] = round(done_count / total * 100) if total else 0
+    trail_dict['completed'] = total > 0 and done_count == total
+    return trail_dict
+
+
+@trails_bp.route('/my', methods=['GET'])
+def my_trails():
+    user = _current_user()
+    if not user:
+        return jsonify({'error': 'Não autenticado'}), 401
+
+    enrollments = UserTrail.query.filter_by(user_id=user.id).all()
+    progress_map = {p.course_id: p for p in Progress.query.filter_by(user_id=user.id).all()}
+
+    in_progress, completed = [], []
+    for ut in enrollments:
+        if not ut.trail:
+            continue
+        td = _annotate_trail_progress(ut.trail, user.id, progress_map)
+        td['enrolled_at'] = ut.enrolled_at.isoformat()
+        if ut.completed_at or td['completed']:
+            td['completed_at'] = ut.completed_at.isoformat() if ut.completed_at else None
+            completed.append(td)
+        else:
+            in_progress.append(td)
+
+    return jsonify({
+        'in_progress': in_progress,
+        'completed': completed,
+        'focused_trail_id': user.active_trail_id,
+    })
 
 
 @trails_bp.route('/active', methods=['GET'])

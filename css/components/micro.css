@@ -78,3 +78,56 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Lesson screen UX (Sprint 2.1) ── */
+.breadcrumb {
+  display: flex; align-items: center; gap: 8px;
+  font-size: var(--text-sm); color: var(--gray);
+  margin-bottom: var(--space-md);
+}
+.breadcrumb a { color: var(--primary); cursor: pointer; text-decoration: none; }
+.breadcrumb a:hover { text-decoration: underline; }
+.breadcrumb-current { color: var(--gray-dark); font-weight: 600; }
+
+.lesson-stepper {
+  display: flex; align-items: center;
+  margin: var(--space-md) 0 var(--space-lg);
+}
+.lesson-dot {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--text-sm); font-weight: 700;
+  background: var(--gray-light); color: var(--gray-dark);
+  flex-shrink: 0;
+}
+.lesson-dot.done { background: var(--success, #27ae60); color: var(--white); }
+.lesson-dot.current {
+  background: var(--primary); color: var(--white);
+  box-shadow: 0 0 0 4px rgba(0,142,168,0.18);
+}
+.lesson-dot.locked { font-size: 0.8rem; }
+.lesson-line {
+  height: 3px; flex: 1; max-width: 48px;
+  background: var(--gray-light);
+}
+.lesson-line.done { background: var(--success, #27ae60); }
+
+.course-progress-label { font-size: var(--text-sm); color: var(--gray-dark); }
+.course-progress-label strong { color: var(--primary); }
+
+.material-reward-hint {
+  text-align: center; font-size: var(--text-sm);
+  color: var(--gray-dark); margin-top: 8px;
+}
+.material-done-badge {
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px; padding: 14px;
+  background: rgba(39,174,96,0.1);
+  border: 1px solid rgba(39,174,96,0.35);
+  border-radius: var(--radius-md);
+  color: #1e8449; font-weight: 700;
+}
+
+.locked-exercise-hint { text-align: center; padding: 24px; color: var(--gray-dark); }
+.locked-exercise-hint .locked-icon { font-size: 2rem; display: block; margin-bottom: 8px; }
+.locked-reward { font-size: var(--text-sm); color: #b8860b; margin-top: 6px; }

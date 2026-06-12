@@ -197,7 +197,7 @@ def aluno_dashboard():
         next_metas.append({'description': f"Continue \"{in_progress_course['name']}\" — Aula {in_progress_course['aula_atual']}/{in_progress_course['total_aulas']}", 'type': 'curso'})
     if up and up.current_level < 7:
         falta = 100 - up.points_in_level
-        next_metas.append({'description': f'+{falta} XP para o próximo nível', 'type': 'xp'})
+        next_metas.append({'description': f'+{falta} pontos para o próximo nível', 'type': 'xp'})
     locked_badges = Badge.query.filter(~Badge.id.in_([ub.badge_id for ub in user_badges])).limit(2).all()
     for b in locked_badges:
         next_metas.append({'description': f'Conquistar "{b.name}"', 'type': 'trofeu'})

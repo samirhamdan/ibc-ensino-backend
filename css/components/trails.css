@@ -138,3 +138,122 @@
 .trail-continue-btn {
   margin: 0 var(--space-xl) var(--space-xl);
 }
+
+/* ── Visual trail path (Sprint 2.1) ── */
+.trail-path {
+  position: relative;
+  padding-left: 8px;
+}
+.trail-step {
+  display: flex;
+  gap: 16px;
+  position: relative;
+  padding-bottom: 28px;
+}
+.trail-step:last-child { padding-bottom: 0; }
+/* connector line */
+.trail-step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 19px;
+  top: 40px;
+  bottom: 0;
+  width: 3px;
+  background: var(--gray-light);
+  border-radius: 2px;
+}
+.trail-step.done:not(:last-child)::before {
+  background: var(--success, #27ae60);
+}
+.trail-step-marker {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+  flex-shrink: 0;
+  background: var(--gray-light);
+  color: var(--gray-dark);
+  z-index: 1;
+}
+.trail-step.done .trail-step-marker {
+  background: var(--success, #27ae60);
+  color: var(--white);
+}
+.trail-step.current .trail-step-marker {
+  background: var(--primary);
+  color: var(--white);
+  box-shadow: 0 0 0 0 rgba(0,142,168,0.5);
+  animation: pulseMarker 2s infinite;
+}
+@keyframes pulseMarker {
+  0% { box-shadow: 0 0 0 0 rgba(0,142,168,0.45); }
+  70% { box-shadow: 0 0 0 12px rgba(0,142,168,0); }
+  100% { box-shadow: 0 0 0 0 rgba(0,142,168,0); }
+}
+.trail-step.locked { opacity: 0.6; }
+.trail-step.finish .trail-step-marker {
+  background: linear-gradient(135deg, #f1c40f, #e67e22);
+  font-size: 1.2rem;
+}
+.trail-step-content { display: flex; flex-direction: column; gap: 4px; }
+.trail-step-here {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 0.06em;
+}
+.trail-step-name { font-weight: 600; color: var(--dark); }
+.trail-step-status { font-size: var(--text-sm); color: var(--gray); }
+.trail-step-content .btn { margin-top: 6px; align-self: flex-start; }
+
+@media (prefers-reduced-motion: reduce) {
+  .trail-step.current .trail-step-marker { animation: none; }
+}
+
+/* ── Goals with instructions (Sprint 2.1) ── */
+.goal-item {
+  display: flex; gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--gray-light);
+}
+.goal-item:last-child { border-bottom: none; }
+.goal-icon { font-size: 1.6rem; }
+.goal-info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.goal-name { font-weight: 700; color: var(--dark); }
+.goal-how { font-size: var(--text-sm); color: var(--gray-dark); }
+.goal-progress { display: flex; align-items: center; gap: 10px; }
+.goal-progress .progress { flex: 1; }
+.goal-count { font-size: var(--text-xs); color: var(--gray); font-weight: 600; }
+
+/* ── Sidebar MY TRAILS (Sprint 2.1) ── */
+.sidebar-trail-item {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.sidebar-trail-item:hover { background: var(--primary-lighter, rgba(0,142,168,0.08)); }
+.sidebar-trail-item.focused { background: rgba(0,142,168,0.1); }
+.sidebar-trail-name {
+  font-size: var(--text-sm); font-weight: 600; color: var(--gray-dark);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sidebar-trail-progress { display: flex; align-items: center; gap: 8px; }
+.sidebar-trail-progress .progress { flex: 1; height: 5px; }
+.sidebar-trail-pct { font-size: var(--text-xs); color: var(--gray); font-weight: 600; }
+
+/* ── Trails page (Sprint 2.1) ── */
+.trail-row-card {
+  display: flex; align-items: center; gap: var(--space-lg);
+  background: var(--white);
+  border: 1px solid var(--gray-light);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-md);
+}
+.trail-row-icon { font-size: 2rem; flex-shrink: 0; }
+.trail-row-info { flex: 1; min-width: 0; }
+.trail-row-name { font-weight: 700; color: var(--dark); }
+.trail-row-sub { font-size: var(--text-sm); color: var(--gray); margin: 2px 0 6px; }
+.trail-row-card .progress { height: 6px; }

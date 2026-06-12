@@ -145,10 +145,18 @@
           <span class="ci-icon">📊</span>
           <div class="ci-text"><div class="ci-name">Meu Painel</div></div>
         </div>
+        <div class="course-item" id="nav-trilhas" onclick="navigateToTrilhas()" style="display:none">
+          <span class="ci-icon">🗺️</span>
+          <div class="ci-text"><div class="ci-name">Trilhas</div></div>
+        </div>
         <div class="course-item" id="nav-catalog" onclick="showCatalog()">
           <span class="ci-icon">🗂️</span>
           <div class="ci-text"><div class="ci-name">Catálogo de Cursos</div></div>
         </div>
+      </div>
+      <div class="sidebar-section" id="my-trails-section" style="display:none">
+        <div class="sidebar-label">Minhas Trilhas</div>
+        <div id="sidebar-trail-list"></div>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-label">Meus Cursos</div>
@@ -319,7 +327,12 @@ function setupUI(){
   if(tutorDashNav) tutorDashNav.style.display = isTutorUser ? 'flex' : 'none';
   const studentDashNav=document.getElementById('nav-student-dash');
   if(studentDashNav) studentDashNav.style.display = isAluno() ? 'flex' : 'none';
+  const trilhasNav=document.getElementById('nav-trilhas');
+  if(trilhasNav) trilhasNav.style.display = isAluno() ? 'flex' : 'none';
+  const myTrailsSection=document.getElementById('my-trails-section');
+  if(myTrailsSection) myTrailsSection.style.display = isAluno() ? 'block' : 'none';
   renderCourseList();
+  if(isAluno()) renderSidebarTrails();
   updateContinueButton();
   checkAndShowOnboarding();
 }
@@ -609,10 +622,10 @@ function renderAulaPage(){
           </div>
         </div>
         ${mat.tipo==='pdf'?renderMaterialReadStatus(a.progress):''}`:'<div class="pdf-no-files" style="margin-bottom:.8rem">Nenhum material cadastrado para esta aula.</div>'}
-        <label style="display:flex;align-items:center;gap:.5rem;cursor:${matRead?'default':'pointer'};font-size:.85rem;font-weight:500;color:var(--navy)">
-          <input type="checkbox" ${matRead?'checked disabled':''} onchange="confirmMaterialRead(${moduleId})" style="accent-color:var(--success);width:17px;height:17px">
-          ${matRead?'✓ Material lido e concluído':'Marcar como lido para liberar o exercício'}
-        </label>
+        ${matRead
+          ? `<div class="material-done-badge">✅ Material concluído · +10 pontos</div>`
+          : `<button class="btn btn-success btn-lg btn-full" id="btnMaterialLido" onclick="confirmMaterialRead(${moduleId})">✅ JÁ LI O MATERIAL</button>
+             <p class="material-reward-hint">Libera o exercício e você ganha <strong>+10 pontos</strong> ⭐</p>`}
       </div>
     </div>`;
 
@@ -620,8 +633,10 @@ function renderAulaPage(){
   let quizInner;
   const quizLocked = !matRead;
   if(quizLocked){
-    quizInner = `<div class="admin-section-body" style="text-align:center;color:var(--muted);padding:2rem 1rem">
-      🔒 Marque o material como lido para liberar o exercício.
+    quizInner = `<div class="locked-exercise-hint">
+      <span class="locked-icon">🔒</span>
+      <p>Leia o material acima e clique em <strong>"Já li o material"</strong> para desbloquear.</p>
+      <p class="locked-reward">Este exercício vale <strong>+20 pontos</strong> ⭐</p>
     </div>`;
   } else if(outOfAttempts && !passed){
     quizInner = `<div class="admin-section-body" style="text-align:center;padding:1.5rem 1rem">
@@ -681,16 +696,36 @@ function renderAulaPage(){
       ${quizInner}
     </div>`;
 
+  // Stepper de aulas: anteriores = concluídas, atual = current, próxima desbloqueia ao passar
+  const stepperHtml = `<div class="lesson-stepper">
+    ${Array.from({length: total}, (_, i)=>{
+      const n = i + 1;
+      let dot;
+      if(n < num) dot = `<div class="lesson-dot done" title="Aula ${n}">✓</div>`;
+      else if(n === num) dot = `<div class="lesson-dot current" title="Aula ${n}">${n}</div>`;
+      else if(n === num + 1 && passed) dot = `<div class="lesson-dot" title="Aula ${n}">${n}</div>`;
+      else dot = `<div class="lesson-dot locked" title="Aula ${n}">🔒</div>`;
+      const line = n < total ? `<div class="lesson-line ${n < num ? 'done' : ''}"></div>` : '';
+      return dot + line;
+    }).join('')}
+  </div>`;
+
   document.getElementById('main-content').innerHTML=`
+    <nav class="breadcrumb">
+      <a onclick="detectarPerfilEAtualizarDashboard()">🏠 Meu Painel</a>
+      <span>›</span>
+      <a onclick="selectCourse(${a.course.id})">${a.course.icon} ${a.course.name}</a>
+      <span>›</span>
+      <span class="breadcrumb-current">Aula ${num} de ${total}</span>
+    </nav>
     <div class="course-header">
-      <span class="course-tag" style="cursor:pointer" onclick="selectCourse(${a.course.id})">← ${a.course.icon} ${a.course.name}</span>
       <h1 class="course-title">Aula ${num}: ${a.nome}</h1>
       <div class="course-meta">${a.dur?`<span>⏱ ${a.dur}</span>`:''}</div>
     </div>
+    ${stepperHtml}
     <div class="progress-section">
       <div class="progress-header">
-        <span class="progress-label">Aula ${num}/${total}</span>
-        <span class="progress-pct">${pct}%</span>
+        <span class="course-progress-label">Progresso do curso: <strong>${pct}%</strong></span>
       </div>
       <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
     </div>
@@ -704,8 +739,8 @@ function renderAulaPage(){
       <button class="btn-secondary" ${num<=1?'disabled':''} onclick="loadAula(${a.course.id},${num-1})">← Voltar</button>
       <button class="btn-secondary" onclick="openAskQuestionModal(${a.course.id})">💬 Fazer Pergunta</button>
       ${num<total
-        ? `<button class="btn-primary" style="width:auto;padding:.7rem 1.4rem" ${passed?'':'disabled'} onclick="loadAula(${a.course.id},${num+1})">Próxima Aula →</button>`
-        : `<button class="btn-primary" style="width:auto;padding:.7rem 1.4rem" ${passed?'':'disabled'} onclick="renderConclusion()">Concluir Curso 🎓</button>`}
+        ? `<button class="btn-primary" style="width:auto;padding:.7rem 1.4rem;${passed?'':'opacity:.55;cursor:not-allowed'}" ${passed?'':'disabled title="Conclua o exercício para avançar"'} onclick="loadAula(${a.course.id},${num+1})">Próxima Aula →</button>`
+        : `<button class="btn-primary" style="width:auto;padding:.7rem 1.4rem;${passed?'':'opacity:.55;cursor:not-allowed'}" ${passed?'':'disabled title="Conclua o exercício para avançar"'} onclick="renderConclusion()">Concluir Curso 🎓</button>`}
     </div>`;
 }
 
@@ -1805,13 +1840,13 @@ async function renderGamiWidget(){
   el.innerHTML = `
     <div style="background:white;border:1px solid #e8e0d4;border-radius:var(--radius);padding:1rem 1.2rem;margin-bottom:1rem">
       <div style="font-family:'Playfair Display',serif;color:var(--navy);font-weight:700;margin-bottom:.5rem">🎮 Seu Progresso</div>
-      <div style="font-size:.85rem;color:var(--navy);font-weight:600">⭐ Level ${s.current_level}: ${GAMI_LEVEL_NAMES[s.current_level]||''}</div>
-      <div style="font-size:.78rem;color:var(--muted);margin:.2rem 0">${s.points_in_level} / ${target} XP (Total: ${s.total_points})</div>
+      <div style="font-size:.85rem;color:var(--navy);font-weight:600">⭐ Nível ${s.current_level}: ${GAMI_LEVEL_NAMES[s.current_level]||''}</div>
+      <div style="font-size:.78rem;color:var(--muted);margin:.2rem 0">${s.points_in_level} / ${target} pontos (Total: ${s.total_points})</div>
       <div style="font-family:monospace;font-size:.85rem;color:var(--gold)">${bar} ${pct}%</div>
-      <div style="margin-top:.7rem;font-size:.8rem;color:var(--navy);font-weight:600">🏆 Seus Troféus:</div>
-      <div style="margin:.3rem 0">${icons||'<span style="color:var(--muted);font-size:.78rem">Nenhum troféu ainda — continue estudando!</span>'}</div>
+      <div style="margin-top:.7rem;font-size:.8rem;color:var(--navy);font-weight:600">🏆 Suas Conquistas:</div>
+      <div style="margin:.3rem 0">${icons||'<span style="color:var(--muted);font-size:.78rem">Nenhuma conquista ainda — continue estudando!</span>'}</div>
       <div style="font-size:.75rem;color:var(--muted);margin-bottom:.6rem">(${s.badges_count} de ${s.badges_count + s.badges_locked.length} conquistadas)</div>
-      <button class="btn-secondary" style="padding:.35rem .8rem;font-size:.78rem" onclick="showBadgesPage()">Ver Todos os Troféus</button>
+      <button class="btn-secondary" style="padding:.35rem .8rem;font-size:.78rem" onclick="showBadgesPage()">Ver Todas as Conquistas</button>
     </div>`;
 }
 
@@ -1820,7 +1855,7 @@ function gamiToast(message){
 }
 
 function showBadgeModal(badge){
-  showTrophyModal(badge.icon, badge.name, badge.description || 'Você conquistou um novo troféu!');
+  showTrophyModal(badge.icon, badge.name, badge.description || 'Você desbloqueou uma nova conquista!');
 }
 
 function showLevelUpModal(level){
@@ -1833,7 +1868,7 @@ function showLevelUpModal(level){
     <div style="background:white;border-radius:var(--radius);padding:1.6rem;text-align:center;max-width:340px">
       <div style="font-size:1.6rem;margin-bottom:.3rem">🎉 Parabéns! 🎉</div>
       <div style="font-size:.85rem;color:var(--muted);margin-bottom:.4rem">Você subiu para:</div>
-      <div style="font-family:'Playfair Display',serif;font-weight:700;color:var(--navy);font-size:1.1rem">Level ${level}: ${GAMI_LEVEL_NAMES[level]||''}</div>
+      <div style="font-family:'Playfair Display',serif;font-weight:700;color:var(--navy);font-size:1.1rem">Nível ${level}: ${GAMI_LEVEL_NAMES[level]||''}</div>
       <div style="margin:.4rem 0 1rem;color:var(--gold)">${'⭐'.repeat(Math.min(level,7))}</div>
       <button class="btn-gold" style="padding:.4rem .9rem;font-size:.8rem" onclick="document.getElementById('levelup-modal').remove()">Fechar</button>
     </div>`;
@@ -1845,7 +1880,7 @@ async function gamiAddPoints(action, extra){
     const res = await api('POST','/gamification/add-points', {action, ...(extra||{})});
     if(!res.ok) return;
     const r = await res.json();
-    if(r.points_awarded) gamiToast(`✓ +${r.points_awarded} XP! (Total: ${r.total_points})`);
+    if(r.points_awarded) gamiToast(`+${r.points_awarded} pontos! (Total: ${r.total_points})`);
     if(r.badge_unlocked) setTimeout(()=>showBadgeModal(r.badge_unlocked), 600);
     if(r.level_up) setTimeout(()=>showLevelUpModal(r.new_level), r.badge_unlocked ? 1300 : 600);
     return r;
@@ -1871,11 +1906,11 @@ async function showBadgesPage(){
   document.getElementById('main-content').innerHTML=`
     <div class="course-header">
       <span class="course-tag">Gamificação</span>
-      <h1 class="course-title">🏆 Coleção de Troféus (${unlocked.length}/${badges.length})</h1>
+      <h1 class="course-title">🏆 Coleção de Conquistas (${unlocked.length}/${badges.length})</h1>
     </div>
     <button class="btn-secondary" style="margin-bottom:1rem;padding:.4rem .9rem;font-size:.8rem" onclick="showStudentDashboard()">‹ Voltar ao Painel</button>
     <h3 style="font-size:.85rem;color:var(--navy);margin:0 0 .6rem">Conquistados (${unlocked.length})</h3>
-    ${unlocked.length ? unlocked.map(card).join('') : '<div class="pdf-no-files" style="margin-bottom:1rem">Nenhum troféu conquistado ainda.</div>'}
+    ${unlocked.length ? unlocked.map(card).join('') : '<div class="pdf-no-files" style="margin-bottom:1rem">Nenhuma conquista ainda.</div>'}
     <h3 style="font-size:.85rem;color:var(--navy);margin:1rem 0 .6rem">Ainda não conquistados (${locked.length})</h3>
     ${locked.length ? locked.map(card).join('') : ''}
   `;
@@ -2022,7 +2057,7 @@ async function renderAlunoDashboard(){
     <div class="card" style="margin-bottom:var(--space-xl)">
       <div class="card-body">
         <h3 class="card-title">✨ Próximas Metas</h3>
-        <ul class="metas-list">${d.next_metas.length?d.next_metas.map(m=>`<li>📌 ${m.description}</li>`).join(''):'<li style="color:var(--gray)">Nenhuma meta — explore o catálogo!</li>'}</ul>
+        <div id="goalsSection"><span style="color:var(--gray);font-size:var(--text-sm)">Carregando...</span></div>
       </div>
     </div>
     ${d.recent_trofeus.length?`<div class="card" style="margin-bottom:var(--space-xl)"><div class="card-body"><h3 class="card-title">🎖️ Últimas Conquistas</h3><div style="margin-top:var(--space-md)">${d.recent_trofeus.map(t=>`<div class="achievement-item"><span class="achievement-icon">${t.icon}</span><div><div class="achievement-name">${t.name}</div><div class="achievement-desc">${t.description||''}</div><div class="achievement-date">${new Date(t.date).toLocaleDateString('pt-BR')}</div></div></div>`).join('')}</div></div></div>`:''}
@@ -2036,6 +2071,40 @@ async function renderAlunoDashboard(){
   // Load trail section
   const trailSection = document.getElementById('trailSection');
   if(trailSection) await loadTrailsSection(trailSection);
+  loadGoalsSection();
+}
+
+// ── Goals with how-to instructions (Sprint 2.1) ──
+async function loadGoalsSection(){
+  const el = document.getElementById('goalsSection');
+  if(!el) return;
+  try{
+    const res = await api('GET','/gamification/badges');
+    if(!res.ok){ el.innerHTML = '<span style="color:var(--gray);font-size:var(--text-sm)">Não foi possível carregar suas metas.</span>'; return; }
+    const badges = await res.json();
+    const locked = badges.filter(b=>!b.unlocked && b.progress).map(b=>{
+      const [cur, tgt] = b.progress.split('/').map(Number);
+      return {...b, cur: cur||0, tgt: tgt||1, ratio: (cur||0)/(tgt||1)};
+    }).sort((a,b)=>b.ratio - a.ratio).slice(0,3);
+    if(!locked.length){
+      el.innerHTML = '<span style="color:var(--gray);font-size:var(--text-sm)">Você desbloqueou todas as conquistas! 🎉</span>';
+      return;
+    }
+    el.innerHTML = locked.map(b=>`
+      <div class="goal-item">
+        <span class="goal-icon">${b.icon}</span>
+        <div class="goal-info">
+          <span class="goal-name">${b.name}</span>
+          <span class="goal-how">${b.description||''}</span>
+          <div class="goal-progress">
+            <div class="progress progress-sm"><div class="progress-bar" style="width:${Math.round(b.ratio*100)}%"></div></div>
+            <span class="goal-count">${b.cur}/${b.tgt}</span>
+          </div>
+        </div>
+      </div>`).join('');
+  } catch(e){
+    el.innerHTML = '<span style="color:var(--gray);font-size:var(--text-sm)">Não foi possível carregar suas metas.</span>';
+  }
 }
 
 async function renderAlunoExternoDashboard(){
@@ -2050,7 +2119,7 @@ async function renderAlunoExternoDashboard(){
   const body=document.getElementById('externo-dash-body');
   const stars=(n)=>'⭐'.repeat(Math.round(n))+'☆'.repeat(5-Math.round(n));
   body.innerHTML=`
-    ${d.user_stats?`<div class="card" style="border-left:4px solid var(--primary);margin-bottom:var(--space-xl)"><div class="card-body" style="display:flex;align-items:center;gap:var(--space-lg);flex-wrap:wrap"><span class="level-badge">⭐ Level ${d.user_stats.level}: ${d.user_stats.level_name}</span><span style="font-size:var(--text-sm);color:var(--gray-dark)">${d.user_stats.points_in_level} XP</span><span style="font-size:var(--text-sm);color:var(--gray-dark)">🏆 ${d.trofeus_count} troféu(s)</span></div></div>`:''}
+    ${d.user_stats?`<div class="card" style="border-left:4px solid var(--primary);margin-bottom:var(--space-xl)"><div class="card-body" style="display:flex;align-items:center;gap:var(--space-lg);flex-wrap:wrap"><span class="level-badge">⭐ Nível ${d.user_stats.level}: ${d.user_stats.level_name}</span><span style="font-size:var(--text-sm);color:var(--gray-dark)">${d.user_stats.points_in_level} pontos</span><span style="font-size:var(--text-sm);color:var(--gray-dark)">🏆 ${d.trofeus_count} conquista(s)</span></div></div>`:''}
     ${d.in_progress?`<div class="card" style="border-left:4px solid var(--primary);margin-bottom:var(--space-xl)"><div class="card-body"><h3 class="card-title">🚀 Continue Estudando</h3><div style="margin:var(--space-md) 0;font-size:var(--text-sm);font-weight:var(--fw-semibold);color:var(--dark)">${d.in_progress.icon} ${d.in_progress.name} — Aula ${d.in_progress.aula}/${d.in_progress.total}</div><div class="progress progress-sm" style="margin-bottom:var(--space-md)"><div class="progress-bar" style="width:${d.in_progress.percentage}%"></div></div><button class="btn btn-primary" onclick="selectCourse(${d.in_progress.id})">🚀 Continuar Aula</button></div></div>`:''}
     <div class="dash-section">
       <div class="dash-section-title">🌟 Descubra Cursos</div>
@@ -2479,7 +2548,7 @@ function renderHero(userData, stats){
   const roleCtx = {
     admin: 'Gerencie a plataforma e acompanhe o crescimento da comunidade.',
     tutor: 'Veja as dúvidas pendentes e acompanhe seus alunos.',
-    aluno_interno: 'Continue sua jornada de fé e conquiste novos troféus.',
+    aluno_interno: 'Continue sua jornada de fé e desbloqueie novas conquistas.',
     aluno_externo: 'Explore os cursos e comece sua jornada hoje.',
   };
   const s = stats || {};
@@ -2506,14 +2575,20 @@ function renderHero(userData, stats){
     <div class="hero-content">
       <div class="hero-greeting">${greeting}, ${userData.name.split(' ')[0]}! 👋</div>
       <div class="hero-context">${roleCtx[userData.role]||''}</div>
-      <div class="hero-level-label">⭐ Level ${level} — ${levelName}</div>
+      <div class="hero-level-label">⭐ Nível ${level} — ${levelName}</div>
       <div class="hero-xp-bar"><div class="hero-xp-fill" id="heroXpFill" style="width:0%"></div></div>
+      ${isAluno() ? (level >= 7
+        ? `<p class="level-hint">Você alcançou o nível máximo! 🎉</p>`
+        : `<p class="level-hint">Faltam <strong>${Math.max(0, levelTarget - ptsInLevel)} pontos</strong> para o Nível ${level+1} — ${GAMI_LEVEL_NAMES[level+1]||''}</p>
+           <p class="level-tip">💡 Você ganha pontos ao ler materiais e acertar exercícios</p>`) : ''}
     </div>
-    <div class="hero-stats">
-      <div class="hero-stat"><span class="hero-stat-value" data-target="${totalPoints}">${totalPoints}</span><span class="hero-stat-label">XP Total</span></div>
-      <div class="hero-stat"><span class="hero-stat-value" data-target="${coursesCount}">${coursesCount}</span><span class="hero-stat-label">Cursos</span></div>
-      <div class="hero-stat"><span class="hero-stat-value" data-target="${badgesCount}">${badgesCount}</span><span class="hero-stat-label">Troféus</span></div>
-    </div>
+    ${(totalPoints === 0 && badgesCount === 0 && isAluno())
+      ? `<p class="hero-cta-empty">🎯 Complete sua primeira aula para ganhar seus primeiros pontos!</p>`
+      : `<div class="hero-stats">
+      <div class="hero-stat"><span class="hero-stat-value" data-target="${totalPoints}">${totalPoints}</span><span class="hero-stat-label">⭐ Pontos</span></div>
+      <div class="hero-stat"><span class="hero-stat-value" data-target="${coursesCount}">${coursesCount}</span><span class="hero-stat-label">📚 Cursos</span></div>
+      <div class="hero-stat"><span class="hero-stat-value" data-target="${badgesCount}">${badgesCount}</span><span class="hero-stat-label">🏆 Conquistas</span></div>
+    </div>`}
   </div>`;
 }
 
@@ -2544,10 +2619,18 @@ async function loadTrailsSection(container){
     // No active trail — show selection grid
     await renderTrailSelection(container);
   } else {
-    renderTrailProgress(container, trail);
+    let extra = 0;
+    try{
+      const myRes = await api('GET', '/trails/my');
+      if(myRes.ok){
+        const my = await myRes.json();
+        extra = my.in_progress.filter(t=>t.id !== trail.id).length;
+      }
+    } catch(e){}
+    renderTrailProgress(container, trail, extra);
     if(trail.new_badge){
       showTrophyModal(trail.new_badge.icon, trail.new_badge.name, trail.new_badge.description);
-      showToast(`+${trail.xp_bonus} XP bônus de Trilha! 🎉`, 'xp');
+      showToast(`⭐ +${trail.xp_bonus} pontos de bônus da Trilha! 🎉`, 'xp');
     }
   }
 }
@@ -2571,7 +2654,7 @@ async function renderTrailSelection(container){
               <div class="trail-card-description">${t.description}</div>
               <div class="trail-card-meta">
                 <span>${t.courses ? t.courses.length : 0} cursos</span>
-                <span class="trail-card-bonus">+${t.xp_bonus} XP bônus</span>
+                <span class="trail-card-bonus">+${t.xp_bonus} pontos de bônus</span>
               </div>
             </div>`).join('')}
         </div>
@@ -2579,10 +2662,40 @@ async function renderTrailSelection(container){
     </div>`;
 }
 
-function renderTrailProgress(container, trail){
+function renderTrailProgress(container, trail, extraTrailsCount){
   const done = trail.courses.filter(c=>c.done).length;
   const total = trail.courses.length;
   const pct = total ? Math.round(done / total * 100) : 0;
+  const steps = trail.courses.map((c, i)=>{
+    const stepNum = i + 1;
+    if(c.state === 'done'){
+      return `<div class="trail-step done">
+        <div class="trail-step-marker">✓</div>
+        <div class="trail-step-content">
+          <span class="trail-step-name">${c.course_icon||'📚'} ${c.course_name}</span>
+          <span class="trail-step-status">Concluído · 100%</span>
+        </div>
+      </div>`;
+    }
+    if(c.state === 'current'){
+      return `<div class="trail-step current">
+        <div class="trail-step-marker">${stepNum}</div>
+        <div class="trail-step-content">
+          <span class="trail-step-here">▶ VOCÊ ESTÁ AQUI</span>
+          <span class="trail-step-name">${c.course_icon||'📚'} ${c.course_name}</span>
+          <span class="trail-step-status">Passo ${stepNum} de ${total}</span>
+          <button class="btn btn-primary btn-sm" onclick="selectCourse(${c.course_id})">Continuar →</button>
+        </div>
+      </div>`;
+    }
+    return `<div class="trail-step locked">
+      <div class="trail-step-marker">${stepNum}</div>
+      <div class="trail-step-content">
+        <span class="trail-step-name">${c.course_icon||'📚'} ${c.course_name}</span>
+        <span class="trail-step-status">🔒 Libera ao concluir o passo ${stepNum - 1}</span>
+      </div>
+    </div>`;
+  }).join('');
   container.innerHTML = `
     <div class="trail-progress-card" style="margin-bottom:var(--space-xl)">
       <div class="trail-progress-header">
@@ -2593,24 +2706,146 @@ function renderTrailProgress(container, trail){
         </div>
       </div>
       <div class="trail-course-list">
-        ${trail.courses.map(c=>{
-          const icon = c.state==='done' ? '✅' : c.state==='current' ? '▶️' : '🔒';
-          return `<div class="trail-course ${c.state}">
-            <span class="trail-course-state-icon">${icon}</span>
-            <span>${c.course_icon||'📚'} ${c.course_name}</span>
-          </div>`;
-        }).join('')}
+        <div class="trail-path">
+          ${steps}
+          <div class="trail-step finish">
+            <div class="trail-step-marker">🎓</div>
+            <div class="trail-step-content">
+              <span class="trail-step-name">Certificado: ${trail.name}</span>
+              <span class="trail-step-status">${trail.completed ? '🎉 Trilha concluída! Parabéns!' : `⭐ +${trail.xp_bonus} pontos de bônus ao concluir`}</span>
+            </div>
+          </div>
+        </div>
       </div>
-      ${trail.current_course_id ? `<div class="trail-continue-btn"><button class="btn btn-primary btn-full" onclick="selectCourse(${trail.current_course_id})">▶️ Continuar Trilha</button></div>` : `<div class="trail-continue-btn"><div class="alert alert-success" style="margin:0"><span class="alert-icon">🎉</span><div class="alert-body">Trilha concluída! Parabéns!</div></div></div>`}
+      ${extraTrailsCount > 0 ? `<div style="padding:0 var(--space-xl) var(--space-lg)"><a style="color:var(--primary);font-weight:var(--fw-semibold);font-size:var(--text-sm);cursor:pointer" onclick="navigateToTrilhas()">Ver minhas outras trilhas (${extraTrailsCount}) →</a></div>` : ''}
     </div>`;
 }
 
 async function enrollTrail(id){
   const res = await api('POST', `/trails/${id}/enroll`);
-  if(!res.ok){ showToast('Erro ao ingressar na trilha.','error'); return; }
-  showToast('Trilha iniciada! Bom estudo! 🚀', 'xp');
+  if(!res.ok){ showToast('Erro ao participar da trilha.','error'); return; }
+  const r = await res.json();
+  showToast(r.already_enrolled ? 'Você já participa desta trilha!' : '🎉 Trilha iniciada!', 'xp');
   const trailContainer = document.getElementById('trailSection');
   if(trailContainer) await loadTrailsSection(trailContainer);
+  renderSidebarTrails();
+  // if we're on the Trails page, refresh it
+  if(document.getElementById('viewTrilhas')) renderTrilhasPage();
+}
+
+// ── Multi-trails: sidebar + focus + Trails page (Sprint 2.1) ──
+async function renderSidebarTrails(){
+  const el = document.getElementById('sidebar-trail-list');
+  if(!el || !currentUser || !isAluno()) return;
+  try{
+    const res = await api('GET','/trails/my');
+    if(!res.ok) return;
+    const my = await res.json();
+    const all = my.in_progress.concat(my.completed);
+    if(!all.length){
+      el.innerHTML = `<div class="sidebar-empty">Nenhuma trilha iniciada<br><a onclick="navigateToTrilhas()">Conhecer trilhas →</a></div>`;
+      return;
+    }
+    el.innerHTML = all.map(t=>`
+      <div class="sidebar-trail-item ${t.id===my.focused_trail_id?'focused':''}" onclick="focusTrail(${t.id})">
+        <span class="sidebar-trail-name">${t.icon} ${t.name.replace(/^Trilha (de |do |da )?/i,'')}</span>
+        <div class="sidebar-trail-progress">
+          <div class="progress progress-sm"><div class="progress-bar" style="width:${t.percentage}%"></div></div>
+          <span class="sidebar-trail-pct">${t.percentage}%</span>
+        </div>
+      </div>`).join('');
+  } catch(e){}
+}
+
+async function focusTrail(id){
+  const res = await api('POST', `/trails/${id}/focus`);
+  if(!res.ok) return;
+  renderSidebarTrails();
+  detectarPerfilEAtualizarDashboard();
+}
+
+async function navigateToTrilhas(){
+  document.querySelectorAll('.course-item').forEach(x=>x.classList.remove('active'));
+  const nav=document.getElementById('nav-trilhas');
+  if(nav) nav.classList.add('active');
+  await renderTrilhasPage();
+}
+
+async function renderTrilhasPage(){
+  const el = document.getElementById('main-content');
+  el.innerHTML = `<section id="viewTrilhas">
+    <div class="dash-heading">🗺️ Trilhas de Aprendizado</div>
+    <div class="dash-subtitle">Percursos guiados de cursos para você crescer passo a passo.</div>
+    <div class="alert alert-info"><span class="alert-icon">⏳</span><div class="alert-body">Carregando...</div></div>
+  </section>`;
+  const [myRes, allRes] = await Promise.all([api('GET','/trails/my'), api('GET','/trails')]);
+  if(!myRes.ok || !allRes.ok){
+    el.querySelector('#viewTrilhas .alert').outerHTML = '<div class="alert alert-danger"><span class="alert-icon">❌</span><div class="alert-body">Não foi possível carregar as trilhas.</div></div>';
+    return;
+  }
+  const my = await myRes.json();
+  const all = await allRes.json();
+  const enrolledIds = new Set(my.in_progress.concat(my.completed).map(t=>t.id));
+  const available = all.filter(t=>!enrolledIds.has(t.id));
+
+  const inProgressHtml = my.in_progress.length ? my.in_progress.map(t=>`
+    <div class="trail-row-card">
+      <span class="trail-row-icon">${t.icon}</span>
+      <div class="trail-row-info">
+        <div class="trail-row-name">${t.name}</div>
+        <div class="trail-row-sub">Passo ${Math.min(t.done_count+1, t.total_courses)} de ${t.total_courses} · ${t.percentage}%</div>
+        <div class="progress progress-sm"><div class="progress-bar" style="width:${t.percentage}%"></div></div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="focusTrailAndGoHome(${t.id})">Continuar →</button>
+    </div>`).join('')
+    : '<p style="color:var(--gray);font-size:var(--text-sm)">Você ainda não está participando de nenhuma trilha. Escolha uma abaixo! 👇</p>';
+
+  const availableHtml = available.length ? `<div class="trail-grid">
+    ${available.map(t=>`
+      <div class="trail-card stagger-item">
+        <span class="trail-card-icon">${t.icon}</span>
+        <div class="trail-card-name">${t.name}</div>
+        <div class="trail-card-description">${t.description}</div>
+        <div class="trail-card-meta">
+          <span>${t.courses ? t.courses.length : 0} cursos</span>
+          <span class="trail-card-bonus">+${t.xp_bonus} pontos de bônus</span>
+        </div>
+        <button class="btn btn-primary btn-sm" style="margin-top:var(--space-md)" onclick="enrollTrail(${t.id})">Participar</button>
+      </div>`).join('')}
+  </div>` : '<p style="color:var(--gray);font-size:var(--text-sm)">Você já participa de todas as trilhas disponíveis! 👏</p>';
+
+  const completedHtml = my.completed.length ? my.completed.map(t=>`
+    <div class="trail-row-card">
+      <span class="trail-row-icon">🎓</span>
+      <div class="trail-row-info">
+        <div class="trail-row-name">${t.name}</div>
+        <div class="trail-row-sub">Concluída${t.completed_at ? ' em ' + new Date(t.completed_at).toLocaleDateString('pt-BR') : ''} · Certificado disponível</div>
+      </div>
+    </div>`).join('')
+    : '<p style="color:var(--gray);font-size:var(--text-sm)">Suas trilhas concluídas aparecerão aqui com seus certificados 🎓</p>';
+
+  el.innerHTML = `<section id="viewTrilhas">
+    <div class="dash-heading">🗺️ Trilhas de Aprendizado</div>
+    <div class="dash-subtitle">Percursos guiados de cursos para você crescer passo a passo.</div>
+    <div class="dash-section">
+      <div class="dash-section-title">▶️ Em Andamento</div>
+      ${inProgressHtml}
+    </div>
+    <div class="dash-section">
+      <div class="dash-section-title">✨ Disponíveis</div>
+      ${availableHtml}
+    </div>
+    <div class="dash-section">
+      <div class="dash-section-title">🎓 Concluídas</div>
+      ${completedHtml}
+    </div>
+  </section>`;
+}
+
+async function focusTrailAndGoHome(id){
+  await api('POST', `/trails/${id}/focus`);
+  renderSidebarTrails();
+  detectarPerfilEAtualizarDashboard();
 }
 
 // ── Onboarding Modal ──
@@ -2703,8 +2938,8 @@ function closeOnboardingModal(){
 
 // ── Guided Tour ──
 const TOUR_STEPS = [
-  { selector: '#trailSection', title: 'Sua Trilha', body: 'Aqui fica sua trilha de aprendizado. Siga os cursos na ordem para ganhar o bônus de XP!', arrow: 'top' },
-  { selector: '.dashboard-hero', title: 'Seu Progresso', body: 'O anel dourado mostra seu progresso de XP no nível atual. Continue estudando para subir de nível!', arrow: 'top' },
+  { selector: '#trailSection', title: 'Sua Trilha', body: 'Aqui fica sua trilha de aprendizado. Siga os cursos na ordem para ganhar pontos de bônus!', arrow: 'top' },
+  { selector: '.dashboard-hero', title: 'Seu Progresso', body: 'O anel dourado mostra seu progresso de pontos no nível atual. Continue estudando para subir de nível!', arrow: 'top' },
   { selector: '#nav-questions', title: 'Tire Dúvidas', body: 'Tem alguma dúvida sobre o conteúdo? Envie sua pergunta e um tutor vai responder!', arrow: 'left' },
 ];
 let _tourStep = 0;
@@ -2833,7 +3068,7 @@ function removeTourTooltip(){
       <div class="onboarding-subtitle">Sua trilha foi ativada. Vamos começar a estudar?</div>
       <div style="font-size:4rem;text-align:center;margin:var(--space-xl) 0">🎯</div>
       <p style="color:var(--gray-dark);font-size:var(--text-sm);text-align:center;line-height:1.6">
-        Complete os cursos da trilha em sequência para ganhar o bônus de XP e desbloquear o troféu especial!
+        Complete os cursos da trilha em sequência para ganhar pontos de bônus e desbloquear a conquista especial!
       </p>
       <div class="onboarding-actions" style="margin-top:var(--space-xl)">
         <button class="btn btn-primary" onclick="onboardingNext()">Ir para o Dashboard ✓</button>
