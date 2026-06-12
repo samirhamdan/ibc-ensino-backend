@@ -1,0 +1,112 @@
+/* ─── Login Premium — full-bleed, tipografia heróica, textura vitral ── */
+
+/* Full-bleed real: anula align/justify center do legado para as colunas esticarem 100vh */
+#screen-login.active {
+  align-items: stretch;
+  justify-items: stretch;
+}
+
+/* Textura de vitral / luz suave sobre o gradiente */
+.hero-texture-overlay {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 50%, rgba(255,255,255,0.08) 1px, transparent 1px),
+    radial-gradient(circle at 60% 30%, rgba(255,255,255,0.06) 1px, transparent 1px),
+    radial-gradient(circle at 80% 70%, rgba(255,255,255,0.07) 1px, transparent 1px);
+  background-size: 200px 200px, 300px 300px, 250px 250px;
+  animation: shimmerLight 20s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes shimmerLight {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+
+/* Tipografia heróica */
+.login-visual-content .login-headline {
+  font-size: 4.2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  margin-bottom: var(--space-lg);
+}
+
+.login-visual-logo {
+  width: 220px;
+  filter: none; /* logo branca dedicada — sem invert */
+}
+
+/* Card com sombra premium */
+#screen-login .login-card {
+  box-shadow: 0 20px 60px rgba(0, 142, 168, 0.12);
+}
+
+/* Olho mostrar/ocultar senha */
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+}
+
+.password-input-wrapper input {
+  flex: 1;
+  padding-right: 42px;
+}
+
+.btn-show-password {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  opacity: 0.55;
+  transition: opacity 0.2s;
+  padding: 0;
+  line-height: 1;
+}
+
+.btn-show-password:hover { opacity: 1; }
+
+/* Rodapé com suporte */
+.login-footer {
+  margin-top: var(--space-xl);
+  text-align: center;
+}
+
+.support-text {
+  font-size: var(--text-sm);
+  color: var(--gray);
+  margin: 0;
+  line-height: 1.6;
+}
+
+.whatsapp-link {
+  color: #25d366;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+.whatsapp-link:hover { opacity: 0.8; }
+
+.login-form-side {
+  flex-direction: column;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .login-visual-content .login-headline { font-size: 2.8rem; }
+}
+
+@media (max-width: 640px) {
+  .login-visual { padding: 30px 20px; }
+  .login-visual-content .login-headline { font-size: 2.2rem; }
+  .login-visual-logo { width: 160px; }
+  #screen-login .login-card { padding: var(--space-lg); }
+}

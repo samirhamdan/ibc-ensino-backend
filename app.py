@@ -120,6 +120,15 @@ def create_app(config_name='development'):
                 return jsonify({'error': 'Acesso negado'}), 403
             return send_from_directory(uploads_dir, safe)
 
+        # Serve image assets (logo etc.)
+        @app.route('/images/<path:filename>', methods=['GET'])
+        def serve_images(filename):
+            import posixpath
+            safe = posixpath.normpath(filename)
+            if safe.startswith('..'):
+                return jsonify({'error': 'Acesso negado'}), 403
+            return send_from_directory(os.path.join(basedir, 'images'), safe)
+
         # Favicon
         @app.route('/favicon.svg', methods=['GET'])
         def favicon():
