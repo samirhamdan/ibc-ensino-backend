@@ -1,0 +1,224 @@
+"""
+Certificate endpoints: issue, download PDF, verify (public), list
+"""
+import random
+import string
+from io import BytesIO
+from datetime import datetime
+from flask import Blueprint, jsonify, session, send_file, request, current_app
+from extensions import db
+from models import Certificate, User, Course, Trail, UserTrail
+
+certificates_bp = Blueprint('certificates', __name__)
+
+_CERT_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'  # no 0/O/1/I
+
+
+def generate_cert_code():
+    """Generate unique IBC-XXXX-XXXX code."""
+    while True:
+        part1 = ''.join(random.choices(_CERT_CHARS, k=4))
+        part2 = ''.join(random.choices(_CERT_CHARS, k=4))
+        code = f'IBC-{part1}-{part2}'
+        if not Certificate.query.filter_by(cert_code=code).first():
+            return code
+
+
+def _current_user():
+    uid = session.get('user_id')
+    return User.query.get(uid) if uid else None
+
+
+# ── Issue certificate ──────────────────────────────────────────────────────
+
+@certificates_bp.route('/issue', methods=['POST'])
+def issue_certificate():
+    user = _current_user()
+    if not user:
+        return jsonify({'error': 'Não autenticado'}), 401
+
+    data = request.get_json(silent=True) or {}
+    cert_type = data.get('cert_type')  # 'course' | 'trail'
+    entity_id = data.get('entity_id')
+
+    if cert_type not in ('course', 'trail') or not entity_id:
+        return jsonify({'error': 'Parâmetros inválidos'}), 400
+
+    if cert_type == 'course':
+        existing = Certificate.query.filter_by(user_id=user.id, course_id=entity_id, cert_type='course').first()
+    else:
+        existing = Certificate.query.filter_by(user_id=user.id, trail_id=entity_id, cert_type='trail').first()
+
+    if existing:
+        return jsonify({'certificate_issued': False, 'cert': existing.to_dict()}), 200
+
+    code = generate_cert_code()
+    if cert_type == 'course':
+        cert = Certificate(user_id=user.id, course_id=entity_id, cert_type='course', cert_code=code)
+    else:
+        cert = Certificate(user_id=user.id, trail_id=entity_id, cert_type='trail', cert_code=code)
+    db.session.add(cert)
+    db.session.commit()
+    return jsonify({'certificate_issued': True, 'cert': cert.to_dict()}), 201
+
+
+# ── List my certificates ───────────────────────────────────────────────────
+
+@certificates_bp.route('/my', methods=['GET'])
+def my_certificates():
+    user = _current_user()
+    if not user:
+        return jsonify({'error': 'Não autenticado'}), 401
+
+    certs = Certificate.query.filter_by(user_id=user.id).order_by(Certificate.issued_at.desc()).all()
+    return jsonify([c.to_dict() for c in certs]), 200
+
+
+# ── Verify (public, no login) ──────────────────────────────────────────────
+
+@certificates_bp.route('/verify/<cert_code>', methods=['GET'])
+def verify_certificate(cert_code):
+    cert = Certificate.query.filter_by(cert_code=cert_code).first()
+    if not cert:
+        return jsonify({'valid': False}), 200
+
+    title = ''
+    if cert.cert_type == 'course' and cert.course:
+        title = cert.course.name
+    elif cert.cert_type == 'trail' and cert.trail:
+        title = cert.trail.name
+
+    return jsonify({
+        'valid': True,
+        'student_name': cert.user.name if cert.user else '',
+        'title': title,
+        'cert_type': cert.cert_type,
+        'issued_at': cert.issued_at.isoformat(),
+        'cert_code': cert.cert_code,
+    }), 200
+
+
+# ── Download PDF ───────────────────────────────────────────────────────────
+
+@certificates_bp.route('/<cert_code>/download', methods=['GET'])
+def download_certificate(cert_code):
+    cert = Certificate.query.filter_by(cert_code=cert_code).first()
+    if not cert:
+        return jsonify({'error': 'Certificado não encontrado'}), 404
+
+    pdf = _generate_pdf(cert)
+    return send_file(
+        pdf,
+        mimetype='application/pdf',
+        as_attachment=True,
+        download_name=f'certificado-{cert_code}.pdf',
+    )
+
+
+def _generate_pdf(cert):
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+    from reportlab.pdfgen import canvas as rl_canvas
+    from reportlab.lib.utils import ImageReader
+    import os
+
+    buf = BytesIO()
+    w, h = landscape(A4)
+    c = rl_canvas.Canvas(buf, pagesize=(w, h))
+
+    primary = colors.HexColor('#008ea8')
+    dark = colors.HexColor('#003d4d')
+    gold = colors.HexColor('#e9c46a')
+    gray = colors.HexColor('#555555')
+    light_gray = colors.HexColor('#aaaaaa')
+
+    # Outer border
+    c.setStrokeColor(primary)
+    c.setLineWidth(4)
+    c.rect(12 * mm, 12 * mm, w - 24 * mm, h - 24 * mm)
+    # Inner border
+    c.setLineWidth(1.5)
+    c.rect(16 * mm, 16 * mm, w - 32 * mm, h - 32 * mm)
+
+    # Logo (if exists)
+    logo_path = os.path.join(os.path.dirname(__file__), '..', 'Logo-IBC-Horizontal.png')
+    logo_y = h - 38 * mm
+    if os.path.exists(logo_path):
+        try:
+            c.drawImage(ImageReader(logo_path), w / 2 - 40 * mm, logo_y, width=80 * mm, height=18 * mm,
+                        preserveAspectRatio=True, mask='auto')
+            logo_y -= 6 * mm
+        except Exception:
+            pass
+    else:
+        # Fallback text header
+        c.setFont('Helvetica-Bold', 20)
+        c.setFillColor(primary)
+        c.drawCentredString(w / 2, h - 30 * mm, 'IBC ENSINO')
+        c.setFont('Helvetica', 11)
+        c.setFillColor(gray)
+        c.drawCentredString(w / 2, h - 38 * mm, 'Igreja Batista Central de Campo Grande')
+        logo_y = h - 44 * mm
+
+    # Decorative line
+    c.setStrokeColor(gold)
+    c.setLineWidth(2)
+    c.line(40 * mm, logo_y - 4 * mm, w - 40 * mm, logo_y - 4 * mm)
+
+    # CERTIFICADO title
+    c.setFont('Helvetica-Bold', 32)
+    c.setFillColor(dark)
+    c.drawCentredString(w / 2, logo_y - 22 * mm, 'CERTIFICADO')
+
+    # Body
+    c.setFont('Helvetica', 14)
+    c.setFillColor(gray)
+    c.drawCentredString(w / 2, logo_y - 32 * mm, 'Certificamos que')
+
+    # Student name
+    student_name = cert.user.name if cert.user else ''
+    c.setFont('Helvetica-Bold', 28)
+    c.setFillColor(dark)
+    c.drawCentredString(w / 2, logo_y - 48 * mm, student_name)
+
+    # Name underline
+    name_w = c.stringWidth(student_name, 'Helvetica-Bold', 28)
+    c.setStrokeColor(primary)
+    c.setLineWidth(1)
+    c.line(w / 2 - name_w / 2, logo_y - 50 * mm, w / 2 + name_w / 2, logo_y - 50 * mm)
+
+    # Course/trail label
+    c.setFont('Helvetica', 14)
+    c.setFillColor(gray)
+    cert_label = 'concluiu com êxito o curso' if cert.cert_type == 'course' else 'concluiu com êxito a trilha'
+    c.drawCentredString(w / 2, logo_y - 60 * mm, cert_label)
+
+    # Title
+    title = ''
+    if cert.cert_type == 'course' and cert.course:
+        title = cert.course.name
+    elif cert.cert_type == 'trail' and cert.trail:
+        title = cert.trail.name
+    c.setFont('Helvetica-Bold', 20)
+    c.setFillColor(primary)
+    c.drawCentredString(w / 2, logo_y - 72 * mm, title)
+
+    # Decorative line bottom
+    c.setStrokeColor(gold)
+    c.setLineWidth(2)
+    c.line(40 * mm, logo_y - 80 * mm, w - 40 * mm, logo_y - 80 * mm)
+
+    # Footer
+    issued_str = cert.issued_at.strftime('%d/%m/%Y') if cert.issued_at else ''
+    app_url = current_app.config.get('APP_URL', 'http://localhost:5000')
+
+    c.setFont('Helvetica', 9)
+    c.setFillColor(light_gray)
+    c.drawString(24 * mm, 22 * mm, f'Emitido em: {issued_str}')
+    c.drawCentredString(w / 2, 22 * mm, f'Verifique em: {app_url}/#verificar/{cert.cert_code}')
+    c.drawRightString(w - 24 * mm, 22 * mm, f'Código de verificação: {cert.cert_code}')
+
+    c.save()
+    buf.seek(0)
+    return buf

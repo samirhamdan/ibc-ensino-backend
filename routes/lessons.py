@@ -1,13 +1,17 @@
 """
 Lesson (aula) routes: linear lesson flow — material + inline quiz per module
 """
+import re
 from flask import Blueprint, request, jsonify, session
 from extensions import db
-from models import Course, Module, LessonProgress, User
+from models import Course, Module, LessonProgress, User, UserPoints, Badge, UserBadge, Certificate
+from routes.gamification import award_points
 
 lessons_bp = Blueprint('lessons', __name__)
 
 PASS_THRESHOLD = 60  # percent
+
+ALLOWED_VIDEO_HOSTS = ('youtube.com', 'youtu.be', 'vimeo.com', 'www.youtube.com', 'www.vimeo.com')
 
 
 def _current_user():
@@ -21,9 +25,34 @@ def _ordered_modules(course_id):
     return Module.query.filter_by(course_id=course_id).order_by(Module.position).all()
 
 
+def get_embed_url(video_url):
+    """Return embeddable iframe URL from a YouTube or Vimeo URL, or None."""
+    if not video_url:
+        return None, None
+    # YouTube: watch?v=ID or youtu.be/ID or youtube.com/embed/ID
+    yt = re.search(r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([A-Za-z0-9_-]{11})', video_url)
+    if yt:
+        return f'https://www.youtube.com/embed/{yt.group(1)}', 'youtube'
+    # Vimeo: vimeo.com/ID or player.vimeo.com/video/ID
+    vm = re.search(r'(?:vimeo\.com/|player\.vimeo\.com/video/)(\d+)', video_url)
+    if vm:
+        return f'https://player.vimeo.com/video/{vm.group(1)}', 'vimeo'
+    return None, None
+
+
+def validate_video_url(url):
+    """Return True if URL is from allowed video hosts."""
+    if not url:
+        return True
+    from urllib.parse import urlparse
+    host = urlparse(url).netloc.lstrip('www.')
+    return host in ('youtube.com', 'youtu.be', 'vimeo.com')
+
+
 def _lesson_dict(module, progress_map, unlocked):
     quiz_total = len(module.quiz)
     prog = progress_map.get(module.id)
+    embed_url, provider = get_embed_url(module.video_url)
     return {
         'id': module.id,
         'nome': module.nome,
@@ -33,6 +62,9 @@ def _lesson_dict(module, progress_map, unlocked):
         'quiz_total': quiz_total,
         'progress': prog.to_dict() if prog else None,
         'unlocked': unlocked,
+        'video_url': module.video_url,
+        'video_provider': provider or module.video_provider,
+        'video_embed_url': embed_url,
     }
 
 
@@ -147,6 +179,24 @@ def submit_aula_quiz(course_id, aula_num):
     next_unlocked = passed
     is_last = aula_num == len(modules)
 
+    # Check if course is now fully complete → issue certificate
+    certificate_issued = False
+    cert_code = None
+    if passed and is_last:
+        all_modules = modules
+        all_progs = {p.module_id: p for p in LessonProgress.query.filter_by(user_id=user.id, course_id=course_id).all()}
+        all_done = all(all_progs.get(m.id) and all_progs[m.id].passed for m in all_modules)
+        if all_done:
+            existing_cert = Certificate.query.filter_by(user_id=user.id, course_id=course_id, cert_type='course').first()
+            if not existing_cert:
+                from routes.certificates import generate_cert_code
+                code = generate_cert_code()
+                cert = Certificate(user_id=user.id, course_id=course_id, cert_type='course', cert_code=code)
+                db.session.add(cert)
+                db.session.commit()
+                certificate_issued = True
+                cert_code = code
+
     return jsonify({
         'score': score,
         'total': total,
@@ -156,4 +206,69 @@ def submit_aula_quiz(course_id, aula_num):
         'feedback': feedback,
         'next_unlocked': next_unlocked,
         'is_last_lesson': is_last,
+        'certificate_issued': certificate_issued,
+        'cert_code': cert_code,
     }), 200
+
+
+@lessons_bp.route('/<int:course_id>/aulas/<int:aula_num>/video-watched', methods=['POST'])
+def mark_video_watched(course_id, aula_num):
+    user = _current_user()
+    if not user:
+        return jsonify({'error': 'Não autenticado'}), 401
+
+    Course.query.get_or_404(course_id)
+    modules = _ordered_modules(course_id)
+    if aula_num < 1 or aula_num > len(modules):
+        return jsonify({'error': 'Aula não encontrada'}), 404
+
+    module = modules[aula_num - 1]
+    if not module.video_url:
+        return jsonify({'error': 'Esta aula não tem vídeo'}), 400
+
+    prog = LessonProgress.query.filter_by(user_id=user.id, module_id=module.id).first()
+    already_watched = bool(prog and prog.video_watched)
+    if not prog:
+        prog = LessonProgress(user_id=user.id, course_id=course_id, module_id=module.id)
+        db.session.add(prog)
+
+    prog.video_watched = True
+    db.session.commit()
+
+    points_result = None
+    if not already_watched:
+        points_result = award_points(user.id, 'material_read')
+
+    # Determine if quiz is now unlocked
+    mat = (module.materials or [None])[0] if module.materials else None
+    mat_read = bool(prog.material_read_at) or bool(prog.material_percentage and prog.material_percentage >= 50)
+    has_material = bool(mat and mat.tipo == 'pdf')
+    quiz_unlocked = prog.video_watched and (not has_material or mat_read)
+
+    return jsonify({
+        'ok': True,
+        'already_watched': already_watched,
+        'points': points_result,
+        'quiz_unlocked': quiz_unlocked,
+    }), 200
+
+
+@lessons_bp.route('/<int:course_id>/modulos/<int:module_id>/video', methods=['PATCH'])
+def update_module_video(course_id, module_id):
+    """Admin/tutor: set or clear video URL on a module."""
+    user = _current_user()
+    if not user or user.role not in ('admin', 'tutor'):
+        return jsonify({'error': 'Acesso negado'}), 403
+
+    module = Module.query.filter_by(id=module_id, course_id=course_id).first_or_404()
+    data = request.get_json(silent=True) or {}
+    video_url = data.get('video_url', '').strip() or None
+
+    if video_url and not validate_video_url(video_url):
+        return jsonify({'error': 'URL inválida. Use YouTube ou Vimeo.'}), 400
+
+    embed_url, provider = get_embed_url(video_url)
+    module.video_url = video_url
+    module.video_provider = provider
+    db.session.commit()
+    return jsonify({'ok': True, 'video_url': video_url, 'video_embed_url': embed_url}), 200

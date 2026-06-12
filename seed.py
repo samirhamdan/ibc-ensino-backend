@@ -3,7 +3,7 @@ Seed the database with initial demo data from BRIEFING.md.
 Run once: python seed.py
 """
 from app import create_app, db
-from models import User, Category, Course, Module, Quiz, Material, Badge, Trail, TrailCourse
+from models import User, Category, Course, Module, Quiz, Material, Badge, Trail, TrailCourse, Certificate
 
 BADGES = [
     ('novo_discipulo', 'Novo Discípulo', 'Seu primeiro curso começado', '👶', 'comum'),
@@ -75,6 +75,7 @@ def seed():
                 'category': 'Teologia',
                 'aulas': [
                     {'nome': 'O que é fé?', 'dur': '30 min',
+                     'video_url': 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
                      'material': ('Apostila — O que é fé?', 'https://example.com/fe.pdf', 'link'),
                      'quiz': [('O que define a fé cristã?', ['Obras', 'Confiança em Deus', 'Tradição', 'Sentimento'], 1, 'Hebreus 11:1')]},
                     {'nome': 'A Bíblia como fundamento', 'dur': '45 min',
@@ -97,6 +98,7 @@ def seed():
                 'category': 'Crescimento',
                 'aulas': [
                     {'nome': 'O chamado ao discipulado', 'dur': '30 min',
+                     'video_url': 'https://www.youtube.com/watch?v=jNQXAC9IVRw',
                      'material': ('Apostila — Discipulado', 'https://example.com/discipulado.pdf', 'link'),
                      'quiz': [('Qual é a Grande Comissão?', ['Amar ao próximo', 'Ir e fazer discípulos', 'Guardar o sábado', 'Jejuar'], 1, 'Mateus 28:19-20')]},
                     {'nome': 'Vida de oração', 'dur': '40 min',
@@ -149,7 +151,11 @@ def seed():
             db.session.flush()
 
             for i, aula in enumerate(cd['aulas']):
-                module = Module(course_id=course.id, nome=aula['nome'], dur=aula['dur'], position=i)
+                from routes.lessons import get_embed_url
+                vurl = aula.get('video_url')
+                _, vprov = get_embed_url(vurl)
+                module = Module(course_id=course.id, nome=aula['nome'], dur=aula['dur'], position=i,
+                                video_url=vurl, video_provider=vprov)
                 db.session.add(module)
                 db.session.flush()
 

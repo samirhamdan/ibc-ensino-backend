@@ -102,13 +102,18 @@ class Module(db.Model):
     nome = db.Column(db.String(200), nullable=False)
     dur = db.Column(db.String(50), default='')
     position = db.Column(db.Integer, default=0)
+    video_url = db.Column(db.String(500), nullable=True)
+    video_provider = db.Column(db.String(20), nullable=True)  # 'youtube' | 'vimeo'
 
     materials = db.relationship('Material', backref='module', lazy=True, cascade='all, delete-orphan')
     quiz = db.relationship('Quiz', backref='module', lazy=True, cascade='all, delete-orphan',
                            order_by='Quiz.position')
 
     def to_dict(self):
-        return {'id': self.id, 'nome': self.nome, 'dur': self.dur, 'position': self.position}
+        return {
+            'id': self.id, 'nome': self.nome, 'dur': self.dur, 'position': self.position,
+            'video_url': self.video_url, 'video_provider': self.video_provider,
+        }
 
 
 class Material(db.Model):
@@ -121,10 +126,11 @@ class Material(db.Model):
     url = db.Column(db.Text, nullable=False)
     tipo = db.Column(db.String(10), default='link')  # pdf | link
     size = db.Column(db.String(20), default='')
+    original_name = db.Column(db.String(255), nullable=True)
 
     def to_dict(self):
         return {'id': self.id, 'name': self.name, 'url': self.url, 'tipo': self.tipo, 'size': self.size,
-                'module_id': self.module_id}
+                'module_id': self.module_id, 'original_name': self.original_name}
 
 
 class Quiz(db.Model):
@@ -162,6 +168,7 @@ class LessonProgress(db.Model):
     material_time_spent = db.Column(db.Integer, default=0)
     material_read_at = db.Column(db.DateTime, nullable=True)
     material_percentage = db.Column(db.Float, default=0.0)
+    video_watched = db.Column(db.Boolean, default=False)
 
     user = db.relationship('User', backref='lesson_progresses', lazy=True)
     course = db.relationship('Course', backref='lesson_progresses', lazy=True)
@@ -178,6 +185,7 @@ class LessonProgress(db.Model):
             'material_time_spent': self.material_time_spent or 0,
             'material_read_at': self.material_read_at.isoformat() if self.material_read_at else None,
             'material_percentage': self.material_percentage or 0.0,
+            'video_watched': bool(self.video_watched),
             'score': self.score,
             'total': self.total,
             'passed': self.passed,
@@ -392,4 +400,35 @@ class UserPoints(db.Model):
             'total_points': self.total_points,
             'current_level': self.current_level,
             'points_in_level': self.points_in_level,
+        }
+
+
+class Certificate(db.Model):
+    __tablename__ = 'certificates'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=True)
+    trail_id = db.Column(db.Integer, db.ForeignKey('trails.id'), nullable=True)
+    cert_type = db.Column(db.String(10), nullable=False)  # 'course' | 'trail'
+    cert_code = db.Column(db.String(20), unique=True, nullable=False)
+    issued_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='certificates', lazy=True)
+    course = db.relationship('Course', backref='certificates', lazy=True)
+    trail = db.relationship('Trail', backref='certificates', lazy=True)
+
+    def to_dict(self):
+        title = ''
+        if self.cert_type == 'course' and self.course:
+            title = self.course.name
+        elif self.cert_type == 'trail' and self.trail:
+            title = self.trail.name
+        return {
+            'id': self.id,
+            'cert_code': self.cert_code,
+            'cert_type': self.cert_type,
+            'title': title,
+            'issued_at': self.issued_at.isoformat(),
+            'student_name': self.user.name if self.user else '',
         }

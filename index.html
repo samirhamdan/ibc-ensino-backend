@@ -40,6 +40,7 @@
 <link rel="stylesheet" href="css/components/hero.css">
 <link rel="stylesheet" href="css/components/trails.css">
 <link rel="stylesheet" href="css/components/onboarding.css">
+<link rel="stylesheet" href="css/components/video.css">
 
 <!-- Scripts -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -149,6 +150,10 @@
           <span class="ci-icon">🗺️</span>
           <div class="ci-text"><div class="ci-name">Trilhas</div></div>
         </div>
+        <div class="course-item" id="nav-certificados" onclick="navigateToCertificados()" style="display:none">
+          <span class="ci-icon">🎓</span>
+          <div class="ci-text"><div class="ci-name">Meus Certificados</div></div>
+        </div>
         <div class="course-item" id="nav-catalog" onclick="showCatalog()">
           <span class="ci-icon">🗂️</span>
           <div class="ci-text"><div class="ci-name">Catálogo de Cursos</div></div>
@@ -198,6 +203,7 @@
 // ── Global state ──
 let currentUser = null;
 let courses = [];
+let allTrails = [];
 let currentCourse = null;
 let currentProgress = null;
 let currentQuestions = [];
@@ -266,6 +272,16 @@ let resetToken = null;
 
 window.addEventListener('DOMContentLoaded', init);
 async function init(){
+  // Handle #verificar/CODE — public, no login required
+  const hash = window.location.hash;
+  const verifyMatch = hash.match(/^#verificar\/([A-Z0-9-]+)$/i);
+  if(verifyMatch){
+    show('main');
+    document.getElementById('main-content').innerHTML='';
+    await renderVerifyPage(verifyMatch[1].toUpperCase());
+    return;
+  }
+
   // Detecta token de reset na URL
   const params = new URLSearchParams(window.location.search);
   const token = params.get('reset_token');
@@ -281,6 +297,7 @@ async function init(){
       currentUser = await res.json();
       await loadCourses();
       await loadCategories();
+      await loadAllTrails();
       setupUI();
       show('main');
       detectarPerfilEAtualizarDashboard();
@@ -290,6 +307,13 @@ async function init(){
   } catch(e){
     show('login');
   }
+}
+
+async function loadAllTrails(){
+  try{
+    const r = await api('GET','/trails');
+    if(r.ok) allTrails = await r.json();
+  }catch(e){}
 }
 
 async function loadCourses(){
@@ -329,6 +353,8 @@ function setupUI(){
   if(studentDashNav) studentDashNav.style.display = isAluno() ? 'flex' : 'none';
   const trilhasNav=document.getElementById('nav-trilhas');
   if(trilhasNav) trilhasNav.style.display = isAluno() ? 'flex' : 'none';
+  const certNav=document.getElementById('nav-certificados');
+  if(certNav) certNav.style.display = isAluno() ? 'flex' : 'none';
   const myTrailsSection=document.getElementById('my-trails-section');
   if(myTrailsSection) myTrailsSection.style.display = isAluno() ? 'block' : 'none';
   renderCourseList();
@@ -350,6 +376,7 @@ async function doLogin(){
   currentUser = await res.json();
   await loadCourses();
   await loadCategories();
+  await loadAllTrails();
   setupUI();
   show('main');
   detectarPerfilEAtualizarDashboard();
@@ -517,11 +544,35 @@ let aulaQuizFeedback = null;
 const MAX_QUIZ_ATTEMPTS = 3;
 
 function _materialReadKey(moduleId){ return `aula_lida_${currentUser.id}_${moduleId}`; }
+function _videoWatchedKey(moduleId){ return `aula_video_${currentUser.id}_${moduleId}`; }
 function _attemptsKey(moduleId){ return `aula_tentativas_${currentUser.id}_${moduleId}`; }
 function isMaterialRead(moduleId){ return localStorage.getItem(_materialReadKey(moduleId))==='1'; }
 function markMaterialRead(moduleId){ localStorage.setItem(_materialReadKey(moduleId),'1'); }
+function isVideoWatched(moduleId){
+  // Check server state first (from progress object), then localStorage
+  if(currentAula && currentAula.progress && currentAula.progress.video_watched) return true;
+  return localStorage.getItem(_videoWatchedKey(moduleId))==='1';
+}
+function markVideoWatched(moduleId){ localStorage.setItem(_videoWatchedKey(moduleId),'1'); }
 function getAttempts(moduleId){ return parseInt(localStorage.getItem(_attemptsKey(moduleId))||'0',10); }
 function incAttempts(moduleId){ const n=getAttempts(moduleId)+1; localStorage.setItem(_attemptsKey(moduleId),String(n)); return n; }
+
+async function marcarVideoAssistido(){
+  const a = currentAula;
+  if(!a) return;
+  markVideoWatched(a.id);
+  // Call server
+  try{
+    const r = await api('POST',`/courses/${a.course.id}/aulas/${a.aula_num}/video-watched`);
+    if(r.ok){
+      const d = await r.json();
+      if(d.points && !d.already_watched) showToast('⭐ +10 pontos!', 'xp');
+      if(currentAula.progress) currentAula.progress.video_watched = true;
+      else currentAula.progress = {video_watched: true, passed: false};
+    }
+  }catch(e){}
+  renderAulaPage();
+}
 function resetAttempts(moduleId){ localStorage.removeItem(_attemptsKey(moduleId)); }
 
 async function renderCourseResume(){
@@ -601,9 +652,35 @@ function renderAulaPage(){
   const passed = a.progress && a.progress.passed;
   const moduleId = a.id;
   const matRead = passed || isMaterialRead(moduleId);
+  const videoWatched = passed || isVideoWatched(moduleId);
+  const hasVideo = !!a.video_embed_url;
+  const hasMat = !!(mat && mat.tipo === 'pdf');
   const attempts = getAttempts(moduleId);
   const attemptsLeft = Math.max(0, MAX_QUIZ_ATTEMPTS - attempts);
   const outOfAttempts = !passed && attempts >= MAX_QUIZ_ATTEMPTS;
+
+  // ── Step 0: Video (if present) ──
+  let videoHtml = '';
+  if(hasVideo){
+    videoHtml = `
+    <div class="admin-section lesson-video-block" style="border-color:${videoWatched?'#2d6a4f':'#e8e0d4'}">
+      <div class="admin-section-header" style="display:flex;align-items:center;gap:.5rem;${videoWatched?'background:var(--success-bg);color:var(--success)':''}">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:${videoWatched?'var(--success)':'var(--primary)'};color:white;font-size:.7rem;flex-shrink:0">${videoWatched?'✓':'▶'}</span>
+        🎬 Vídeo da Aula ${videoWatched?'<span style="margin-left:auto;font-size:.7rem;font-weight:700">CONCLUÍDO</span>':''}
+      </div>
+      <div class="admin-section-body">
+        <div class="video-wrapper">
+          <iframe src="${a.video_embed_url}" frameborder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowfullscreen></iframe>
+        </div>
+        ${videoWatched
+          ? `<div class="material-done-badge">✅ Vídeo concluído · +10 pontos</div>`
+          : `<button class="btn btn-success btn-lg btn-full" id="btnVideoAssistido" onclick="marcarVideoAssistido()">✅ JÁ ASSISTI O VÍDEO</button>
+             <p class="material-reward-hint">Você ganha <strong>+10 pontos</strong> ⭐</p>`}
+      </div>
+    </div>`;
+  }
 
   // ── Step 1: Material ──
   const materialHtml = `
@@ -631,11 +708,17 @@ function renderAulaPage(){
 
   // ── Step 2: Quiz ──
   let quizInner;
-  const quizLocked = !matRead;
+  // Unlock rule: video+material → need both; video only → need video; material only → need material
+  const quizLocked = (hasVideo && !videoWatched) || (hasMat && !matRead);
   if(quizLocked){
+    const lockMsg = hasVideo && hasMat
+      ? 'Assista ao vídeo e leia o material para desbloquear o exercício.'
+      : hasVideo
+        ? 'Assista ao vídeo e clique em <strong>"Já assisti o vídeo"</strong> para desbloquear.'
+        : 'Leia o material acima e clique em <strong>"Já li o material"</strong> para desbloquear.';
     quizInner = `<div class="locked-exercise-hint">
       <span class="locked-icon">🔒</span>
-      <p>Leia o material acima e clique em <strong>"Já li o material"</strong> para desbloquear.</p>
+      <p>${lockMsg}</p>
       <p class="locked-reward">Este exercício vale <strong>+20 pontos</strong> ⭐</p>
     </div>`;
   } else if(outOfAttempts && !passed){
@@ -731,8 +814,10 @@ function renderAulaPage(){
     </div>
     <div style="font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Mapa de Progresso</div>
     <div style="display:flex;flex-direction:column;gap:.8rem;margin-bottom:1.2rem">
+      ${videoHtml}
+      ${videoHtml && mat?`<div style="text-align:center;color:var(--muted);font-size:.8rem">↓</div>`:''}
       ${materialHtml}
-      <div style="text-align:center;color:var(--muted);font-size:.8rem">${matRead?'↓':'🔒 ↓'}</div>
+      <div style="text-align:center;color:var(--muted);font-size:.8rem">${quizLocked?'🔒 ↓':'↓'}</div>
       ${quizHtml}
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1.2rem;flex-wrap:wrap;gap:.6rem">
@@ -935,12 +1020,26 @@ async function submitAulaQuiz(){
   }
 }
 
-function renderConclusion(){
+async function renderConclusion(){
   const c=currentCourse;
   const passedScores = currentAulas.map(a=>a.progress).filter(p=>p&&p.total);
   const totalScore = passedScores.reduce((s,p)=>s+p.score,0);
   const totalMax = passedScores.reduce((s,p)=>s+p.total,0);
   const pct = totalMax ? Math.round(totalScore/totalMax*100) : 0;
+
+  // Issue certificate
+  let certCode = null;
+  try{
+    const r = await api('POST','/certificates/issue',{cert_type:'course', entity_id: c.id});
+    if(r.ok){
+      const d = await r.json();
+      certCode = d.cert && d.cert.cert_code;
+      if(d.certificate_issued){
+        setTimeout(()=>showTrophyModal('🎓','Certificado conquistado!',`Seu certificado de "${c.name}" está disponível!`), 600);
+      }
+    }
+  }catch(e){}
+
   document.getElementById('main-content').innerHTML=`
     <div style="text-align:center;padding:2.5rem 1rem">
       <div style="font-size:3.5rem">🎉</div>
@@ -948,10 +1047,12 @@ function renderConclusion(){
       <p style="color:var(--muted);margin-top:.4rem">Você concluiu o curso <strong>${c.name}</strong></p>
       <div class="result-score" style="margin-top:1rem">${pct}%</div>
       <div class="result-label">aproveitamento médio</div>
+      ${certCode?`<div style="margin:.8rem 0;font-size:.85rem;color:var(--muted)">Código: <strong>${certCode}</strong></div>`:''}
       <div style="margin-top:1.5rem;display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap">
-        <button class="btn-gold" onclick="alert('Certificado em geração — funcionalidade em breve!')">🏆 Baixar Certificado</button>
-        <button class="btn-secondary" onclick="selectCourse(${c.id})">Voltar ao curso</button>
-        <button class="btn-secondary" onclick="showCatalog()">Ver outros cursos</button>
+        ${certCode?`<button class="btn btn-primary" onclick="downloadCertificate('${certCode}')">🎓 Baixar Certificado</button>`:''}
+        ${certCode?`<button class="btn btn-success" onclick="shareWhatsApp({cert_code:'${certCode}',title:'${c.name.replace(/'/g,"\\'")}' })">💚 Compartilhar</button>`:''}
+        <button class="btn btn-secondary" onclick="selectCourse(${c.id})">Voltar ao curso</button>
+        <button class="btn btn-secondary" onclick="showCatalog()">Ver outros cursos</button>
       </div>
     </div>`;
 }
@@ -2282,6 +2383,55 @@ function showCatalog(){
   renderCatalogView('');
 }
 
+function _courseTrailChip(courseId){
+  for(const t of allTrails){
+    if((t.courses||[]).some(tc=>tc.course_id===courseId))
+      return `<span class="course-trail-chip">${t.icon} ${t.name}</span>`;
+  }
+  return '';
+}
+
+function _courseBadgeTag(c, userPct){
+  const now = Date.now();
+  if(userPct>=100) return '<span class="course-badge-tag done">CONCLUÍDO ✓</span>';
+  if(userPct>=60 && userPct<100) return `<span class="course-badge-tag">QUASE LÁ! ${userPct}%</span>`;
+  // "NOVO" if created < 30 days ago — use id as proxy (high id = newer)
+  if(c._isNew) return '<span class="course-badge-tag">NOVO</span>';
+  return '';
+}
+
+function _courseCardV2(c, userPct, showEdit){
+  const nModules = (c.modules||[]).length;
+  const badge = _courseBadgeTag(c, userPct);
+  const trail = _courseTrailChip(c.id);
+  const coverBg = `linear-gradient(135deg, #006b85, #1ba3c2)`;
+  const editBtns = showEdit ? `
+    <div style="display:flex;gap:.4rem;margin-top:.6rem">
+      <button class="btn btn-outline" style="flex:1;padding:.35rem;font-size:.72rem" onclick="event.stopPropagation();selectCourse(${c.id})">Editar</button>
+      <button class="btn btn-danger-sm" style="font-size:.72rem;padding:.35rem .6rem" onclick="event.stopPropagation();removeCourse(${c.id})">Remover</button>
+    </div>` : '';
+  const accessChip = showEdit ? `<span style="font-size:.6rem;padding:.1rem .4rem;border-radius:3px;background:${c.acesso==='publico'?'#e8f4f6':'#f3f0ff'};color:var(--navy)">${c.acesso==='publico'?'🌐 Público':'✝️ Interno'}</span>` : '';
+  return `
+    <div class="course-card-v2 stagger-item" onclick="selectCourse(${c.id})">
+      <div class="course-cover" style="background:${coverBg}">
+        ${badge}
+        <div class="course-cover-overlay"></div>
+        <span class="course-cover-icon">${c.icon||'📚'}</span>
+        ${userPct>0 ? `<div class="course-cover-progress" style="width:${userPct}%"></div>` : ''}
+      </div>
+      <div class="course-card-v2-body">
+        <span class="course-category">${c.tag||''} ${accessChip}</span>
+        <h3 class="course-card-v2-title">${c.name}</h3>
+        <div class="course-card-v2-meta">
+          <span>📚 ${nModules} aula(s)</span>
+          <span>⏱️ ${c.duracao||'–'}</span>
+        </div>
+        ${trail}
+        ${editBtns}
+      </div>
+    </div>`;
+}
+
 function renderCatalogView(filterCat){
   if(!filterCat) filterCat='';
   const allCats=['', ...new Set(courses.map(c=>c.tag))];
@@ -2289,21 +2439,7 @@ function renderCatalogView(filterCat){
     '<button class="cat-filter '+(filterCat===c?'active':'')+'" onclick="renderCatalogView(\''+c+'\')">'+( c===''?'Todos':c)+'</button>'
   ).join('');
   const filtered=filterCat?courses.filter(c=>c.tag===filterCat):courses;
-  const cardsHtml=filtered.map(c=>`
-    <div class="course-card stagger-item" onclick="selectCourse(${c.id})">
-      <div class="course-card-banner">${c.icon||'📚'}</div>
-      <div class="course-card-body">
-        <div class="course-card-tag">${c.tag}</div>
-        <div class="course-card-name">${c.name}</div>
-        <div class="course-card-meta">
-          <span>📋 ${(c.modules||[]).length} módulos</span>
-        </div>
-        <div class="course-card-progress">
-          <div class="cc-bar"><div class="cc-bar-fill" style="width:0%"></div></div>
-          <div class="cc-pct">Clique para iniciar</div>
-        </div>
-      </div>
-    </div>`).join('');
+  const cardsHtml=filtered.map(c=>_courseCardV2(c,c._pct||0,false)).join('');
   document.getElementById('main-content').innerHTML=
     '<div class="course-header">'
     +'<span class="course-tag">Catálogo</span>'
@@ -2311,7 +2447,7 @@ function renderCatalogView(filterCat){
     +'<div class="course-meta"><span>'+courses.length+' curso(s) disponível(is)</span></div>'
     +'</div>'
     +'<div class="catalog-filters">'+filterHtml+'</div>'
-    +(filtered.length?'<div class="catalog-grid">'+cardsHtml+'</div>':'<div style="text-align:center;padding:2rem;color:var(--muted)">Nenhum curso nesta categoria.</div>');
+    +(filtered.length?'<div class="course-grid-v2">'+cardsHtml+'</div>':'<div style="text-align:center;padding:2rem;color:var(--muted)">Nenhum curso nesta categoria.</div>');
 }
 
 // ── Admin Catalog ──
@@ -2323,21 +2459,7 @@ function renderAdminCatalog(filterCat){
     '<button class="cat-filter '+(filterCat===c?'active':'')+'" onclick="renderAdminCatalog(\''+c+'\')">'+( c===''?'Todos':c)+'</button>'
   ).join('');
   const filtered=filterCat?courses.filter(c=>c.tag===filterCat):courses;
-  const cardsHtml=filtered.map(c=>`
-    <div class="course-card">
-      <div class="course-card-banner">${c.icon||'📚'}</div>
-      <div class="course-card-body">
-        <div class="course-card-tag">${c.tag} &nbsp;<span style="font-size:.6rem;padding:.1rem .4rem;border-radius:3px;background:${c.acesso==='publico'?'#e8f4f6':'#f3f0ff'};color:var(--navy)">${c.acesso==='publico'?'🌐 Público':'✝️ Interno'}</span></div>
-        <div class="course-card-name">${c.name}</div>
-        <div class="course-card-meta">
-          <span>📋 ${(c.modules||[]).length} mód.</span>
-        </div>
-        <div style="display:flex;gap:.4rem;margin-top:.6rem">
-          <button class="btn-gold" style="flex:1;padding:.35rem;font-size:.72rem" onclick="event.stopPropagation();selectCourse(${c.id})">Editar</button>
-          <button class="btn-sm btn-danger-sm" onclick="event.stopPropagation();removeCourse(${c.id})">Remover</button>
-        </div>
-      </div>
-    </div>`).join('');
+  const cardsHtml=filtered.map(c=>_courseCardV2(c,0,true)).join('');
   document.getElementById('main-content').innerHTML=
     '<div class="course-header">'
     +'<span class="course-tag">Admin</span>'
@@ -2345,7 +2467,7 @@ function renderAdminCatalog(filterCat){
     +'<div class="course-meta"><span>'+courses.length+' curso(s)</span></div>'
     +'</div>'
     +'<div class="catalog-filters">'+filterHtml+'</div>'
-    +(filtered.length?'<div class="catalog-grid">'+cardsHtml+'</div>':'<div style="text-align:center;padding:2rem;color:var(--muted)">Nenhum curso nesta categoria.</div>');
+    +(filtered.length?'<div class="course-grid-v2">'+cardsHtml+'</div>':'<div style="text-align:center;padding:2rem;color:var(--muted)">Nenhum curso nesta categoria.</div>');
 }
 
 // ── Admin: Categories ──
@@ -2846,6 +2968,125 @@ async function focusTrailAndGoHome(id){
   await api('POST', `/trails/${id}/focus`);
   renderSidebarTrails();
   detectarPerfilEAtualizarDashboard();
+}
+
+// ── Certificates ──────────────────────────────────────────────────────────
+
+function downloadCertificate(certCode){
+  window.open(`/api/certificates/${certCode}/download`, '_blank');
+}
+
+function shareWhatsApp(cert){
+  const text = encodeURIComponent(
+    `🎓 Acabei de conquistar o certificado "${cert.title}" no IBC Ensino!\n` +
+    `Verifique: ${window.location.origin}/#verificar/${cert.cert_code}`
+  );
+  window.open(`https://wa.me/?text=${text}`, '_blank');
+}
+
+async function navigateToCertificados(){
+  document.querySelectorAll('.course-item').forEach(x=>x.classList.remove('active'));
+  const nav = document.getElementById('nav-certificados');
+  if(nav) nav.classList.add('active');
+  const el = document.getElementById('main-content');
+  el.innerHTML = '<div style="padding:2rem;color:var(--gray)">Carregando certificados...</div>';
+  try{
+    const r = await api('GET', '/certificates/my');
+    if(!r.ok){ el.innerHTML='<p style="color:var(--danger);padding:1.5rem">Erro ao carregar certificados.</p>'; return; }
+    const certs = await r.json();
+    el.innerHTML = `
+      <div class="course-header">
+        <span class="course-tag">Aluno</span>
+        <h1 class="course-title">🎓 Meus Certificados</h1>
+        <div class="course-meta"><span>${certs.length} certificado(s) conquistado(s)</span></div>
+      </div>
+      ${certs.length === 0
+        ? `<div class="card" style="text-align:center;padding:2.5rem">
+             <div style="font-size:3rem;margin-bottom:.8rem">🎓</div>
+             <div style="font-weight:600;color:var(--dark)">Nenhum certificado ainda</div>
+             <p style="color:var(--gray);font-size:.9rem;margin-top:.4rem">Conclua um curso ou trilha para ganhar seu primeiro certificado!</p>
+             <button class="btn btn-primary" style="margin-top:1rem" onclick="showCatalog()">Ver cursos</button>
+           </div>`
+        : certs.map(cert => `
+            <div class="card" style="display:flex;align-items:center;gap:1rem;margin-bottom:var(--space-md);flex-wrap:wrap">
+              <div style="font-size:2.5rem">🎓</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:700;color:var(--dark)">${cert.title}</div>
+                <div style="font-size:.8rem;color:var(--gray);margin:.2rem 0">
+                  ${cert.cert_type==='trail'?'Trilha':'Curso'} · Emitido em ${new Date(cert.issued_at).toLocaleDateString('pt-BR')}
+                </div>
+                <div style="font-size:.75rem;color:var(--gray-dark);font-weight:600">Código: ${cert.cert_code}</div>
+              </div>
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+                <button class="btn btn-outline" onclick="downloadCertificate('${cert.cert_code}')">⬇ Baixar PDF</button>
+                <button class="btn btn-success" onclick="shareWhatsApp(${JSON.stringify(cert).replace(/"/g,'&quot;')})">💚 WhatsApp</button>
+              </div>
+            </div>`).join('')}`;
+  }catch(e){
+    el.innerHTML='<p style="color:var(--danger);padding:1.5rem">Erro ao carregar certificados.</p>';
+  }
+}
+
+// ── Public verification page (accessible without login) ──────────────────
+
+async function renderVerifyPage(certCode){
+  const el = document.getElementById('main-content');
+  const code = certCode || '';
+  el.innerHTML = `
+    <div style="max-width:540px;margin:2rem auto;padding:0 1rem">
+      <div class="course-header">
+        <h1 class="course-title">🔍 Verificar Certificado</h1>
+      </div>
+      <div class="card" style="margin-bottom:var(--space-lg)">
+        <div style="display:flex;gap:.6rem;align-items:flex-end">
+          <div class="form-group" style="flex:1;margin:0">
+            <label>Código do certificado</label>
+            <input type="text" id="verify-code-input" value="${code}" placeholder="IBC-XXXX-XXXX"
+                   style="text-transform:uppercase;letter-spacing:.1em"
+                   oninput="this.value=this.value.toUpperCase()">
+          </div>
+          <button class="btn btn-primary" onclick="doVerifyCert()">Verificar</button>
+        </div>
+      </div>
+      <div id="verify-result"></div>
+    </div>`;
+  if(code) doVerifyCert();
+}
+
+async function doVerifyCert(){
+  const code = (document.getElementById('verify-code-input')?.value||'').trim().toUpperCase();
+  const res = document.getElementById('verify-result');
+  if(!code || !res) return;
+  res.innerHTML='<div style="color:var(--gray);font-size:.9rem">Verificando...</div>';
+  try{
+    const r = await fetch(`/api/certificates/verify/${encodeURIComponent(code)}`);
+    const d = await r.json();
+    if(d.valid){
+      res.innerHTML=`
+        <div class="card" style="border:2px solid var(--success);background:rgba(39,174,96,.06)">
+          <div style="display:flex;align-items:center;gap:.8rem;margin-bottom:.8rem">
+            <span style="font-size:2rem">✅</span>
+            <div>
+              <div style="font-weight:700;color:var(--success);font-size:1.1rem">Certificado válido</div>
+              <div style="font-size:.8rem;color:var(--gray)">Código: ${d.cert_code}</div>
+            </div>
+          </div>
+          <div style="font-size:.95rem;color:var(--dark)"><strong>Aluno:</strong> ${d.student_name}</div>
+          <div style="font-size:.95rem;color:var(--dark);margin:.3rem 0"><strong>${d.cert_type==='trail'?'Trilha':'Curso'}:</strong> ${d.title}</div>
+          <div style="font-size:.85rem;color:var(--gray)">Emitido em: ${new Date(d.issued_at).toLocaleDateString('pt-BR')}</div>
+          <button class="btn btn-outline" style="margin-top:1rem" onclick="downloadCertificate('${d.cert_code}')">⬇ Baixar PDF</button>
+        </div>`;
+    } else {
+      res.innerHTML=`
+        <div class="card" style="border:2px solid var(--danger);background:rgba(231,76,60,.06);text-align:center;padding:1.5rem">
+          <div style="font-size:2rem">❌</div>
+          <div style="font-weight:700;color:var(--danger);margin-top:.4rem">Código não encontrado</div>
+          <p style="font-size:.85rem;color:var(--gray);margin-top:.3rem">Verifique o código e tente novamente.</p>
+        </div>`;
+    }
+  }catch(e){
+    res.innerHTML='<div style="color:var(--danger)">Erro ao verificar. Tente novamente.</div>';
+  }
 }
 
 // ── Onboarding Modal ──

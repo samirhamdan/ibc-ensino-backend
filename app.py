@@ -52,7 +52,7 @@ def create_app(config_name='development'):
     # Context
     with app.app_context():
         # Importar modelos
-        from models import User, Course, Material, Module, Quiz, Progress, Question, Category, Trail, TrailCourse, UserTrail, OnboardingAnswer
+        from models import User, Course, Material, Module, Quiz, Progress, Question, Category, Trail, TrailCourse, UserTrail, OnboardingAnswer, Certificate
         
         # Criar tabelas
         db.create_all()
@@ -67,6 +67,7 @@ def create_app(config_name='development'):
         from routes.gamification import gamification_bp
         from routes.dashboards import dashboards_bp
         from routes.trails import trails_bp, onboarding_bp
+        from routes.certificates import certificates_bp
 
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
         app.register_blueprint(courses_bp, url_prefix='/api/courses')
@@ -78,6 +79,7 @@ def create_app(config_name='development'):
         app.register_blueprint(dashboards_bp, url_prefix='/api')
         app.register_blueprint(trails_bp, url_prefix='/api/trails')
         app.register_blueprint(onboarding_bp, url_prefix='/api/onboarding')
+        app.register_blueprint(certificates_bp, url_prefix='/api/certificates')
 
         # Convenience alias so GET /api/user works alongside /api/auth/user
         @app.route('/api/user', methods=['GET'])
@@ -108,10 +110,15 @@ def create_app(config_name='development'):
                 'size': f'{size_mb} MB',
             }), 201
 
-        # Serve uploaded files
+        # Serve uploaded files (including materials/ subdir)
         @app.route('/uploads/<path:filename>', methods=['GET'])
         def serve_upload(filename):
-            return send_from_directory(uploads_dir, filename)
+            # Prevent path traversal
+            import posixpath
+            safe = posixpath.normpath(filename)
+            if safe.startswith('..'):
+                return jsonify({'error': 'Acesso negado'}), 403
+            return send_from_directory(uploads_dir, safe)
 
         # Favicon
         @app.route('/favicon.svg', methods=['GET'])
