@@ -28,6 +28,8 @@ class User(db.Model):
     role = db.Column(db.String(20), nullable=False, default='aluno_externo')
     # roles: admin | tutor | aluno_interno | aluno_externo
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    onboarding_completed = db.Column(db.Boolean, default=False)
+    active_trail_id = db.Column(db.Integer, db.ForeignKey('trails.id', use_alter=True, name='fk_user_active_trail'), nullable=True)
 
     progress = db.relationship('Progress', backref='user', lazy=True, cascade='all, delete-orphan')
     questions = db.relationship('Question', backref='author', lazy=True, cascade='all, delete-orphan')
@@ -45,6 +47,8 @@ class User(db.Model):
             'email': self.email,
             'role': self.role,
             'created_at': self.created_at.isoformat(),
+            'onboarding_completed': self.onboarding_completed,
+            'active_trail_id': self.active_trail_id,
         }
 
 
@@ -279,6 +283,94 @@ class UserBadge(db.Model):
     badge = db.relationship('Badge')
 
     __table_args__ = (db.UniqueConstraint('user_id', 'badge_id', name='uq_user_badge'),)
+
+
+class Trail(db.Model):
+    __tablename__ = 'trails'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, default='')
+    icon = db.Column(db.String(10), default='🛤️')
+    goal = db.Column(db.String(50), default='')  # evangelismo | discipulado | teologia | servico
+    xp_bonus = db.Column(db.Integer, default=100)
+    badge_code = db.Column(db.String(50), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    trail_courses = db.relationship('TrailCourse', backref='trail', lazy=True,
+                                    cascade='all, delete-orphan', order_by='TrailCourse.position')
+
+    def to_dict(self, include_courses=False):
+        data = {
+            'id': self.id,
+            'name': self.name,
+            'description': self.description,
+            'icon': self.icon,
+            'goal': self.goal,
+            'xp_bonus': self.xp_bonus,
+            'badge_code': self.badge_code,
+        }
+        if include_courses:
+            data['courses'] = [tc.to_dict() for tc in self.trail_courses]
+        return data
+
+
+class TrailCourse(db.Model):
+    __tablename__ = 'trail_courses'
+
+    id = db.Column(db.Integer, primary_key=True)
+    trail_id = db.Column(db.Integer, db.ForeignKey('trails.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
+    position = db.Column(db.Integer, default=0)
+
+    course = db.relationship('Course')
+
+    def to_dict(self):
+        return {
+            'position': self.position,
+            'course_id': self.course_id,
+            'course_name': self.course.name if self.course else '',
+            'course_icon': self.course.icon if self.course else '',
+        }
+
+
+class UserTrail(db.Model):
+    __tablename__ = 'user_trails'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    trail_id = db.Column(db.Integer, db.ForeignKey('trails.id'), nullable=False)
+    enrolled_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime, nullable=True)
+
+    trail = db.relationship('Trail')
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'trail_id', name='uq_user_trail'),)
+
+    def to_dict(self):
+        return {
+            'trail_id': self.trail_id,
+            'enrolled_at': self.enrolled_at.isoformat(),
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+        }
+
+
+class OnboardingAnswer(db.Model):
+    __tablename__ = 'onboarding_answers'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, unique=True)
+    goal = db.Column(db.String(50), nullable=False)
+    recommended_trail_id = db.Column(db.Integer, db.ForeignKey('trails.id'), nullable=True)
+    answered_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    recommended_trail = db.relationship('Trail')
+
+    def to_dict(self):
+        return {
+            'goal': self.goal,
+            'recommended_trail_id': self.recommended_trail_id,
+        }
 
 
 class UserPoints(db.Model):

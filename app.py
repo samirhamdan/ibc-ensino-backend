@@ -52,7 +52,7 @@ def create_app(config_name='development'):
     # Context
     with app.app_context():
         # Importar modelos
-        from models import User, Course, Material, Module, Quiz, Progress, Question, Category
+        from models import User, Course, Material, Module, Quiz, Progress, Question, Category, Trail, TrailCourse, UserTrail, OnboardingAnswer
         
         # Criar tabelas
         db.create_all()
@@ -66,6 +66,7 @@ def create_app(config_name='development'):
         from routes.materials import materials_bp
         from routes.gamification import gamification_bp
         from routes.dashboards import dashboards_bp
+        from routes.trails import trails_bp, onboarding_bp
 
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
         app.register_blueprint(courses_bp, url_prefix='/api/courses')
@@ -75,6 +76,8 @@ def create_app(config_name='development'):
         app.register_blueprint(materials_bp, url_prefix='/api/materiais')
         app.register_blueprint(gamification_bp, url_prefix='/api/gamification')
         app.register_blueprint(dashboards_bp, url_prefix='/api')
+        app.register_blueprint(trails_bp, url_prefix='/api/trails')
+        app.register_blueprint(onboarding_bp, url_prefix='/api/onboarding')
 
         # Convenience alias so GET /api/user works alongside /api/auth/user
         @app.route('/api/user', methods=['GET'])

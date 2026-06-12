@@ -3,7 +3,7 @@ Seed the database with initial demo data from BRIEFING.md.
 Run once: python seed.py
 """
 from app import create_app, db
-from models import User, Category, Course, Module, Quiz, Material, Badge
+from models import User, Category, Course, Module, Quiz, Material, Badge, Trail, TrailCourse
 
 BADGES = [
     ('novo_discipulo', 'Novo Discípulo', 'Seu primeiro curso começado', '👶', 'comum'),
@@ -14,6 +14,11 @@ BADGES = [
     ('edificador', 'Edificador', 'Concluiu 3 cursos completos', '👑', 'épico'),
     ('corredor_incansavel', 'Corredor Incansável', 'Concluiu curso em 7 dias', '🔥', 'comum'),
     ('servo_fiel', 'Servo Fiel', 'Estudou 7 dias seguidos', '💪', 'raro'),
+    # Trail badges
+    ('trilha_evangelismo', 'Evangelizador', 'Concluiu a Trilha de Evangelismo', '📢', 'épico'),
+    ('trilha_discipulado', 'Discípulo Fiel', 'Concluiu a Trilha de Discipulado', '🙏', 'épico'),
+    ('trilha_teologia', 'Teólogo', 'Concluiu a Trilha de Teologia', '✝️', 'épico'),
+    ('trilha_servico', 'Servo do Senhor', 'Concluiu a Trilha de Serviço', '🤝', 'épico'),
 ]
 
 
@@ -155,6 +160,70 @@ def seed():
                 for j, (q, opts, ans, exp) in enumerate(aula['quiz']):
                     db.session.add(Quiz(course_id=course.id, module_id=module.id,
                                         q=q, opts=opts, ans=ans, exp=exp, position=j))
+
+        db.session.commit()
+
+        # ── Trails ─────────────────────────────────────────────
+        courses_by_name = {c.name: c for c in Course.query.all()}
+        trails_data = [
+            {
+                'name': 'Trilha do Evangelismo',
+                'description': 'Aprenda a compartilhar o evangelho com clareza e amor.',
+                'icon': '📢',
+                'goal': 'evangelismo',
+                'xp_bonus': 150,
+                'badge_code': 'trilha_evangelismo',
+                'courses': ['Estudo Bíblico — Salmos', 'Fundamentos da Fé'],
+            },
+            {
+                'name': 'Trilha do Discipulado',
+                'description': 'Cresça em fé e aprenda a fazer discípulos.',
+                'icon': '🙏',
+                'goal': 'discipulado',
+                'xp_bonus': 150,
+                'badge_code': 'trilha_discipulado',
+                'courses': ['Discipulado Cristão', 'Fundamentos da Fé'],
+            },
+            {
+                'name': 'Trilha de Teologia',
+                'description': 'Aprofunde seu conhecimento dos fundamentos teológicos.',
+                'icon': '✝️',
+                'goal': 'teologia',
+                'xp_bonus': 200,
+                'badge_code': 'trilha_teologia',
+                'courses': ['Fundamentos da Fé', 'Estudo Bíblico — Salmos'],
+            },
+            {
+                'name': 'Trilha de Serviço',
+                'description': 'Descubra seu chamado e sirva com excelência na Igreja.',
+                'icon': '🤝',
+                'goal': 'servico',
+                'xp_bonus': 150,
+                'badge_code': 'trilha_servico',
+                'courses': ['Discipulado Cristão', 'Estudo Bíblico — Salmos'],
+            },
+        ]
+
+        for td in trails_data:
+            trail = Trail(
+                name=td['name'],
+                description=td['description'],
+                icon=td['icon'],
+                goal=td['goal'],
+                xp_bonus=td['xp_bonus'],
+                badge_code=td['badge_code'],
+            )
+            db.session.add(trail)
+            db.session.flush()
+            for pos, cname in enumerate(td['courses']):
+                course = courses_by_name.get(cname)
+                if course:
+                    db.session.add(TrailCourse(trail_id=trail.id, course_id=course.id, position=pos))
+
+        # admin and tutor skip onboarding
+        for u in users:
+            if u.role in ('admin', 'tutor'):
+                u.onboarding_completed = True
 
         db.session.commit()
         print("Seed concluído com sucesso!")
