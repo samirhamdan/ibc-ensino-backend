@@ -41,6 +41,7 @@
 <link rel="stylesheet" href="css/components/trails.css">
 <link rel="stylesheet" href="css/components/onboarding.css">
 <link rel="stylesheet" href="css/components/video.css">
+<link rel="stylesheet" href="css/components/lesson-sections.css">
 
 <!-- Scripts -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -647,7 +648,7 @@ async function loadAula(courseId, aulaNum){
 function renderAulaPage(){
   const a=currentAula;
   const total=a.total_aulas, num=a.aula_num;
-  const pct=Math.round((num/total)*100);
+  const coursePct=Math.round((num/total)*100);
   const mat=(a.materiais||[])[0];
   const passed = a.progress && a.progress.passed;
   const moduleId = a.id;
@@ -658,17 +659,19 @@ function renderAulaPage(){
   const attempts = getAttempts(moduleId);
   const attemptsLeft = Math.max(0, MAX_QUIZ_ATTEMPTS - attempts);
   const outOfAttempts = !passed && attempts >= MAX_QUIZ_ATTEMPTS;
+  const quizLocked = (hasVideo && !videoWatched) || (hasMat && !matRead);
 
-  // ── Step 0: Video (if present) ──
-  let videoHtml = '';
+  // ── Card 1: Vídeo ──
+  let videoCardHtml = '';
   if(hasVideo){
-    videoHtml = `
-    <div class="admin-section lesson-video-block" style="border-color:${videoWatched?'#2d6a4f':'#e8e0d4'}">
-      <div class="admin-section-header" style="display:flex;align-items:center;gap:.5rem;${videoWatched?'background:var(--success-bg);color:var(--success)':''}">
-        <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:${videoWatched?'var(--success)':'var(--primary)'};color:white;font-size:.7rem;flex-shrink:0">${videoWatched?'✓':'▶'}</span>
-        🎬 Vídeo da Aula ${videoWatched?'<span style="margin-left:auto;font-size:.7rem;font-weight:700">CONCLUÍDO</span>':''}
+    videoCardHtml = `
+    <div class="lesson-section-card">
+      <div class="lesson-section-header${videoWatched?' done':''}">
+        <span class="lesson-section-icon">${videoWatched?'✓':'▶'}</span>
+        <h2 class="lesson-section-title">VÍDEO DA AULA</h2>
+        ${videoWatched?'<span class="lesson-section-status">✓ Concluído</span>':''}
       </div>
-      <div class="admin-section-body">
+      <div class="lesson-section-body">
         <div class="video-wrapper">
           <iframe src="${a.video_embed_url}" frameborder="0"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -682,54 +685,68 @@ function renderAulaPage(){
     </div>`;
   }
 
-  // ── Step 1: Material ──
-  const materialHtml = `
-    <div class="admin-section" style="border-color:${matRead?'#2d6a4f':'#e8e0d4'}">
-      <div class="admin-section-header" style="display:flex;align-items:center;gap:.5rem;${matRead?'background:var(--success-bg);color:var(--success)':''}">
-        <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:${matRead?'var(--success)':'var(--navy)'};color:white;font-size:.7rem;flex-shrink:0">${matRead?'✓':'1'}</span>
-        📄 Material da Aula ${matRead?'<span style="margin-left:auto;font-size:.7rem;font-weight:700">CONCLUÍDO</span>':''}
-      </div>
-      <div class="admin-section-body">
-        ${mat?`<div class="material-list" style="margin-bottom:.8rem">
-          <div class="material-item">
-            <span class="mat-icon">📄</span>
-            <div class="mat-info"><div class="mat-name">${mat.name}</div><div class="mat-meta">${mat.tipo==='pdf'?'PDF':'Link'}</div></div>
-            ${mat.tipo==='pdf'?`<button class="btn-view" onclick="openPdfViewer(${mat.id},'${mat.name.replace(/'/g,"\\'")}')">📖 Abrir Viewer</button>`:''}
-            <a class="btn-view" style="margin-left:.4rem" href="${mat.url}" target="_blank" rel="noopener" download>${mat.tipo==='pdf'?'📥 Baixar':'Abrir'}</a>
-          </div>
+  // ── Card 2: Material ──
+  const matItems = (a.materiais||[]).map(m=>`
+    <div class="material-item-row">
+      <div class="material-item-info">
+        <span class="material-item-icon">${m.tipo==='pdf'?'📄':'🔗'}</span>
+        <div>
+          <div class="material-item-name">${m.name}</div>
+          <div class="material-item-type">${m.tipo==='pdf'?'PDF':'Link'}</div>
         </div>
-        ${mat.tipo==='pdf'?renderMaterialReadStatus(a.progress):''}`:'<div class="pdf-no-files" style="margin-bottom:.8rem">Nenhum material cadastrado para esta aula.</div>'}
-        ${matRead
-          ? `<div class="material-done-badge">✅ Material concluído · +10 pontos</div>`
-          : `<button class="btn btn-success btn-lg btn-full" id="btnMaterialLido" onclick="confirmMaterialRead(${moduleId})">✅ JÁ LI O MATERIAL</button>
-             <p class="material-reward-hint">Libera o exercício e você ganha <strong>+10 pontos</strong> ⭐</p>`}
       </div>
+      <div class="material-item-actions">
+        ${m.tipo==='pdf'?`<button class="btn btn-outline" onclick="openPdfViewer(${m.id},'${m.name.replace(/'/g,"\\'")}')">📖 Abrir Viewer</button>`:''}
+        <a class="btn btn-outline" href="${m.url}" target="_blank" rel="noopener">${m.tipo==='pdf'?'📥 Baixar':'🔗 Abrir'}</a>
+      </div>
+    </div>`).join('');
+
+  const matBodyContent = matItems
+    ? `${matItems}
+       ${hasMat ? renderMaterialReadStatus(a.progress) : ''}
+       ${matRead
+         ? `<div class="material-done-badge">✅ Material concluído · +10 pontos</div>`
+         : `<button class="btn btn-success btn-lg btn-full" id="btnMaterialLido" onclick="confirmMaterialRead(${moduleId})">✅ JÁ LI O MATERIAL</button>
+            <p class="material-reward-hint">Libera o exercício e você ganha <strong>+10 pontos</strong> ⭐</p>`}`
+    : `<p class="section-placeholder">Nenhum material cadastrado para esta aula.</p>
+       ${matRead
+         ? `<div class="material-done-badge">✅ Concluído</div>`
+         : `<button class="btn btn-success btn-lg btn-full" id="btnMaterialLido" onclick="confirmMaterialRead(${moduleId})">✅ JÁ LI O MATERIAL</button>
+            <p class="material-reward-hint">Libera o exercício e você ganha <strong>+10 pontos</strong> ⭐</p>`}`;
+
+  const materialCardHtml = `
+    <div class="lesson-section-card">
+      <div class="lesson-section-header${matRead?' done':''}">
+        <span class="lesson-section-icon">${matRead?'✓':'✍'}</span>
+        <h2 class="lesson-section-title">MATERIAL DA AULA</h2>
+        ${matRead?'<span class="lesson-section-status">✓ Concluído</span>':''}
+      </div>
+      <div class="lesson-section-body">${matBodyContent}</div>
     </div>`;
 
-  // ── Step 2: Quiz ──
-  let quizInner;
-  // Unlock rule: video+material → need both; video only → need video; material only → need material
-  const quizLocked = (hasVideo && !videoWatched) || (hasMat && !matRead);
+  // ── Card 3: Exercício ──
+  let exerciseBody;
   if(quizLocked){
     const lockMsg = hasVideo && hasMat
       ? 'Assista ao vídeo e leia o material para desbloquear o exercício.'
       : hasVideo
         ? 'Assista ao vídeo e clique em <strong>"Já assisti o vídeo"</strong> para desbloquear.'
-        : 'Leia o material acima e clique em <strong>"Já li o material"</strong> para desbloquear.';
-    quizInner = `<div class="locked-exercise-hint">
-      <span class="locked-icon">🔒</span>
-      <p>${lockMsg}</p>
-      <p class="locked-reward">Este exercício vale <strong>+20 pontos</strong> ⭐</p>
-    </div>`;
+        : 'Leia o material e clique em <strong>"Já li o material"</strong> para desbloquear.';
+    exerciseBody = `
+      <div class="locked-exercise-hint">
+        <span class="locked-exercise-hint-icon">🔒</span>
+        <p>${lockMsg}</p>
+        <p class="locked-exercise-reward">Este exercício vale <strong>+20 pontos</strong> ⭐</p>
+      </div>`;
   } else if(outOfAttempts && !passed){
-    quizInner = `<div class="admin-section-body" style="text-align:center;padding:1.5rem 1rem">
-      <div style="font-size:1.6rem">😕</div>
-      <div class="result-msg fail" style="margin-top:.6rem">Você esgotou suas ${MAX_QUIZ_ATTEMPTS} tentativas para esta aula.</div>
-      <p style="font-size:.82rem;color:var(--muted);margin-top:.6rem">Revise o material com atenção e entre em contato com o tutor através do botão "Fazer Pergunta" para liberar uma nova tentativa.</p>
-    </div>`;
+    exerciseBody = `
+      <div style="text-align:center;padding:var(--space-lg)">
+        <div style="font-size:1.8rem">😕</div>
+        <div class="result-msg fail" style="margin-top:.6rem">Você esgotou suas ${MAX_QUIZ_ATTEMPTS} tentativas.</div>
+        <p style="font-size:.85rem;color:var(--muted);margin-top:.6rem">Entre em contato com o tutor para liberar uma nova tentativa.</p>
+      </div>`;
   } else if(aulaQuizSubmitted && aulaQuizFeedback){
-    const fb=aulaQuizFeedback;
-    const pass=fb.passed;
+    const fb=aulaQuizFeedback, pass=fb.passed;
     const reviewHtml = fb.feedback ? fb.feedback.map((f,i)=>`
       <div class="question-card ${f.is_correct?'correct':'wrong'}">
         <div class="q-num">Questão ${i+1}</div>
@@ -740,20 +757,21 @@ function renderAulaPage(){
         </div>
         <div class="q-feedback ${f.is_correct?'ok':'err'}">${f.is_correct?'✓ Correto!':'✗ Incorreto — '+f.explanation}</div>
       </div>`).join('') : '';
-    const remainingMsg = pass ? '' : `<p style="font-size:.8rem;color:var(--muted);margin-top:.5rem">Tentativas restantes: <strong>${attemptsLeft}</strong> de ${MAX_QUIZ_ATTEMPTS}</p>`;
-    quizInner = `<div class="quiz-body">
+    exerciseBody = `
+      <div class="quiz-body">
         <div class="quiz-result">
           <div class="result-score">${fb.score}/${fb.total}</div>
           <div class="result-label">${fb.percentage}% de aproveitamento</div>
           <div class="result-msg ${pass?'pass':'fail'}">${pass?'🎉 Você foi aprovado nesta aula!':'📚 Você precisa de pelo menos 60% para avançar.'}</div>
-          ${remainingMsg}
+          ${pass?'':` <p style="font-size:.8rem;color:var(--muted);margin-top:.5rem">Tentativas restantes: <strong>${attemptsLeft}</strong> de ${MAX_QUIZ_ATTEMPTS}</p>`}
         </div>
         ${reviewHtml?`<hr style="border:none;border-top:1px solid #e8e0d4;margin:1rem 0">${reviewHtml}`:''}
-        <div class="quiz-actions">${pass?'':`<button class="btn-secondary" ${attemptsLeft<=0?'disabled':''} onclick="retakeAulaQuiz()">Tentar novamente (${attemptsLeft} restante${attemptsLeft===1?'':'s'})</button>`}</div>
+        <div class="quiz-actions">${pass?'':`<button class="btn btn-outline" ${attemptsLeft<=0?'disabled':''} onclick="retakeAulaQuiz()">Tentar novamente (${attemptsLeft} restante${attemptsLeft===1?'':'s'})</button>`}</div>
       </div>`;
   } else {
-    quizInner = `<div class="quiz-body">
-        <p style="font-size:.8rem;color:var(--muted);margin-bottom:.8rem">Tentativa ${attempts+1} de ${MAX_QUIZ_ATTEMPTS} · Mínimo 60% para avançar</p>
+    exerciseBody = `
+      <div class="quiz-body">
+        <p style="font-size:.85rem;color:var(--muted);margin-bottom:var(--space-md)">Tentativa ${attempts+1} de ${MAX_QUIZ_ATTEMPTS} · Mínimo 60% para avançar</p>
         ${a.quiz.map((q,i)=>`
           <div class="question-card" id="aqcard-${i}">
             <div class="q-num">Questão ${i+1} de ${a.quiz.length}</div>
@@ -763,35 +781,42 @@ function renderAulaPage(){
                 <input type="radio" name="aq${i}" ${aulaQuizAnswers[i]===j?'checked':''} readonly><span>${o}</span></div>`).join('')}
             </div>
           </div>`).join('')}
-        <div class="quiz-actions"><button class="btn-gold" onclick="submitAulaQuiz()">Enviar respostas →</button></div>
+        <div class="quiz-actions"><button class="btn btn-primary" onclick="submitAulaQuiz()">Enviar respostas →</button></div>
       </div>`;
   }
-  const quizStepDone = passed;
-  const quizHtml = `
-    <div class="quiz-wrap" style="${quizLocked?'opacity:.55':''}">
-      <div class="quiz-header" style="display:flex;align-items:center;gap:.5rem">
-        <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:${quizStepDone?'var(--success)':(quizLocked?'rgba(255,255,255,.25)':'var(--gold)')};color:${quizStepDone?'white':'var(--navy)'};font-size:.7rem;flex-shrink:0">${quizStepDone?'✓':(quizLocked?'🔒':'2')}</span>
-        <div>
-          <div class="quiz-title">📝 Exercício</div>
-          <div class="quiz-desc">${a.quiz.length} questão(ões) ${quizLocked?'· bloqueado até concluir o material':`· ${MAX_QUIZ_ATTEMPTS} tentativas`}</div>
-        </div>
+
+  const quizHeaderDone = passed;
+  const exerciseCardHtml = `
+    <div class="lesson-section-card">
+      <div class="lesson-section-header${quizHeaderDone?' done':quizLocked?' ':''}">
+        <span class="lesson-section-icon">${quizHeaderDone?'✓':quizLocked?'🔒':'📝'}</span>
+        <h2 class="lesson-section-title">EXERCÍCIO</h2>
+        ${quizHeaderDone
+          ? '<span class="lesson-section-status">✓ Aprovado</span>'
+          : quizLocked
+            ? '<span class="lesson-section-status" style="opacity:.75">Bloqueado</span>'
+            : `<span class="lesson-section-status" style="opacity:.75">${a.quiz.length} questão(ões)</span>`}
       </div>
-      ${quizInner}
+      <div class="lesson-section-body">${exerciseBody}</div>
     </div>`;
 
-  // Stepper de aulas: anteriores = concluídas, atual = current, próxima desbloqueia ao passar
+  // ── Stepper ──
   const stepperHtml = `<div class="lesson-stepper">
     ${Array.from({length: total}, (_, i)=>{
-      const n = i + 1;
+      const n = i+1;
       let dot;
-      if(n < num) dot = `<div class="lesson-dot done" title="Aula ${n}">✓</div>`;
-      else if(n === num) dot = `<div class="lesson-dot current" title="Aula ${n}">${n}</div>`;
-      else if(n === num + 1 && passed) dot = `<div class="lesson-dot" title="Aula ${n}">${n}</div>`;
-      else dot = `<div class="lesson-dot locked" title="Aula ${n}">🔒</div>`;
-      const line = n < total ? `<div class="lesson-line ${n < num ? 'done' : ''}"></div>` : '';
-      return dot + line;
+      if(n < num)           dot=`<div class="lesson-dot done" title="Aula ${n}">✓</div>`;
+      else if(n === num)    dot=`<div class="lesson-dot current" title="Aula ${n}">${n}</div>`;
+      else if(n===num+1 && passed) dot=`<div class="lesson-dot" title="Aula ${n}">${n}</div>`;
+      else                  dot=`<div class="lesson-dot locked" title="Aula ${n}">🔒</div>`;
+      const line = n<total ? `<div class="lesson-line ${n<num?'done':''}"></div>` : '';
+      return dot+line;
     }).join('')}
   </div>`;
+
+  const nextBtn = num<total
+    ? `<button class="btn btn-primary" style="${passed?'':'opacity:.55;cursor:not-allowed'}" ${passed?'':'disabled title="Conclua o exercício para avançar"'} onclick="loadAula(${a.course.id},${num+1})">Próxima Aula →</button>`
+    : `<button class="btn btn-primary" style="${passed?'':'opacity:.55;cursor:not-allowed'}" ${passed?'':'disabled title="Conclua o exercício para avançar"'} onclick="renderConclusion()">Concluir Curso 🎓</button>`;
 
   document.getElementById('main-content').innerHTML=`
     <nav class="breadcrumb">
@@ -808,24 +833,19 @@ function renderAulaPage(){
     ${stepperHtml}
     <div class="progress-section">
       <div class="progress-header">
-        <span class="course-progress-label">Progresso do curso: <strong>${pct}%</strong></span>
+        <span class="course-progress-label">Progresso do curso: <strong>${coursePct}%</strong></span>
       </div>
-      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${coursePct}%"></div></div>
     </div>
-    <div style="font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.5rem">Mapa de Progresso</div>
-    <div style="display:flex;flex-direction:column;gap:.8rem;margin-bottom:1.2rem">
-      ${videoHtml}
-      ${videoHtml && mat?`<div style="text-align:center;color:var(--muted);font-size:.8rem">↓</div>`:''}
-      ${materialHtml}
-      <div style="text-align:center;color:var(--muted);font-size:.8rem">${quizLocked?'🔒 ↓':'↓'}</div>
-      ${quizHtml}
+    <div class="lesson-sections-container">
+      ${videoCardHtml}
+      ${materialCardHtml}
+      ${exerciseCardHtml}
     </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:1.2rem;flex-wrap:wrap;gap:.6rem">
-      <button class="btn-secondary" ${num<=1?'disabled':''} onclick="loadAula(${a.course.id},${num-1})">← Voltar</button>
-      <button class="btn-secondary" onclick="openAskQuestionModal(${a.course.id})">💬 Fazer Pergunta</button>
-      ${num<total
-        ? `<button class="btn-primary" style="width:auto;padding:.7rem 1.4rem;${passed?'':'opacity:.55;cursor:not-allowed'}" ${passed?'':'disabled title="Conclua o exercício para avançar"'} onclick="loadAula(${a.course.id},${num+1})">Próxima Aula →</button>`
-        : `<button class="btn-primary" style="width:auto;padding:.7rem 1.4rem;${passed?'':'opacity:.55;cursor:not-allowed'}" ${passed?'':'disabled title="Conclua o exercício para avançar"'} onclick="renderConclusion()">Concluir Curso 🎓</button>`}
+    <div class="lesson-navigation">
+      <button class="btn btn-outline" ${num<=1?'disabled':''} onclick="loadAula(${a.course.id},${num-1})">← Voltar</button>
+      <button class="btn btn-outline" onclick="openAskQuestionModal(${a.course.id})">💬 Fazer Pergunta</button>
+      ${nextBtn}
     </div>`;
 }
 
