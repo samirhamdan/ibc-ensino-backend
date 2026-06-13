@@ -58,3 +58,19 @@ a:hover .icon,
 }
 
 .icon--spinning { animation: icon-spin 1s linear infinite; }
+
+/* Icon semantic-color shortcuts */
+.icon--target          { color: var(--danger); }
+.icon--checkmark-circle{ color: var(--success); }
+.icon--x-circle        { color: var(--danger); }
+.icon--rocket          { color: var(--info, #3498db); }
+.icon--cross-light     { color: #8e44ad; }
+.icon--hands-pray      { color: var(--info, #3498db); }
+.icon--graduation-cap  { color: var(--warning); }
+.icon--wallet          { color: var(--success); }
+.icon--books           { color: var(--primary); }
+.icon--clock           { color: var(--gray); }
+.icon--lightbulb       { color: var(--warning); }
+.icon--plant           { color: var(--success); }
+.icon--megaphone       { color: var(--primary); }
+.icon--handshake       { color: var(--success); }

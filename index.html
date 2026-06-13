@@ -657,7 +657,7 @@ async function renderCourseResume(){
         ${allDone?'Revisar curso':(passedCount>0?'Continuar de onde parei →':'COMECE AGORA →')}
       </button>
       <div style="margin-top:.8rem">
-        <button class="btn-secondary" onclick="openAskQuestionModal(${c.id})">💬 Fazer Pergunta</button>
+        <button class="btn-secondary" onclick="openAskQuestionModal(${c.id})">${icon('message','16')} Fazer Pergunta</button>
       </div>
     </div>`;
 }
@@ -879,7 +879,7 @@ function renderAulaPage(){
     </div>
     <div class="lesson-navigation">
       <button class="btn btn-outline" ${num<=1?'disabled':''} onclick="loadAula(${a.course.id},${num-1})">← Voltar</button>
-      <button class="btn btn-outline" onclick="openAskQuestionModal(${a.course.id})">💬 Fazer Pergunta</button>
+      <button class="btn btn-outline" onclick="openAskQuestionModal(${a.course.id})"${icon('message','16')} Fazer Pergunta</button>
       ${nextBtn}
     </div>`;
 }
@@ -929,7 +929,7 @@ async function openPdfViewer(materialId, materialName){
   modal.innerHTML=`
     <div style="background:white;border-radius:var(--radius);width:100%;max-width:720px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden">
       <div style="background:var(--navy);color:white;padding:.8rem 1.1rem;display:flex;align-items:center;justify-content:space-between">
-        <strong style="font-family:'Playfair Display',serif">📖 ${materialName}</strong>
+        <strong style="font-family:'Playfair Display',serif">${icon('document-text','16')} ${materialName}</strong>
         <button onclick="closePdfViewer()" style="background:none;border:none;color:white;font-size:1.2rem;cursor:pointer">✕</button>
       </div>
       <div style="flex:1;overflow:auto;background:#525659;display:flex;justify-content:center;padding:1rem">
@@ -1105,7 +1105,7 @@ async function renderConclusion(){
       ${certCode?`<div style="margin:.8rem 0;font-size:.85rem;color:var(--muted)">Código: <strong>${certCode}</strong></div>`:''}
       <div style="margin-top:1.5rem;display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap">
         ${certCode?`<button class="btn btn-primary" onclick="downloadCertificate('${certCode}')">${icon('download','18')} Baixar Certificado</button>`:''}
-        ${certCode?`<button class="btn btn-success" onclick="shareWhatsApp({cert_code:'${certCode}',title:'${c.name.replace(/'/g,"\\'")}' })">💚 Compartilhar</button>`:''}
+        ${certCode?`<button class="btn btn-success" onclick="shareWhatsApp({cert_code:'${certCode}',title:'${c.name.replace(/'/g,"\\'")}' })">${icon('share','16','icon--success')} Compartilhar</button>`:''}
         <button class="btn btn-secondary" onclick="selectCourse(${c.id})">Voltar ao curso</button>
         <button class="btn btn-secondary" onclick="showCatalog()">Ver outros cursos</button>
       </div>
@@ -1121,7 +1121,7 @@ function openAskQuestionModal(courseId){
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:1000';
   modal.innerHTML=`
     <div style="background:white;border-radius:var(--radius);padding:1.4rem;width:100%;max-width:420px;margin:1rem">
-      <h3 style="font-family:'Playfair Display',serif;color:var(--navy);margin-bottom:.8rem">💬 Fazer Pergunta</h3>
+      <h3 style="font-family:'Playfair Display',serif;color:var(--navy);margin-bottom:.8rem">${icon('message','18')} Fazer Pergunta</h3>
       <div class="form-group" style="margin-bottom:.7rem">
         <label>Sua dúvida</label>
         <textarea id="ask-question-text" placeholder="Digite sua pergunta para o tutor..." style="min-height:90px"></textarea>
@@ -1183,10 +1183,10 @@ function renderCourse(){
     </div>
     <div class="tabs tabs-5">
       <button class="tab ${activeTab==='resumo'?'active':''}" id="tab-btn-resumo" onclick="setTab('resumo')">📋 Resumo</button>
-      <button class="tab ${activeTab==='modulos'?'active':''}" id="tab-btn-modulos" onclick="setTab('modulos')">🗂️ Módulos</button>
+      <button class="tab ${activeTab==='modulos'?'active':''}" id="tab-btn-modulos" onclick="setTab('modulos')">${icon('catalog','14')} Módulos</button>
       <button class="tab ${activeTab==='material'?'active':''}" id="tab-btn-material" onclick="setTab('material')">📄 Material</button>
       <button class="tab ${activeTab==='quiz'?'active':''}" id="tab-btn-quiz" onclick="setTab('quiz')">📝 Exercícios</button>
-      <button class="tab ${activeTab==='perguntas'?'active':''}" id="tab-btn-perguntas" onclick="setTab('perguntas')">💬 Perguntas${nPendente&&canManageCourse(currentUser,c.id)?' ('+nPendente+')':''}</button>
+      <button class="tab ${activeTab==='perguntas'?'active':''}" id="tab-btn-perguntas" onclick="setTab('perguntas')">${icon('message','14')} Perguntas${nPendente&&canManageCourse(currentUser,c.id)?' ('+nPendente+')':''}</button>
     </div>
     <div id="tab-content"></div>`;
   renderTabContent();
@@ -1249,11 +1249,11 @@ function renderResumo(){
     </div>
     <div class="resumo-desc">${c.resumo||'<em style="color:var(--muted)">Nenhuma descrição cadastrada.</em>'}</div>
     <div class="resumo-stats">
-      <div class="resumo-stat">📋 <strong>${(c.modules||[]).length}</strong> módulos</div>
+      <div class="resumo-stat">${icon('catalog','12')} <strong>${(c.modules||[]).length}</strong> módulos</div>
       ${c.duracao?`<div class="resumo-stat">⏱ <strong>${c.duracao}</strong></div>`:''}
       <div class="resumo-stat">📄 <strong>${mats.length}</strong> material(is)</div>
       <div class="resumo-stat">❓ <strong>${(c.quiz||[]).length}</strong> questões</div>
-      <div class="resumo-stat">💬 <strong>${currentQuestions.length}</strong> pergunta(s)</div>
+      <div class="resumo-stat">${icon('message','12')} <strong>${currentQuestions.length}</strong> pergunta(s)</div>
     </div>
   </div>`+editForm;
 }
@@ -1669,7 +1669,7 @@ function showAdminPanel(panel){
 // ── Admin: Users ──
 async function renderAdminUsers(){
   const res=await api('GET','/auth/users');
-  if(!res.ok){document.getElementById('main-content').innerHTML='<div class="course-header"><h1 class="course-title">👥 Usuários</h1></div><div class="admin-section"><div class="admin-section-body">Acesso negado.</div></div>';return;}
+  if(!res.ok){document.getElementById('main-content').innerHTML='<div class="course-header"><h1 class="course-title">'+icon('users','20')+' Usuários</h1></div><div class="admin-section"><div class="admin-section-body">Acesso negado.</div></div>';return;}
   allUsers=await res.json();
 
   const canSeeAll=isAdmin();
@@ -1736,7 +1736,7 @@ async function renderAdminUsers(){
     </div>`:'';
 
   document.getElementById('main-content').innerHTML=
-    '<div class="course-header"><span class="course-tag">Admin</span><h1 class="course-title">👥 Gerenciar Usuários</h1></div>'
+    '<div class="course-header"><span class="course-tag">Admin</span><h1 class="course-title">'+icon('users','20')+' Gerenciar Usuários</h1></div>'
     +formSection
     +`<div class="admin-section">
       <div class="admin-section-header">Usuários cadastrados (${visibleUsers.length})</div>
@@ -1854,11 +1854,11 @@ async function removeCourse(id){
 function renderDashboard(){
   const totalCourses=courses.length;
   document.getElementById('main-content').innerHTML=
-    '<div class="course-header"><span class="course-tag">Admin</span><h1 class="course-title">📊 Dashboard</h1></div>'
+    '<div class="course-header"><span class="course-tag">Admin</span><h1 class="course-title">'+icon('bar-chart','20')+' Dashboard</h1></div>'
     +'<div class="dash-grid">'
-    +'<div class="dash-card"><span class="dash-card-icon">📚</span><div class="dash-card-value">'+totalCourses+'</div><div class="dash-card-label">Cursos ativos</div></div>'
+    +'<div class="dash-card"><span class="dash-card-icon">'+icon('books','28','icon--books')+'</span><div class="dash-card-value">'+totalCourses+'</div><div class="dash-card-label">Cursos ativos</div></div>'
     +'</div>'
-    +'<div class="admin-section"><div class="admin-section-header">📚 Cursos disponíveis</div>'
+    +'<div class="admin-section"><div class="admin-section-header">'+icon('books','16','icon--books')+' Cursos disponíveis</div>'
     +'<div class="admin-section-body" style="padding:0">'
     +'<table class="table-users"><thead><tr><th>Curso</th><th>Categoria</th><th>Acesso</th></tr></thead>'
     +'<tbody>'+courses.map(c=>'<tr><td>'+(c.icon||'📚')+' '+c.name+'</td><td><span class="badge-cat">'+(c.tag||'—')+'</span></td><td>'+(c.acesso==='publico'?'🌐 Público':'✝️ Interno')+'</td></tr>').join('')+'</tbody></table>'
@@ -1902,12 +1902,12 @@ async function renderStudentDashboard(){
   document.getElementById('main-content').innerHTML=`
     <div class="course-header">
       <span class="course-tag">Meu Painel</span>
-      <h1 class="course-title">📊 Olá, ${currentUser.name.split(' ')[0]}!</h1>
+      <h1 class="course-title">${icon('bar-chart','20')} Olá, ${currentUser.name.split(' ')[0]}!</h1>
     </div>
     <div id="gami-widget"></div>
     <div class="tabs">
-      <button class="tab ${studentDashTab==='cursos'?'active':''}" onclick="setStudentDashTab('cursos')">📚 Meus Cursos</button>
-      <button class="tab ${studentDashTab==='duvidas'?'active':''}" onclick="setStudentDashTab('duvidas')">💬 Minhas Dúvidas ${myQuestions.filter(q=>!q.resposta).length?'<span style="background:var(--gold);color:var(--navy);border-radius:10px;padding:.05rem .4rem;font-size:.65rem;margin-left:.3rem">'+myQuestions.filter(q=>!q.resposta).length+'</span>':''}</button>
+      <button class="tab ${studentDashTab==='cursos'?'active':''}" onclick="setStudentDashTab('cursos')">${icon('catalog','16')} Meus Cursos</button>
+      <button class="tab ${studentDashTab==='duvidas'?'active':''}" onclick="setStudentDashTab('duvidas')">${icon('message','16')} Minhas Dúvidas ${myQuestions.filter(q=>!q.resposta).length?'<span style="background:var(--gold);color:var(--navy);border-radius:10px;padding:.05rem .4rem;font-size:.65rem;margin-left:.3rem">'+myQuestions.filter(q=>!q.resposta).length+'</span>':''}</button>
     </div>
     <div id="student-dash-content"></div>`;
 
@@ -1925,13 +1925,13 @@ async function renderStudentDashboard(){
             <div class="cc-bar"><div class="cc-bar-fill" style="width:${c._pct}%"></div></div>
             <div class="cc-pct">${c._total ? c._pct+'% concluído · '+c._passed+'/'+c._total+' aulas' : 'Sem aulas cadastradas'}</div>
           </div>
-          ${c._pct===100?'<div style="margin-top:.5rem"><span class="badge-respondida">🏆 Concluído</span></div>':(c._pct>0?'<button class="btn-gold" style="margin-top:.5rem;width:100%;padding:.4rem;font-size:.78rem">Continuar</button>':'<button class="btn-secondary" style="margin-top:.5rem;width:100%;padding:.4rem;font-size:.78rem">Começar curso</button>')}
+          ${c._pct===100?'<div style="margin-top:.5rem"><span class="badge-respondida">'+icon('achievements','12','icon--gold')+' Concluído</span></div>':(c._pct>0?'<button class="btn-gold" style="margin-top:.5rem;width:100%;padding:.4rem;font-size:.78rem">Continuar</button>':'<button class="btn-secondary" style="margin-top:.5rem;width:100%;padding:.4rem;font-size:.78rem">Começar curso</button>')}
         </div>
       </div>`;
     let html='';
     if(!inProgress.length && !completed.length){
       html+=`<div class="empty-state">
-        <div class="empty-icon">📚</div>
+        <div class="empty-icon">${icon('catalog','48','icon--primary')}</div>
         <h3>Você ainda não começou nenhum curso</h3>
         <p>Explore o catálogo e comece sua jornada de aprendizado!</p>
         <button class="btn-gold" onclick="showCatalog()">Explorar Cursos</button>
@@ -1960,7 +1960,7 @@ async function renderStudentDashboard(){
     let html='';
     if(!myQuestions.length){
       html=`<div class="empty-state">
-        <div class="empty-icon">💬</div>
+        <div class="empty-icon">${icon('message','48','icon--primary')}</div>
         <h3>Nenhuma dúvida ainda</h3>
         <p>Durante as aulas, você pode perguntar ao tutor a qualquer momento.</p>
       </div>`;
@@ -1999,7 +1999,7 @@ async function renderGamiWidget(){
       <div style="font-size:.85rem;color:var(--navy);font-weight:600">⭐ Nível ${s.current_level}: ${GAMI_LEVEL_NAMES[s.current_level]||''}</div>
       <div style="font-size:.78rem;color:var(--muted);margin:.2rem 0">${s.points_in_level} / ${target} pontos (Total: ${s.total_points})</div>
       <div style="font-family:monospace;font-size:.85rem;color:var(--gold)">${bar} ${pct}%</div>
-      <div style="margin-top:.7rem;font-size:.8rem;color:var(--navy);font-weight:600">🏆 Suas Conquistas:</div>
+      <div style="margin-top:.7rem;font-size:.8rem;color:var(--navy);font-weight:600">${icon('achievements','14','icon--gold')} Suas Conquistas:</div>
       <div style="margin:.3rem 0">${icons||'<span style="color:var(--muted);font-size:.78rem">Nenhuma conquista ainda — continue estudando!</span>'}</div>
       <div style="font-size:.75rem;color:var(--muted);margin-bottom:.6rem">(${s.badges_count} de ${s.badges_count + s.badges_locked.length} conquistadas)</div>
       <button class="btn-secondary" style="padding:.35rem .8rem;font-size:.78rem" onclick="showBadgesPage()">Ver Todas as Conquistas</button>
@@ -2062,7 +2062,7 @@ async function showBadgesPage(){
   document.getElementById('main-content').innerHTML=`
     <div class="course-header">
       <span class="course-tag">Gamificação</span>
-      <h1 class="course-title">🏆 Coleção de Conquistas (${unlocked.length}/${badges.length})</h1>
+      <h1 class="course-title">${icon('achievements','20','icon--gold')} Coleção de Conquistas (${unlocked.length}/${badges.length})</h1>
     </div>
     <button class="btn-secondary" style="margin-bottom:1rem;padding:.4rem .9rem;font-size:.8rem" onclick="showStudentDashboard()">‹ Voltar ao Painel</button>
     <h3 style="font-size:.85rem;color:var(--navy);margin:0 0 .6rem">Conquistados (${unlocked.length})</h3>
@@ -2089,14 +2089,14 @@ async function renderAdminDashboard(){
     <div class="dash-heading">📊 Dashboard Executivo</div>
     <div id="admin-dash-body"><div class="alert alert-info"><span class="alert-icon">⏳</span><div class="alert-body">Carregando...</div></div></div>`;
   const res=await api('GET','/admin/dashboard');
-  if(!res.ok){ document.getElementById('admin-dash-body').innerHTML='<div class="alert alert-danger"><span class="alert-icon">❌</span><div class="alert-body">Não foi possível carregar o dashboard.</div></div>'; return; }
+  if(!res.ok){ document.getElementById('admin-dash-body').innerHTML='<div class="alert alert-danger"><span class="alert-icon">'+icon('x-circle','16','icon--x-circle')+'</span><div class="alert-body">Não foi possível carregar o dashboard.</div></div>'; return; }
   const d=await res.json();
   const body=document.getElementById('admin-dash-body');
   body.innerHTML=`
     <div class="kpi-grid">
       <div class="stat-card stagger-item">
         <div class="stat-value">${d.total_users.total}</div>
-        <div class="stat-label">👥 Usuários</div>
+        <div class="stat-label">${icon('users','14')} Usuários</div>
         <div style="font-size:var(--text-xs);color:var(--gray);margin-top:2px">${d.total_users.alunos} alunos · ${d.total_users.tutores} tutores</div>
         ${d.new_users_7d>0?`<div class="stat-trend stat-trend-up">↑ ${d.new_users_7d} novos (7d)</div>`:''}
       </div>
@@ -2156,7 +2156,7 @@ async function renderTutorPanelDashboard(){
     <div class="dash-subtitle">Olá, ${currentUser.name.split(' ')[0]}! Aqui está seu resumo.</div>
     <div id="tutor-panel-body"><div class="alert alert-info"><span class="alert-icon">⏳</span><div class="alert-body">Carregando...</div></div></div>`;
   const res=await api('GET','/tutor/dashboard');
-  if(!res.ok){ document.getElementById('tutor-panel-body').innerHTML='<div class="alert alert-danger"><span class="alert-icon">❌</span><div class="alert-body">Não foi possível carregar.</div></div>'; return; }
+  if(!res.ok){ document.getElementById('tutor-panel-body').innerHTML='<div class="alert alert-danger"><span class="alert-icon">'+icon('x-circle','16','icon--x-circle')+'</span><div class="alert-body">Não foi possível carregar.</div></div>'; return; }
   const d=await res.json();
   const body=document.getElementById('tutor-panel-body');
   const pend=d.pending_questions;
@@ -2167,7 +2167,7 @@ async function renderTutorPanelDashboard(){
       ${pend.map(q=>`<div class="question-item"><div class="question-item-header"><span><strong>${q.author}:</strong> "${q.text}"</span><span class="time-badge">${new Date(q.timestamp).toLocaleString('pt-BR')}</span></div><div class="question-course-tag">📚 ${q.course}</div><div><button class="btn btn-primary btn-sm" onclick="setTutorDashTab('duvidas');showTutorDashboard()">Responder Agora</button></div></div>`).join('')}
     </div>`:`<div class="alert alert-success"><span class="alert-icon">✅</span><div class="alert-body">Nenhuma dúvida pendente — tudo em dia!</div></div>`}
     <div class="dash-section">
-      <div class="dash-section-title">📚 Meus Cursos</div>
+      <div class="dash-section-title">${icon('catalog','16')} Meus Cursos</div>
       <div class="grid grid-cols-2 gap-lg">
         ${d.my_courses.map(c=>`<div class="card"><div class="card-body"><h3 class="card-title">${c.icon||'📚'} ${c.name}</h3><div class="stat-row"><span>👥 ${c.students} aluno(s)</span><span style="color:var(--primary);font-weight:var(--fw-bold)">${c.completion_rate}% conclusão</span></div><div class="progress progress-sm" style="margin:var(--space-sm) 0"><div class="progress-bar" style="width:${c.completion_rate}%"></div></div><div style="font-size:var(--text-xs);color:var(--gray);margin-bottom:var(--space-md)">${c.completed}/${c.students} concluíram</div>${c.alerts.length?`<div class="alert alert-sm alert-warning" style="margin-bottom:var(--space-md)"><span>⚠️ ${c.alerts[0]}</span></div>`:`<div class="alert alert-sm alert-success" style="margin-bottom:var(--space-md)"><span>✅ Curso rodando bem</span></div>`}<button class="btn btn-outline btn-sm btn-full" onclick="selectCourse(${c.id})">Ver Alunos</button></div></div>`).join('')}
       </div>
@@ -2178,12 +2178,12 @@ async function renderTutorPanelDashboard(){
         <div class="kpi-grid">
           <div class="stat-card" style="box-shadow:none;border:1px solid var(--gray-light)">
             <div class="stat-value">${d.weekly_activity.new_questions}</div>
-            <div class="stat-label">💬 Novas dúvidas</div>
+            <div class="stat-label">${icon('message','14')} Novas dúvidas</div>
             <div class="stat-trend stat-trend-up">↑ respondeu ${d.weekly_activity.answered}</div>
           </div>
           <div class="stat-card" style="box-shadow:none;border:1px solid var(--gray-light)">
             <div class="stat-value">${d.weekly_activity.new_students}</div>
-            <div class="stat-label">👥 Novos alunos</div>
+            <div class="stat-label">${icon('users','14')} Novos alunos</div>
           </div>
         </div>
       </div>
@@ -2198,7 +2198,7 @@ async function renderAlunoDashboard(){
   const el=document.getElementById('main-content');
   el.innerHTML=`<div id="aluno-dash-body"><div class="alert alert-info"><span class="alert-icon">⏳</span><div class="alert-body">Carregando...</div></div></div>`;
   const res=await api('GET','/aluno/dashboard');
-  if(!res.ok){ document.getElementById('aluno-dash-body').innerHTML='<div class="alert alert-danger"><span class="alert-icon">❌</span><div class="alert-body">Não foi possível carregar.</div></div>'; return; }
+  if(!res.ok){ document.getElementById('aluno-dash-body').innerHTML='<div class="alert alert-danger"><span class="alert-icon">'+icon('x-circle','16','icon--x-circle')+'</span><div class="alert-body">Não foi possível carregar.</div></div>'; return; }
   const d=await res.json();
   const body=document.getElementById('aluno-dash-body');
   const s=d.user_stats;
@@ -2212,13 +2212,13 @@ async function renderAlunoDashboard(){
     ${ip?`<div class="card" style="border-left:4px solid var(--primary);margin-bottom:var(--space-xl)"><div class="card-body"><h3 class="card-title">🎯 Continue de Onde Parou</h3><div style="margin:var(--space-md) 0"><div style="font-size:var(--text-sm);font-weight:var(--fw-semibold);color:var(--dark);margin-bottom:var(--space-sm)">${ip.icon} ${ip.name} — Aula ${ip.aula_atual}/${ip.total_aulas}</div><div class="progress progress-sm" style="margin-bottom:var(--space-xs)"><div class="progress-bar" style="width:${ip.percentage}%"></div></div><div style="font-size:var(--text-xs);color:var(--gray);text-align:right">${ip.percentage}% concluído</div></div><div class="status-grid"><div class="status-item"><span class="status-label">Material</span><span class="status-value">${ip.material_read?'✅ Lido':'📖 Pendente'}</span></div><div class="status-item"><span class="status-label">Quiz</span><span class="status-value">${ip.quiz_done?'✅ Concluído':'❌ Pendente'}</span></div></div><button class="btn btn-primary btn-full" style="margin-top:var(--space-md)" onclick="selectCourse(${ip.id})">🚀 CONTINUAR AULA</button></div></div>`:''}
     <div class="card" style="margin-bottom:var(--space-xl)">
       <div class="card-body">
-        <h3 class="card-title">✨ Próximas Metas</h3>
+        <h3 class="card-title">${icon('lightbulb','16','icon--lightbulb')} Próximas Metas</h3>
         <div id="goalsSection"><span style="color:var(--gray);font-size:var(--text-sm)">Carregando...</span></div>
       </div>
     </div>
     ${d.recent_trofeus.length?`<div class="card" style="margin-bottom:var(--space-xl)"><div class="card-body"><h3 class="card-title">🎖️ Últimas Conquistas</h3><div style="margin-top:var(--space-md)">${d.recent_trofeus.map(t=>`<div class="achievement-item"><span class="achievement-icon">${t.icon}</span><div><div class="achievement-name">${t.name}</div><div class="achievement-desc">${t.description||''}</div><div class="achievement-date">${new Date(t.date).toLocaleDateString('pt-BR')}</div></div></div>`).join('')}</div></div></div>`:''}
     <div class="dash-section">
-      <div class="dash-section-title">📚 Outros Cursos</div>
+      <div class="dash-section-title">${icon('catalog','16')} Outros Cursos</div>
       <div class="grid grid-cols-2 gap-lg">${d.other_courses.map(c=>`<div class="card other-course-card" onclick="selectCourse(${c.id})" style="cursor:pointer"><div class="other-course-icon">${c.icon||'📚'}</div><h3 style="font-size:var(--text-sm);font-weight:var(--fw-bold);color:var(--dark)">${c.name}</h3>${c.status==='concluido'?`<span style="color:var(--success);font-size:var(--text-xs)">✅ Concluído</span><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();selectCourse(${c.id})">🏆 Certificado</button>`:c.status==='em_andamento'?`<span style="color:var(--primary);font-size:var(--text-xs)">${c.percentage}% concluído</span><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();selectCourse(${c.id})">Continuar</button>`:`<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();selectCourse(${c.id})">Começar</button>`}</div>`).join('')}</div>
     </div>`;
   // Animate hero ring
@@ -2270,7 +2270,7 @@ async function renderAlunoExternoDashboard(){
     <div class="dash-subtitle">${currentUser?`Bem-vindo, ${currentUser.name.split(' ')[0]}!`:'Bem-vindo, visitante!'} "Descubra uma comunidade de aprendizado cristão" ✨</div>
     <div id="externo-dash-body"><div class="alert alert-info"><span class="alert-icon">⏳</span><div class="alert-body">Carregando...</div></div></div>`;
   const res=await api('GET','/aluno-externo/dashboard');
-  if(!res.ok){ document.getElementById('externo-dash-body').innerHTML='<div class="alert alert-danger"><span class="alert-icon">❌</span><div class="alert-body">Não foi possível carregar.</div></div>'; return; }
+  if(!res.ok){ document.getElementById('externo-dash-body').innerHTML='<div class="alert alert-danger"><span class="alert-icon">'+icon('x-circle','16','icon--x-circle')+'</span><div class="alert-body">Não foi possível carregar.</div></div>'; return; }
   const d=await res.json();
   const body=document.getElementById('externo-dash-body');
   const stars=(n)=>'⭐'.repeat(Math.round(n))+'☆'.repeat(5-Math.round(n));
@@ -2328,10 +2328,10 @@ async function renderTutorDashboard(){
   document.getElementById('main-content').innerHTML=`
     <div class="course-header">
       <span class="course-tag">Painel do Tutor</span>
-      <h1 class="course-title">🎓 Olá, ${currentUser.name.split(' ')[0]}!</h1>
+      <h1 class="course-title">${icon('graduation-cap','20','icon--graduation-cap')} Olá, ${currentUser.name.split(' ')[0]}!</h1>
     </div>
     <div class="tabs">
-      <button class="tab ${tutorDashTab==='cursos'?'active':''}" onclick="setTutorDashTab('cursos')">📚 Meus Cursos</button>
+      <button class="tab ${tutorDashTab==='cursos'?'active':''}" onclick="setTutorDashTab('cursos')">${icon('catalog','16')} Meus Cursos</button>
       <button class="tab ${tutorDashTab==='duvidas'?'active':''}" onclick="setTutorDashTab('duvidas')">💬 Dúvidas dos Alunos ${semResposta.length?'<span style="background:var(--danger);color:white;border-radius:10px;padding:.05rem .45rem;font-size:.65rem;margin-left:.3rem">'+semResposta.length+'</span>':''}</button>
     </div>
     <div id="tutor-dash-content"></div>`;
@@ -2498,7 +2498,7 @@ function renderCatalogView(filterCat){
   document.getElementById('main-content').innerHTML=
     '<div class="course-header">'
     +'<span class="course-tag">Catálogo</span>'
-    +'<h1 class="course-title">🗂️ Todos os Cursos</h1>'
+    +'<h1 class="course-title">'+icon('catalog','20')+' Todos os Cursos</h1>'
     +'<div class="course-meta"><span>'+courses.length+' curso(s) disponível(is)</span></div>'
     +'</div>'
     +'<div class="catalog-filters">'+filterHtml+'</div>'
@@ -2518,7 +2518,7 @@ function renderAdminCatalog(filterCat){
   document.getElementById('main-content').innerHTML=
     '<div class="course-header">'
     +'<span class="course-tag">Admin</span>'
-    +'<h1 class="course-title">🗂️ Catálogo de Cursos</h1>'
+    +'<h1 class="course-title">'+icon('catalog','20')+' Catálogo de Cursos</h1>'
     +'<div class="course-meta"><span>'+courses.length+' curso(s)</span></div>'
     +'</div>'
     +'<div class="catalog-filters">'+filterHtml+'</div>'
@@ -2957,7 +2957,7 @@ async function renderTrilhasPage(){
   </section>`;
   const [myRes, allRes] = await Promise.all([api('GET','/trails/my'), api('GET','/trails')]);
   if(!myRes.ok || !allRes.ok){
-    el.querySelector('#viewTrilhas .alert').outerHTML = '<div class="alert alert-danger"><span class="alert-icon">❌</span><div class="alert-body">Não foi possível carregar as trilhas.</div></div>';
+    el.querySelector('#viewTrilhas .alert').outerHTML = '<div class="alert alert-danger"><span class="alert-icon">'+icon('x-circle','16','icon--x-circle')+'</span><div class="alert-body">Não foi possível carregar as trilhas.</div></div>';
     return;
   }
   const my = await myRes.json();
