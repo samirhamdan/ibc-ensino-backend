@@ -42,6 +42,7 @@
 <link rel="stylesheet" href="css/components/onboarding.css">
 <link rel="stylesheet" href="css/components/video.css">
 <link rel="stylesheet" href="css/components/lesson-sections.css">
+<link rel="stylesheet" href="css/components/icons.css">
 <link rel="stylesheet" href="css/components/chrome-premium.css">
 <link rel="stylesheet" href="css/pages/login-premium.css">
 
@@ -50,6 +51,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 </head>
 <body>
+
+<!-- SVG Icon Sprite (inline so <use> works same-origin) -->
+<div id="svg-sprite-container" style="display:none" aria-hidden="true"></div>
 
 <!-- LOGIN -->
 <div id="screen-login" class="screen active">
@@ -77,7 +81,7 @@
       <label>Senha</label>
       <div class="password-input-wrapper">
         <input type="password" id="login-pass" placeholder="••••••">
-        <button type="button" class="btn-show-password" onclick="togglePassword()" aria-label="Mostrar senha">👁</button>
+        <button type="button" class="btn-show-password" onclick="togglePassword()" aria-label="Mostrar senha"><svg class="icon icon-eye" viewBox="0 0 24 24"><use href="#icon-eye"></use></svg></button>
       </div>
     </div>
     <button class="btn-primary" onclick="doLogin()">Entrar</button>
@@ -145,7 +149,7 @@
       </div>
     </div>
     <div class="topbar-user">
-      <button id="continueBtn" class="btn-gold" style="display:none;padding:.35rem .9rem;font-size:.78rem;border-radius:6px" onclick="continueLastLesson()">▶ Continuar</button>
+      <button id="continueBtn" class="btn-gold" style="display:none;padding:.35rem .9rem;font-size:.78rem;border-radius:6px" onclick="continueLastLesson()"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-play"></use></svg> Continuar</button>
       <div class="avatar" id="topbar-avatar">A</div>
       <div style="display:flex;flex-direction:column;align-items:flex-start"><span style="font-size:.82rem;color:rgba(255,255,255,.85);line-height:1.2" id="topbar-name">Usuário</span><span style="font-size:.65rem;color:rgba(255,255,255,.5)" id="topbar-role">—</span></div>
       <button class="btn-logout" onclick="doLogout()">Sair</button>
@@ -156,19 +160,19 @@
       <div class="sidebar-section">
         <div class="sidebar-label">Menu</div>
         <div class="course-item" id="nav-student-dash" onclick="detectarPerfilEAtualizarDashboard()" style="display:none">
-          <span class="ci-icon">📊</span>
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-home"></use></svg></span>
           <div class="ci-text"><div class="ci-name">Meu Painel</div></div>
         </div>
         <div class="course-item" id="nav-trilhas" onclick="navigateToTrilhas()" style="display:none">
-          <span class="ci-icon">🗺️</span>
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-trails"></use></svg></span>
           <div class="ci-text"><div class="ci-name">Trilhas</div></div>
         </div>
         <div class="course-item" id="nav-certificados" onclick="navigateToCertificados()" style="display:none">
-          <span class="ci-icon">🎓</span>
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-certificates"></use></svg></span>
           <div class="ci-text"><div class="ci-name">Meus Certificados</div></div>
         </div>
         <div class="course-item" id="nav-catalog" onclick="showCatalog()">
-          <span class="ci-icon">🗂️</span>
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-catalog"></use></svg></span>
           <div class="ci-text"><div class="ci-name">Catálogo de Cursos</div></div>
         </div>
       </div>
@@ -183,27 +187,27 @@
       <div class="sidebar-section" id="admin-nav-section" style="display:none">
         <div class="sidebar-label">Administração</div>
         <div class="course-item" id="nav-admin-dashboard" onclick="detectarPerfilEAtualizarDashboard()" style="display:none">
-          <span class="ci-icon">📊</span>
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-bar-chart"></use></svg></span>
           <div class="ci-text"><div class="ci-name">Dashboard</div></div>
         </div>
         <div class="course-item" id="nav-tutor-dash" onclick="detectarPerfilEAtualizarDashboard()" style="display:none">
-          <span class="ci-icon">📊</span>
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-bar-chart"></use></svg></span>
           <div class="ci-text"><div class="ci-name">Painel do Tutor</div></div>
         </div>
         <div class="course-item" id="nav-admin-catalog" onclick="showAdminPanel('catalog')">
-          <span class="ci-icon">🗂️</span>
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-catalog"></use></svg></span>
           <div class="ci-text"><div class="ci-name">Catálogo de Cursos</div></div>
         </div>
         <div class="course-item" id="nav-admin-categories" onclick="showAdminPanel('categories')" style="display:none">
-          <span class="ci-icon">🏷️</span>
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-tag"></use></svg></span>
           <div class="ci-text"><div class="ci-name">Categorias</div></div>
         </div>
         <div class="course-item" id="nav-admin-courses" onclick="showAdminPanel('courses')" style="display:none">
-          <span class="ci-icon">➕</span>
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-plus"></use></svg></span>
           <div class="ci-text"><div class="ci-name">Novo Curso</div></div>
         </div>
         <div class="course-item" id="nav-admin-users" onclick="showAdminPanel('users')">
-          <span class="ci-icon">👥</span>
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-users"></use></svg></span>
           <div class="ci-text"><div class="ci-name">Usuários</div></div>
         </div>
       </div>
@@ -376,7 +380,22 @@ function setupUI(){
   checkAndShowOnboarding();
 }
 
+// ── SVG Icon Helper ──────────────────────────────────────
+// ── SVG Icon Sprite Loader ────────────────────────────────
+(function loadSprite(){
+  fetch('/css/icons/sprite.svg')
+    .then(r=>r.text())
+    .then(svg=>{
+      const c=document.getElementById('svg-sprite-container');
+      if(c) c.innerHTML=svg;
+    })
+    .catch(()=>{});
+})();
+
 // ── Login / Logout ──
+function icon(name, size='20', extra=''){
+  return `<svg class="icon icon-${name}${extra?' '+extra:''}" width="${size}" height="${size}" viewBox="0 0 24 24"><use href="#icon-${name}"></use></svg>`;
+}
 function togglePassword(){
   const inp = document.getElementById('login-pass');
   inp.type = inp.type === 'password' ? 'text' : 'password';
@@ -694,7 +713,7 @@ function renderAulaPage(){
                   allowfullscreen></iframe>
         </div>
         ${videoWatched
-          ? `<div class="material-done-badge">✅ Vídeo concluído · +10 pontos</div>`
+          ? `<div class="material-done-badge">${icon('checkmark','16','icon--success')} Vídeo concluído · +10 pontos</div>`
           : `<button class="btn btn-success btn-lg btn-full" id="btnVideoAssistido" onclick="marcarVideoAssistido()">✅ JÁ ASSISTI O VÍDEO</button>
              <p class="material-reward-hint">Você ganha <strong>+10 pontos</strong> ⭐</p>`}
       </div>
@@ -750,7 +769,7 @@ function renderAulaPage(){
         : 'Leia o material e clique em <strong>"Já li o material"</strong> para desbloquear.';
     exerciseBody = `
       <div class="locked-exercise-hint">
-        <span class="locked-exercise-hint-icon">🔒</span>
+        <span class="locked-exercise-hint-icon">${icon('lock','36','icon--disabled')}</span>
         <p>${lockMsg}</p>
         <p class="locked-exercise-reward">Este exercício vale <strong>+20 pontos</strong> ⭐</p>
       </div>`;
@@ -824,7 +843,7 @@ function renderAulaPage(){
       if(n < num)           dot=`<div class="lesson-dot done" title="Aula ${n}">✓</div>`;
       else if(n === num)    dot=`<div class="lesson-dot current" title="Aula ${n}">${n}</div>`;
       else if(n===num+1 && passed) dot=`<div class="lesson-dot" title="Aula ${n}">${n}</div>`;
-      else                  dot=`<div class="lesson-dot locked" title="Aula ${n}">🔒</div>`;
+      else                  dot=`<div class="lesson-dot locked" title="Aula ${n}">${icon('lock','12','icon--disabled')}</div>`;
       const line = n<total ? `<div class="lesson-line ${n<num?'done':''}"></div>` : '';
       return dot+line;
     }).join('')}
@@ -832,7 +851,7 @@ function renderAulaPage(){
 
   const nextBtn = num<total
     ? `<button class="btn btn-primary" style="${passed?'':'opacity:.55;cursor:not-allowed'}" ${passed?'':'disabled title="Conclua o exercício para avançar"'} onclick="loadAula(${a.course.id},${num+1})">Próxima Aula →</button>`
-    : `<button class="btn btn-primary" style="${passed?'':'opacity:.55;cursor:not-allowed'}" ${passed?'':'disabled title="Conclua o exercício para avançar"'} onclick="renderConclusion()">Concluir Curso 🎓</button>`;
+    : `<button class="btn btn-primary" style="${passed?'':'opacity:.55;cursor:not-allowed'}" ${passed?'':'disabled title="Conclua o exercício para avançar"'} onclick="renderConclusion()">${icon('certificates','18')} Concluir Curso</button>`;
 
   document.getElementById('main-content').innerHTML=`
     <nav class="breadcrumb">
@@ -1085,7 +1104,7 @@ async function renderConclusion(){
       <div class="result-label">aproveitamento médio</div>
       ${certCode?`<div style="margin:.8rem 0;font-size:.85rem;color:var(--muted)">Código: <strong>${certCode}</strong></div>`:''}
       <div style="margin-top:1.5rem;display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap">
-        ${certCode?`<button class="btn btn-primary" onclick="downloadCertificate('${certCode}')">🎓 Baixar Certificado</button>`:''}
+        ${certCode?`<button class="btn btn-primary" onclick="downloadCertificate('${certCode}')">${icon('download','18')} Baixar Certificado</button>`:''}
         ${certCode?`<button class="btn btn-success" onclick="shareWhatsApp({cert_code:'${certCode}',title:'${c.name.replace(/'/g,"\\'")}' })">💚 Compartilhar</button>`:''}
         <button class="btn btn-secondary" onclick="selectCourse(${c.id})">Voltar ao curso</button>
         <button class="btn btn-secondary" onclick="showCatalog()">Ver outros cursos</button>
@@ -2083,7 +2102,7 @@ async function renderAdminDashboard(){
       </div>
       <div class="stat-card stagger-item">
         <div class="stat-value">${d.total_courses}</div>
-        <div class="stat-label">📚 Cursos</div>
+        <div class="stat-label">${icon('catalog','14')} Cursos</div>
       </div>
       <div class="stat-card stagger-item">
         <div class="stat-value">${d.completion_rate}%</div>
@@ -2266,10 +2285,10 @@ async function renderAlunoExternoDashboard(){
       <div class="card-header"><h3 class="card-title">📊 Nossa Comunidade</h3></div>
       <div class="card-body">
         <div class="community-stats">
-          <div class="community-stat"><div class="stat-value">${d.community_stats.total_users.toLocaleString('pt-BR')}</div><div class="stat-label">👥 Alunos</div></div>
-          <div class="community-stat"><div class="stat-value">${d.community_stats.total_courses}</div><div class="stat-label">📚 Cursos</div></div>
-          <div class="community-stat"><div class="stat-value">${d.community_stats.avg_rating}/5</div><div class="stat-label">⭐ Avaliação</div></div>
-          <div class="community-stat"><div class="stat-value">${d.community_stats.completion_rate}%</div><div class="stat-label">🎯 Conclusão</div></div>
+          <div class="community-stat"><div class="stat-value">${d.community_stats.total_users.toLocaleString('pt-BR')}</div><div class="stat-label">${icon('users','14')} Alunos</div></div>
+          <div class="community-stat"><div class="stat-value">${d.community_stats.total_courses}</div><div class="stat-label">${icon('catalog','14')} Cursos</div></div>
+          <div class="community-stat"><div class="stat-value">${d.community_stats.avg_rating}/5</div><div class="stat-label">${icon('points','14','icon--gold')} Avaliação</div></div>
+          <div class="community-stat"><div class="stat-value">${d.community_stats.completion_rate}%</div><div class="stat-label">${icon('target','14')} Conclusão</div></div>
         </div>
       </div>
     </div>
@@ -2743,9 +2762,9 @@ function renderHero(userData, stats){
     ${(totalPoints === 0 && badgesCount === 0 && isAluno())
       ? `<p class="hero-cta-empty">🎯 Complete sua primeira aula para ganhar seus primeiros pontos!</p>`
       : `<div class="hero-stats">
-      <div class="hero-stat"><span class="hero-stat-value" data-target="${totalPoints}">${totalPoints}</span><span class="hero-stat-label">⭐ Pontos</span></div>
-      <div class="hero-stat"><span class="hero-stat-value" data-target="${coursesCount}">${coursesCount}</span><span class="hero-stat-label">📚 Cursos</span></div>
-      <div class="hero-stat"><span class="hero-stat-value" data-target="${badgesCount}">${badgesCount}</span><span class="hero-stat-label">🏆 Conquistas</span></div>
+      <div class="hero-stat"><span class="hero-stat-value" data-target="${totalPoints}">${totalPoints}</span><span class="hero-stat-label">${icon('points','16','icon--gold')} Pontos</span></div>
+      <div class="hero-stat"><span class="hero-stat-value" data-target="${coursesCount}">${coursesCount}</span><span class="hero-stat-label">${icon('catalog','16')} Cursos</span></div>
+      <div class="hero-stat"><span class="hero-stat-value" data-target="${badgesCount}">${badgesCount}</span><span class="hero-stat-label">${icon('achievements','16','icon--gold')} Conquistas</span></div>
     </div>`}
   </div>`;
 }

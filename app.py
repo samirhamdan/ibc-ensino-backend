@@ -120,6 +120,15 @@ def create_app(config_name='development'):
                 return jsonify({'error': 'Acesso negado'}), 403
             return send_from_directory(uploads_dir, safe)
 
+        # Serve SVG icon sprite
+        @app.route('/css/icons/sprite.svg', methods=['GET'])
+        def serve_icon_sprite():
+            icons_dir = os.path.join(basedir, 'css', 'icons')
+            resp = send_from_directory(icons_dir, 'sprite.svg')
+            resp.headers['Content-Type'] = 'image/svg+xml'
+            resp.headers['Cache-Control'] = 'public, max-age=86400'
+            return resp
+
         # Serve image assets (logo etc.)
         @app.route('/images/<path:filename>', methods=['GET'])
         def serve_images(filename):

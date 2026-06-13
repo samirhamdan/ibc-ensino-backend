@@ -1,0 +1,60 @@
+/* ─── SVG Icon System ─────────────────────────────────────── */
+
+.icon {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  vertical-align: -4px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+/* Colour variants */
+.icon--primary  { color: var(--primary); }
+.icon--success  { color: var(--success); }
+.icon--warning  { color: var(--warning); }
+.icon--error    { color: var(--danger); }
+.icon--disabled { color: var(--gray); opacity: 0.55; }
+.icon--white    { color: var(--white); }
+.icon--dark     { color: var(--dark); }
+.icon--gold     { color: #e9c46a; }
+
+/* Size variants */
+.icon--xs  { width: 14px; height: 14px; }
+.icon--sm  { width: 16px; height: 16px; }
+.icon--lg  { width: 28px; height: 28px; }
+.icon--xl  { width: 40px; height: 40px; }
+.icon--2xl { width: 56px; height: 56px; }
+
+/* Button/link inline spacing */
+button .icon:not(:last-child),
+a .icon:not(:last-child) {
+  margin-right: 6px;
+}
+
+/* Hover lift */
+button:hover .icon,
+a:hover .icon,
+.course-item:hover .icon {
+  transform: scale(1.12);
+}
+
+/* Sidebar nav icon */
+.ci-icon .icon {
+  width: 18px;
+  height: 18px;
+  vertical-align: -3px;
+}
+
+/* Spinning animation */
+@keyframes icon-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.icon--spinning { animation: icon-spin 1s linear infinite; }
