@@ -64,6 +64,9 @@ class Course(db.Model):
     duracao = db.Column(db.String(50), default='')
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=True)
     tutor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    color = db.Column(db.String(20), default='#008ea8')
+    tag = db.Column(db.String(100), default='')
+    description = db.Column(db.Text, default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     tutor = db.relationship('User', foreign_keys=[tutor_id])
@@ -307,6 +310,8 @@ class Trail(db.Model):
     goal = db.Column(db.String(50), default='')  # evangelismo | discipulado | teologia | servico
     xp_bonus = db.Column(db.Integer, default=100)
     badge_code = db.Column(db.String(50), nullable=True)
+    color = db.Column(db.String(20), default='#008ea8')
+    certificate_name = db.Column(db.String(200), default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     trail_courses = db.relationship('TrailCourse', backref='trail', lazy=True,
