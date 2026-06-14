@@ -1,0 +1,197 @@
+/* ─── Admin UX: Trilhas + Cursos (Sprint 4) ─────────────────── */
+
+.admin-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-xl);
+}
+
+/* ── Trail Card Grid ── */
+.admin-trail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-lg);
+}
+.admin-trail-card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-md);
+  border-top: 4px solid var(--trail-color, var(--primary));
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  text-align: center;
+}
+.admin-trail-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+.admin-trail-card-icon {
+  width: 56px; height: 56px;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto var(--space-sm);
+  background: rgba(0,142,168,0.08);
+  border-radius: 50%;
+}
+.admin-trail-card-icon .icon { width: 28px; height: 28px; }
+.admin-trail-card-name { font-family: var(--font-display); font-size: var(--text-lg); margin-bottom: var(--space-sm); }
+.admin-trail-card-stats {
+  display: flex; justify-content: center; gap: var(--space-md);
+  font-size: var(--text-sm); color: var(--gray); margin-bottom: var(--space-md);
+}
+.admin-trail-card-stats .icon { width: 14px; height: 14px; margin-right: 3px; }
+
+/* ── Trail Editor ── */
+.trail-editor {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: var(--space-xl);
+}
+.trail-editor-preview {
+  background: var(--gray-lighter, #f8f9fa);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  position: sticky;
+  top: 80px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+}
+.trail-editor-actions {
+  display: flex; justify-content: flex-end; gap: var(--space-sm);
+  margin-top: var(--space-xl); padding-top: var(--space-md);
+  border-top: 1px solid var(--gray-light, #e0e0e0);
+}
+.add-course-row { display: flex; gap: 8px; margin-top: var(--space-md); }
+.add-course-row select { flex: 1; }
+
+/* ── Sortable Lists ── */
+.sortable-course-list {
+  list-style: none; padding: 0; margin: var(--space-md) 0;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.sortable-course-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  background: var(--white);
+  border: 1px solid var(--gray-light, #e0e0e0);
+  border-radius: var(--radius-md);
+  transition: box-shadow 0.15s;
+}
+.sortable-course-item:hover { box-shadow: var(--shadow-sm); }
+.sortable-course-item.sortable-ghost { opacity: 0.4; }
+.drag-handle { cursor: grab; color: var(--gray); flex-shrink: 0; touch-action: none; }
+.drag-handle:active { cursor: grabbing; }
+.drag-handle .icon { width: 18px; height: 18px; }
+.course-order-num {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--primary); color: var(--white);
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--text-xs); font-weight: 700; flex-shrink: 0;
+}
+.course-name-item { flex: 1; font-weight: 600; }
+.btn-icon-only {
+  background: none; border: none; cursor: pointer; padding: 4px;
+  color: var(--gray); border-radius: var(--radius-sm);
+  transition: color 0.15s, background 0.15s;
+}
+.btn-icon-only:hover { color: var(--danger, #e74c3c); background: rgba(231,76,60,0.08); }
+.btn-icon-only .icon { width: 18px; height: 18px; }
+
+/* ── Admin Course Card List ── */
+.admin-course-list { display: flex; flex-direction: column; gap: var(--space-md); }
+.admin-course-card {
+  display: flex; align-items: center; gap: var(--space-lg);
+  background: var(--white); border-radius: var(--radius-lg);
+  padding: var(--space-lg); box-shadow: var(--shadow-md);
+  cursor: pointer; transition: box-shadow 0.2s, transform 0.2s;
+}
+.admin-course-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+.admin-course-card-icon {
+  width: 56px; height: 56px; border-radius: var(--radius-md);
+  background: var(--primary);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.admin-course-card-icon .icon { width: 28px; height: 28px; }
+.admin-course-card-info { flex: 1; min-width: 0; }
+.admin-course-card-name {
+  font-family: var(--font-display); font-size: var(--text-lg);
+  margin: 0 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.admin-course-card-meta { font-size: var(--text-sm); color: var(--gray); margin: 0 0 8px; }
+.admin-course-card-flags { display: flex; gap: 8px; flex-wrap: wrap; }
+.flag-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--text-xs); font-weight: 600;
+  background: rgba(0,142,168,0.08); color: var(--primary);
+  padding: 3px 10px; border-radius: 99px;
+}
+.flag-badge .icon { width: 12px; height: 12px; }
+
+/* ── Course Editor / Lesson Accordion ── */
+.course-editor-header {
+  background: var(--white); border-radius: var(--radius-lg);
+  padding: var(--space-lg); box-shadow: var(--shadow-sm); margin-bottom: var(--space-lg);
+}
+.input-title {
+  font-family: var(--font-display); font-size: 1.6rem; font-weight: 700;
+  border: none; border-bottom: 2px solid transparent;
+  width: 100%; padding: 4px 0; margin-bottom: var(--space-sm);
+  background: transparent; transition: border-color 0.2s;
+}
+.input-title:focus { border-bottom-color: var(--primary); outline: none; }
+
+.lesson-accordion { display: flex; flex-direction: column; gap: 8px; margin: var(--space-md) 0; }
+.lesson-accordion-item {
+  background: var(--white); border: 1px solid var(--gray-light, #e0e0e0);
+  border-radius: var(--radius-md); overflow: hidden; transition: box-shadow 0.15s;
+}
+.lesson-accordion-item:hover { box-shadow: var(--shadow-sm); }
+.lesson-accordion-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px; cursor: pointer; user-select: none; transition: background 0.15s;
+}
+.lesson-accordion-header:hover { background: var(--gray-lighter, #f8f9fa); }
+.lesson-order-num {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--primary); color: var(--white);
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--text-sm); font-weight: 700; flex-shrink: 0;
+}
+.lesson-title-label { flex: 1; font-weight: 600; }
+.lesson-flags { display: flex; gap: 6px; }
+.lesson-flags .icon { width: 16px; height: 16px; color: var(--primary); }
+.accordion-chevron { transition: transform 0.2s; color: var(--gray); }
+.accordion-chevron .icon { width: 18px; height: 18px; }
+.lesson-accordion-item.expanded .accordion-chevron { transform: rotate(180deg); }
+.lesson-accordion-body {
+  padding: var(--space-lg); border-top: 1px solid var(--gray-light, #e0e0e0);
+  background: var(--gray-lighter, #f8f9fa);
+  display: flex; flex-direction: column; gap: var(--space-md);
+}
+.material-list-edit { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.material-edit-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; background: var(--white); border-radius: var(--radius-sm);
+  border: 1px solid var(--gray-light, #e0e0e0);
+}
+.material-source-toggle {
+  display: flex; gap: var(--space-lg); margin: 8px 0; font-size: var(--text-sm);
+}
+.material-source-toggle label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.exercise-options { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.exercise-option { display: flex; align-items: center; gap: 10px; }
+.exercise-option input[type="text"] { flex: 1; }
+.exercise-option input[type="radio"] { accent-color: var(--primary); }
+.lesson-actions {
+  display: flex; justify-content: space-between;
+  padding-top: var(--space-sm); border-top: 1px solid var(--gray-light, #e0e0e0);
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .trail-editor { grid-template-columns: 1fr; }
+  .trail-editor-preview { position: static; max-height: none; }
+}
+@media (max-width: 640px) {
+  .admin-course-card { flex-wrap: wrap; }
+  .admin-course-card-icon { width: 44px; height: 44px; }
+  .admin-page-header { flex-direction: column; align-items: flex-start; gap: var(--space-sm); }
+}

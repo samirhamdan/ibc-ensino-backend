@@ -204,9 +204,13 @@
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-tag"></use></svg></span>
           <div class="ci-text"><div class="ci-name">Categorias</div></div>
         </div>
+        <div class="course-item" id="nav-admin-trails" onclick="showAdminPanel('trails')" style="display:none">
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-trails"></use></svg></span>
+          <div class="ci-text"><div class="ci-name">Gerenciar Trilhas</div></div>
+        </div>
         <div class="course-item" id="nav-admin-courses" onclick="showAdminPanel('courses')" style="display:none">
-          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-plus"></use></svg></span>
-          <div class="ci-text"><div class="ci-name">Novo Curso</div></div>
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-books"></use></svg></span>
+          <div class="ci-text"><div class="ci-name">Gerenciar Cursos</div></div>
         </div>
         <div class="course-item" id="nav-admin-users" onclick="showAdminPanel('users')">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-users"></use></svg></span>
@@ -360,7 +364,7 @@ function setupUI(){
   document.getElementById('admin-nav-section').style.display = (isAdmin()||isTutor()) ? 'block' : 'none';
   const isAdminUser = isAdmin();
   const isTutorUser = isTutor();
-  ['nav-admin-dashboard','nav-admin-categories','nav-admin-courses'].forEach(id=>{
+  ['nav-admin-dashboard','nav-admin-categories','nav-admin-courses','nav-admin-trails'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.style.display = isAdminUser ? 'flex' : 'none';
   });
@@ -1665,6 +1669,7 @@ function showAdminPanel(panel){
   else if(panel==='dashboard') renderDashboard();
   else if(panel==='catalog') renderAdminCatalog();
   else if(panel==='categories') renderAdminCategories();
+  else if(panel==='trails') renderAdminTrails();
   else renderAdminCourses();
 }
 
@@ -1777,49 +1782,553 @@ async function removeUser(id){
   }
 }
 
-// ── Admin: Courses ──
-function renderAdminCourses(){
-  document.getElementById('main-content').innerHTML=`
-    <div class="course-header"><span class="course-tag">Admin</span><h1 class="course-title">➕ Novo Curso</h1></div>
-    <div class="admin-section">
-      <div class="admin-section-header">Dados do curso</div>
-      <div class="admin-section-body">
-        <div class="form-row">
-          <div class="form-group"><label>Nome do Curso</label><input type="text" id="nc-name" placeholder="Ex: Estudo de Romanos"></div>
-          <div class="form-group"><label>Categoria</label><select id="nc-tag"><option value="">Selecionar...</option>${categories.map(c=>`<option>${c}</option>`).join('')}</select></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group" style="max-width:100px"><label>Ícone (emoji)</label><input type="text" id="nc-icon" placeholder="📖" maxlength="2"></div>
-          <div class="form-group"><label>Visibilidade</label>
-            <select id="nc-acesso">
-              <option value="interno">✝️ Alunos Internos e acima</option>
-              <option value="publico">🌐 Público (Externos também)</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-group" style="margin-bottom:.7rem">
-          <label>Descrição / resumo</label>
-          <textarea id="nc-resumo" placeholder="Breve descrição do curso..." style="min-height:60px"></textarea>
-        </div>
-        <div class="form-row">
-          <div class="form-group" style="max-width:140px"><label>Duração estimada</label>
-            <input type="text" id="nc-duracao" placeholder="Ex: 4 semanas">
-          </div>
-        </div>
-        <button class="btn-gold" onclick="addCourse()">Criar curso</button>
+// ── Admin: Trails (Sprint 4) ──
+let _adminTrails = [], _editTrailId = null, _trailSortable = null;
+
+async function renderAdminTrails() {
+  document.getElementById('main-content').innerHTML =
+    '<div class="admin-page-header"><h1 class="text-h2">'+icon('trails','24')+' Gerenciar Trilhas</h1>'
+    +'<button class="btn btn-primary" onclick="openNewTrailModal()">'+icon('plus','16')+' Nova Trilha</button></div>'
+    +'<div class="admin-trail-grid" id="adminTrailGrid"><div class="empty-state"><p>Carregando...</p></div></div>';
+  const res = await api('GET', '/trails/admin/trails');
+  if (!res.ok) { showToast('Erro ao carregar trilhas', 'error'); return; }
+  const data = await res.json();
+  _adminTrails = data.trails;
+  renderAdminTrailGrid();
+}
+
+function renderAdminTrailGrid() {
+  const grid = document.getElementById('adminTrailGrid');
+  if (!grid) return;
+  if (!_adminTrails.length) {
+    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">'+icon('trails','48','icon--primary')+'</div><p>Nenhuma trilha criada ainda.</p></div>';
+    return;
+  }
+  grid.innerHTML = _adminTrails.map(t => `
+    <div class="admin-trail-card" style="--trail-color:${t.color}" onclick="openTrailEditor(${t.id})">
+      <div class="admin-trail-card-icon">
+        ${icon(t.icon || 'trails', '28')}
       </div>
+      <h3 class="admin-trail-card-name">${t.name}</h3>
+      <div class="admin-trail-card-stats">
+        <span>${icon('books','14')} ${t.total_courses} cursos</span>
+        <span>${icon('users','14')} ${t.enrolled_users} alunos</span>
+      </div>
+      <button class="btn btn-outline btn-sm btn-full" onclick="event.stopPropagation();openTrailEditor(${t.id})">Editar</button>
     </div>
-    <div class="admin-section">
-      <div class="admin-section-header">Cursos existentes (${courses.length})</div>
-      <div class="admin-section-body" style="padding:.5rem">
-        ${courses.map(c=>`<div class="pdf-item">
-          <span class="pdf-item-icon">${c.icon||'📚'}</span>
-          <div class="pdf-item-name">${c.name}</div>
-          <span class="badge-role badge-aluno" style="font-size:.65rem">${c.tag}</span>
-          <button class="btn-sm btn-danger-sm" onclick="removeCourse(${c.id})">Remover</button>
-        </div>`).join('')}
+  `).join('');
+}
+
+async function openTrailEditor(trailId) {
+  _editTrailId = trailId;
+  const t = _adminTrails.find(x => x.id === trailId);
+  if (!t) return;
+  const res = await api('GET', '/trails/admin/courses/available-for-trail/' + trailId);
+  const available = res.ok ? (await res.json()).courses : [];
+  
+  document.getElementById('main-content').innerHTML = `
+    <div class="admin-page-header">
+      <h2 class="text-h3">${icon('trails','20')} Editar Trilha</h2>
+      <button class="btn btn-outline" onclick="renderAdminTrails()">${icon('chevron-left','16')} Voltar</button>
+    </div>
+    <div class="trail-editor">
+      <div class="trail-editor-form">
+        <div class="form-group">
+          <label>Nome da Trilha</label>
+          <input type="text" id="trailEditName" class="form-control" value="${t.name.replace(/"/g,'&quot;')}">
+        </div>
+        <div class="form-group">
+          <label>Descrição</label>
+          <textarea id="trailEditDescription" class="form-control" rows="3">${(t.description||'').replace(/</g,'&lt;')}</textarea>
+        </div>
+        <div style="display:flex;gap:var(--space-md)">
+          <div class="form-group" style="flex:1">
+            <label>Cor</label>
+            <input type="color" id="trailEditColor" class="form-control" value="${t.color||'#008ea8'}" oninput="updateTrailPreview()">
+          </div>
+          <div class="form-group" style="flex:1">
+            <label>Pontos bônus</label>
+            <input type="number" id="trailEditXpBonus" class="form-control" value="${t.xp_bonus||0}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Nome do Certificado</label>
+          <input type="text" id="trailEditCertName" class="form-control" value="${(t.certificate_name||'').replace(/"/g,'&quot;')}">
+        </div>
+
+        <h3 class="text-h4" style="margin-top:var(--space-lg)">Cursos na Trilha <small style="color:var(--gray);font-weight:400;font-size:var(--text-sm)">(arraste para reordenar)</small></h3>
+        <ul class="sortable-course-list" id="sortableCourseList">
+          ${t.courses.map((c, i) => `
+            <li class="sortable-course-item" data-course-id="${c.id}">
+              <span class="drag-handle">${icon('drag-handle','18')}</span>
+              <span class="course-order-num">${i + 1}</span>
+              <span class="course-name-item">${c.name}</span>
+              <button class="btn-icon-only" onclick="removeCourseFromTrail(${c.id})" title="Remover">${icon('x-circle','18')}</button>
+            </li>
+          `).join('')}
+        </ul>
+
+        <div class="add-course-row">
+          <select id="addCourseSelect" class="form-control">
+            <option value="">Selecionar curso para adicionar...</option>
+            ${available.map(c => '<option value="'+c.id+'">'+c.name+'</option>').join('')}
+          </select>
+          <button class="btn btn-outline" onclick="addCourseToTrail()">${icon('plus','16')} Adicionar</button>
+        </div>
+
+        <div class="trail-editor-actions">
+          <button class="btn btn-outline" onclick="renderAdminTrails()">Cancelar</button>
+          <button class="btn btn-primary" onclick="saveTrailEdits()">Salvar Trilha</button>
+        </div>
+      </div>
+
+      <div class="trail-editor-preview">
+        <h3 class="text-h4">${icon('eye','16')} Preview (como o aluno vê)</h3>
+        <div id="trailPreviewPath"></div>
       </div>
     </div>`;
+
+  if (typeof Sortable !== 'undefined') {
+    _trailSortable = new Sortable(document.getElementById('sortableCourseList'), {
+      handle: '.drag-handle',
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      onEnd: updateTrailPreview
+    });
+  }
+  updateTrailPreview();
+}
+
+function updateTrailPreview() {
+  const items = document.querySelectorAll('#sortableCourseList .sortable-course-item');
+  items.forEach((el, i) => {
+    const numEl = el.querySelector('.course-order-num');
+    if (numEl) numEl.textContent = i + 1;
+  });
+  const preview = document.getElementById('trailPreviewPath');
+  if (!preview) return;
+  const courses = Array.from(items).map((el, i) => ({
+    id: parseInt(el.dataset.courseId),
+    name: el.querySelector('.course-name-item') ? el.querySelector('.course-name-item').textContent : '',
+    order: i + 1
+  }));
+  const colorEl = document.getElementById('trailEditColor');
+  const color = colorEl ? colorEl.value : '#008ea8';
+  if (!courses.length) {
+    preview.innerHTML = '<p style="color:var(--gray);font-size:var(--text-sm)">Adicione cursos para ver o preview.</p>';
+    return;
+  }
+  preview.innerHTML = `
+    <div class="trail-path" style="--trail-color:${color}">
+      ${courses.map((c, i) => `
+        <div class="trail-step ${i === 0 ? 'current' : 'locked'}">
+          <div class="trail-step-marker">${i === 0 ? '▶' : icon('lock','12','icon--disabled')}</div>
+          <div class="trail-step-content">
+            <span class="trail-step-num">Passo ${c.order}</span>
+            <span class="trail-step-name">${c.name}</span>
+            ${i === 0 ? '<span class="trail-step-status">VOCÊ ESTÁ AQUI</span>' : ''}
+          </div>
+        </div>
+      `).join('')}
+      <div class="trail-step certificate-step">
+        <div class="trail-step-marker">${icon('certificates','16','icon--gold')}</div>
+        <div class="trail-step-content">
+          <span class="trail-step-name" style="color:var(--primary)">Certificado de Conclusão</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function addCourseToTrail() {
+  const sel = document.getElementById('addCourseSelect');
+  const courseId = sel ? parseInt(sel.value) : 0;
+  if (!courseId) { showToast('Selecione um curso', 'error'); return; }
+  const res = await api('POST', '/trails/admin/trails/' + _editTrailId + '/courses', {course_id: courseId});
+  if (!res.ok) { showToast('Erro ao adicionar curso', 'error'); return; }
+  const r2 = await api('GET', '/trails/admin/trails');
+  if (r2.ok) { _adminTrails = (await r2.json()).trails; }
+  openTrailEditor(_editTrailId);
+}
+
+async function removeCourseFromTrail(courseId) {
+  if (!confirm('Remover curso desta trilha?')) return;
+  const res = await api('DELETE', '/trails/admin/trails/' + _editTrailId + '/courses/' + courseId);
+  if (!res.ok) { showToast('Erro ao remover curso', 'error'); return; }
+  const r2 = await api('GET', '/trails/admin/trails');
+  if (r2.ok) { _adminTrails = (await r2.json()).trails; }
+  openTrailEditor(_editTrailId);
+}
+
+async function saveTrailEdits() {
+  const nameEl = document.getElementById('trailEditName');
+  const name = nameEl ? nameEl.value.trim() : '';
+  if (!name) { showToast('Nome da trilha é obrigatório', 'error'); return; }
+  const descEl = document.getElementById('trailEditDescription');
+  const colorEl = document.getElementById('trailEditColor');
+  const xpEl = document.getElementById('trailEditXpBonus');
+  const certEl = document.getElementById('trailEditCertName');
+  const r1 = await api('PUT', '/trails/admin/trails/' + _editTrailId, {
+    name,
+    description: descEl ? descEl.value : '',
+    color: colorEl ? colorEl.value : '#008ea8',
+    xp_bonus: xpEl ? parseInt(xpEl.value || 0) : 0,
+    certificate_name: certEl ? certEl.value : ''
+  });
+  if (!r1.ok) { showToast('Erro ao salvar trilha', 'error'); return; }
+  const items = document.querySelectorAll('#sortableCourseList .sortable-course-item');
+  const courseIds = Array.from(items).map(el => parseInt(el.dataset.courseId));
+  if (courseIds.length) {
+    const r2 = await api('PUT', '/trails/admin/trails/' + _editTrailId + '/courses/reorder', {course_ids: courseIds});
+    if (!r2.ok) { showToast('Erro ao salvar ordem', 'error'); return; }
+  }
+  showToast('Trilha atualizada com sucesso!', 'success');
+  const r3 = await api('GET', '/trails/admin/trails');
+  if (r3.ok) { _adminTrails = (await r3.json()).trails; }
+  renderAdminTrails();
+}
+
+async function openNewTrailModal() {
+  const name = prompt('Nome da nova trilha:');
+  if (!name || !name.trim()) return;
+  const res = await api('POST', '/trails', {name: name.trim(), description: '', xp_bonus: 100});
+  if (!res.ok) { showToast('Erro ao criar trilha', 'error'); return; }
+  showToast('Trilha criada!', 'success');
+  await renderAdminTrails();
+}
+
+// ── Admin: Courses (Sprint 4) ──
+let _editCourseId = null, _lessonSortable = null;
+
+async function renderAdminCourses() {
+  document.getElementById('main-content').innerHTML =
+    '<div class="admin-page-header"><h1 class="text-h2">'+icon('books','24')+' Gerenciar Cursos</h1>'
+    +'<button class="btn btn-primary" onclick="showNewCourseForm()">'+icon('plus','16')+' Novo Curso</button></div>'
+    +'<div class="admin-course-list" id="adminCourseList"><p>Carregando...</p></div>';
+  const res = await api('GET', '/courses/admin/courses');
+  if (!res.ok) { showToast('Erro ao carregar cursos', 'error'); return; }
+  const data = await res.json();
+  const list = document.getElementById('adminCourseList');
+  if (!list) return;
+  if (!data.courses.length) {
+    list.innerHTML = '<div class="empty-state"><p>Nenhum curso criado.</p></div>';
+    return;
+  }
+  list.innerHTML = data.courses.map(c => `
+    <div class="admin-course-card" onclick="openCourseEditor(${c.id})">
+      <div class="admin-course-card-icon" style="background:${c.color||'var(--primary)'}">
+        ${icon('books','28','icon--white')}
+      </div>
+      <div class="admin-course-card-info">
+        <h3 class="admin-course-card-name">${c.name}</h3>
+        <p class="admin-course-card-meta">
+          ${c.category} · ${c.total_lessons} aulas · ${c.enrolled_users} alunos
+          ${c.trail_name ? ' · Trilha: ' + c.trail_name : ''}
+        </p>
+        <div class="admin-course-card-flags">
+          ${c.has_video ? '<span class="flag-badge">'+icon('play-circle','12')+' Vídeo</span>' : ''}
+          ${c.has_pdf ? '<span class="flag-badge">'+icon('file','12')+' PDF</span>' : ''}
+        </div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openCourseEditor(${c.id})">Editar</button>
+    </div>
+  `).join('');
+}
+
+function showNewCourseForm() {
+  document.getElementById('main-content').innerHTML = `
+    <div class="admin-page-header">
+      <h2 class="text-h3">${icon('books','20')} Novo Curso</h2>
+      <button class="btn btn-outline" onclick="renderAdminCourses()">${icon('chevron-left','16')} Voltar</button>
+    </div>
+    <div class="course-editor-header">
+      <div class="form-group"><label>Nome do Curso</label><input type="text" id="nc-name" class="form-control" placeholder="Ex: Estudo de Romanos"></div>
+      <div style="display:flex;gap:var(--space-md)">
+        <div class="form-group" style="flex:1"><label>Categoria</label><select id="nc-tag" class="form-control"><option value="">Selecionar...</option>${categories.map(c=>'<option>'+c+'</option>').join('')}</select></div>
+        <div class="form-group" style="flex:1"><label>Visibilidade</label><select id="nc-acesso" class="form-control"><option value="interno">Alunos Internos</option><option value="publico">Público</option></select></div>
+      </div>
+      <div class="form-group"><label>Descrição</label><textarea id="nc-resumo" class="form-control" rows="2" placeholder="Breve descrição..."></textarea></div>
+      <div style="display:flex;gap:var(--space-md);margin-top:var(--space-md)">
+        <button class="btn btn-outline" onclick="renderAdminCourses()">Cancelar</button>
+        <button class="btn btn-primary" onclick="addCourse()">Criar Curso</button>
+      </div>
+    </div>`;
+}
+
+async function openCourseEditor(courseId) {
+  _editCourseId = courseId;
+  const cRes = await api('GET', `/courses/${courseId}`);
+  const lRes = await api('GET', `/courses/admin/courses/${courseId}/lessons`);
+  if (!cRes.ok || !lRes.ok) { showToast('Erro ao carregar curso', 'error'); return; }
+  const c = await cRes.json();
+  const {lessons} = await lRes.json();
+  
+  document.getElementById('main-content').innerHTML = `
+    <div class="admin-page-header">
+      <h2 class="text-h3">${icon('books','20')} Editar Curso</h2>
+      <button class="btn btn-outline" onclick="renderAdminCourses()">${icon('chevron-left','16')} Voltar</button>
+    </div>
+    <div class="course-editor-header">
+      <input type="text" id="courseEditName" class="input-title" value="${(c.name||'').replace(/"/g,'&quot;')}">
+      <div style="display:flex;gap:var(--space-md)">
+        <div class="form-group" style="flex:1">
+          <label>Categoria / Tag</label>
+          <input type="text" id="courseEditCategory" class="form-control" value="${(c.tag||'').replace(/"/g,'&quot;')}">
+        </div>
+        <div class="form-group">
+          <label>Cor</label>
+          <input type="color" id="courseEditColor" class="form-control" value="${c.color||'#008ea8'}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Descrição</label>
+        <textarea id="courseEditDescription" class="form-control" rows="2">${(c.resumo||c.description||'').replace(/</g,'&lt;')}</textarea>
+      </div>
+      <div style="display:flex;gap:var(--space-md);margin-top:var(--space-md)">
+        <button class="btn btn-outline" onclick="renderAdminCourses()">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveCourseHeader()">Salvar Informações</button>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-md)">
+      <h3 class="text-h4">Aulas (${lessons.length}) <small style="color:var(--gray);font-weight:400;font-size:var(--text-sm)">(arraste para reordenar)</small></h3>
+      <button class="btn btn-sm btn-outline" onclick="addNewLesson(${courseId})">${icon('plus','16')} Nova Aula</button>
+    </div>
+
+    <div class="lesson-accordion" id="lessonAccordion">
+      ${lessons.map((l, i) => renderLessonAccordionItem(l, i)).join('')}
+    </div>`;
+
+  if (typeof Sortable !== 'undefined') {
+    _lessonSortable = new Sortable(document.getElementById('lessonAccordion'), {
+      handle: '.drag-handle',
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      onEnd: async function() {
+        const items = document.querySelectorAll('#lessonAccordion .lesson-accordion-item');
+        const lessonIds = Array.from(items).map(el => parseInt(el.dataset.lessonId));
+        await api('PUT', `/courses/admin/courses/${_editCourseId}/lessons/reorder`, {lesson_ids: lessonIds});
+        items.forEach((el, i) => {
+          const num = el.querySelector('.lesson-order-num');
+          if (num) num.textContent = i + 1;
+        });
+      }
+    });
+  }
+}
+
+function renderLessonAccordionItem(l, i) {
+  const opts = l.exercise ? (l.exercise.options || ['', '', '', '']) : ['', '', '', ''];
+  const correctIdx = l.exercise ? (l.exercise.correct_index || 0) : 0;
+  const matSrc = 'matSrc_' + l.id;
+  return `
+    <div class="lesson-accordion-item" data-lesson-id="${l.id}">
+      <div class="lesson-accordion-header" onclick="toggleLessonAccordion(${l.id})">
+        <span class="drag-handle">${icon('drag-handle','18')}</span>
+        <span class="lesson-order-num">${i + 1}</span>
+        <span class="lesson-title-label">${l.title || ('Aula ' + (i+1))}</span>
+        <span class="lesson-flags">
+          ${l.video_url ? icon('play-circle','16') : ''}
+          ${l.materials && l.materials.length ? icon('file','16') : ''}
+          ${l.exercise ? icon('document-text','16') : ''}
+        </span>
+        <span class="accordion-chevron">${icon('chevron-down','18')}</span>
+      </div>
+      <div class="lesson-accordion-body" id="lessonBody_${l.id}" style="display:none">
+        <div class="form-group">
+          <label>Título da Aula</label>
+          <input type="text" id="lt_${l.id}" class="form-control" value="${(l.title||'').replace(/"/g,'&quot;')}">
+        </div>
+        <div class="form-group">
+          <label>Duração</label>
+          <input type="text" id="ld_${l.id}" class="form-control" value="${l.duration_min||''}" placeholder="Ex: 30 min">
+        </div>
+        <div class="form-group">
+          <label>${icon('play-circle','14')} URL do Vídeo (YouTube/Vimeo)</label>
+          <input type="text" id="lv_${l.id}" class="form-control" value="${(l.video_url||'').replace(/"/g,'&quot;')}" placeholder="https://youtube.com/watch?v=...">
+        </div>
+        <div class="form-group">
+          <label>${icon('file','14')} Materiais</label>
+          <div class="material-list-edit" id="matList_${l.id}">
+            ${(l.materials||[]).map(m => `
+              <div class="material-edit-item" id="matItem_${m.id}">
+                <span>${icon(m.tipo==='pdf'?'file':'document-text','14')} ${m.name}</span>
+                <button class="btn-icon-only" onclick="adminRemoveMaterial(${m.id},${l.id})" title="Remover">${icon('x-circle','16')}</button>
+              </div>`).join('')}
+          </div>
+          <div class="material-source-toggle">
+            <label><input type="radio" name="${matSrc}" value="link" checked onchange="toggleMatInput(${l.id},'link')"> Link</label>
+            <label><input type="radio" name="${matSrc}" value="upload" onchange="toggleMatInput(${l.id},'upload')"> Upload PDF</label>
+          </div>
+          <div id="matInputLink_${l.id}" style="display:flex;gap:8px">
+            <input type="text" id="matName_${l.id}" class="form-control" placeholder="Nome do material" style="flex:1">
+            <input type="text" id="matUrl_${l.id}" class="form-control" placeholder="URL" style="flex:2">
+          </div>
+          <div id="matInputUpload_${l.id}" style="display:none;gap:8px">
+            <input type="text" id="matNameUp_${l.id}" class="form-control" placeholder="Nome do material" style="flex:1">
+            <input type="file" id="matFile_${l.id}" accept=".pdf" class="form-control" style="flex:2">
+          </div>
+          <button class="btn btn-sm btn-outline" style="margin-top:8px" onclick="adminAddMaterial(${l.id})">${icon('plus','14')} Adicionar</button>
+        </div>
+        <div class="form-group">
+          <label>${icon('document-text','14')} Exercício (múltipla escolha)</label>
+          <textarea id="eq_${l.id}" class="form-control" rows="2" placeholder="Pergunta do exercício">${(l.exercise&&l.exercise.question||'').replace(/</g,'&lt;')}</textarea>
+          <div class="exercise-options" style="margin-top:8px">
+            ${[0,1,2,3].map(j => `
+              <div class="exercise-option">
+                <input type="radio" name="correctOpt_${l.id}" value="${j}" ${correctIdx===j?'checked':''}>
+                <input type="text" id="eo_${l.id}_${j}" class="form-control" placeholder="Opção ${j+1}" value="${(opts[j]||'').replace(/"/g,'&quot;')}">
+              </div>`).join('')}
+          </div>
+          <small style="color:var(--gray)">Selecione o rádio ao lado da resposta correta</small>
+        </div>
+        <div class="lesson-actions">
+          <button class="btn btn-outline btn-sm" style="color:var(--danger,#e74c3c);border-color:var(--danger,#e74c3c)" onclick="adminDeleteLesson(${l.id})">${icon('x-circle','14')} Excluir</button>
+          <button class="btn btn-primary btn-sm" onclick="adminSaveLesson(${l.id})">Salvar Aula</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function toggleLessonAccordion(lessonId) {
+  const body = document.getElementById('lessonBody_' + lessonId);
+  const item = body && body.closest('.lesson-accordion-item');
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  document.querySelectorAll('.lesson-accordion-body').forEach(b => b.style.display = 'none');
+  document.querySelectorAll('.lesson-accordion-item').forEach(el => el.classList.remove('expanded'));
+  if (!isOpen) {
+    body.style.display = 'flex';
+    if (item) item.classList.add('expanded');
+  }
+}
+
+function toggleMatInput(lessonId, type) {
+  document.getElementById('matInputLink_' + lessonId).style.display = type === 'link' ? 'flex' : 'none';
+  document.getElementById('matInputUpload_' + lessonId).style.display = type === 'upload' ? 'flex' : 'none';
+}
+
+async function adminSaveLesson(lessonId) {
+  const title = document.getElementById('lt_' + lessonId) && document.getElementById('lt_' + lessonId).value.trim();
+  if (!title) { showToast('Título é obrigatório', 'error'); return; }
+  const videoUrl = document.getElementById('lv_' + lessonId) && document.getElementById('lv_' + lessonId).value.trim();
+  const durationMin = document.getElementById('ld_' + lessonId) && document.getElementById('ld_' + lessonId).value;
+  const r1 = await api('PUT', `/courses/admin/lessons/${lessonId}`, {
+    title, video_url: videoUrl || '', duration_min: durationMin || ''
+  });
+  if (!r1.ok) {
+    const err = await r1.json().catch(() => ({}));
+    showToast(err.error || 'Erro ao salvar aula', 'error'); return;
+  }
+  const question = document.getElementById('eq_' + lessonId) && document.getElementById('eq_' + lessonId).value.trim();
+  if (question) {
+    const options = [0,1,2,3].map(j => {
+      const el = document.getElementById('eo_' + lessonId + '_' + j);
+      return el ? el.value.trim() : '';
+    });
+    const correctRadio = document.querySelector('input[name="correctOpt_' + lessonId + '"]:checked');
+    const correctIndex = correctRadio ? parseInt(correctRadio.value) : 0;
+    await api('PUT', `/courses/admin/lessons/${lessonId}/exercise`, {question, options, correct_index: correctIndex});
+  }
+  showToast('Aula salva!', 'success');
+  const titleLabel = document.querySelector('.lesson-accordion-item[data-lesson-id="' + lessonId + '"] .lesson-title-label');
+  if (titleLabel) titleLabel.textContent = title;
+}
+
+async function adminAddMaterial(lessonId) {
+  const activeRadio = document.querySelector('input[name="matSrc_' + lessonId + '"]:checked');
+  const tipo = activeRadio ? activeRadio.value : 'link';
+  if (tipo === 'link') {
+    const nameEl = document.getElementById('matName_' + lessonId);
+    const urlEl = document.getElementById('matUrl_' + lessonId);
+    const name = nameEl ? nameEl.value.trim() : '';
+    const url = urlEl ? urlEl.value.trim() : '';
+    if (!name || !url) { showToast('Nome e URL são obrigatórios', 'error'); return; }
+    const res = await api('POST', `/courses/admin/lessons/${lessonId}/materials`, {name, url, tipo: 'link'});
+    if (!res.ok) { showToast('Erro ao adicionar material', 'error'); return; }
+    const mat = await res.json();
+    const list = document.getElementById('matList_' + lessonId);
+    if (list) {
+      const div = document.createElement('div');
+      div.className = 'material-edit-item';
+      div.id = 'matItem_' + mat.id;
+      div.innerHTML = '<span>'+icon('document-text','14')+' '+mat.name+'</span><button class="btn-icon-only" onclick="adminRemoveMaterial('+mat.id+','+lessonId+')">'+icon('x-circle','16')+'</button>';
+      list.appendChild(div);
+    }
+    if (nameEl) nameEl.value = '';
+    if (urlEl) urlEl.value = '';
+    showToast('Material adicionado!', 'success');
+  } else {
+    const nameEl = document.getElementById('matNameUp_' + lessonId);
+    const fileInput = document.getElementById('matFile_' + lessonId);
+    const name = nameEl ? nameEl.value.trim() : '';
+    const file = fileInput && fileInput.files[0];
+    if (!name || !file) { showToast('Nome e arquivo são obrigatórios', 'error'); return; }
+    const fd = new FormData();
+    fd.append('file', file);
+    const uploadRes = await fetch('/api/upload', {method:'POST', credentials:'include', body: fd});
+    if (!uploadRes.ok) { showToast('Erro no upload', 'error'); return; }
+    const uploadData = await uploadRes.json();
+    const res = await api('POST', `/courses/admin/lessons/${lessonId}/materials`, {name, url: uploadData.url, tipo: 'pdf'});
+    if (!res.ok) { showToast('Erro ao salvar material', 'error'); return; }
+    const mat = await res.json();
+    const list = document.getElementById('matList_' + lessonId);
+    if (list) {
+      const div = document.createElement('div');
+      div.className = 'material-edit-item';
+      div.id = 'matItem_' + mat.id;
+      div.innerHTML = '<span>'+icon('file','14')+' '+mat.name+'</span><button class="btn-icon-only" onclick="adminRemoveMaterial('+mat.id+','+lessonId+')">'+icon('x-circle','16')+'</button>';
+      list.appendChild(div);
+    }
+    showToast('PDF adicionado!', 'success');
+  }
+}
+
+async function adminRemoveMaterial(materialId, lessonId) {
+  if (!confirm('Remover este material?')) return;
+  const res = await api('DELETE', `/courses/admin/materials/${materialId}`);
+  if (res.ok) {
+    const el = document.getElementById('matItem_' + materialId);
+    if (el) el.remove();
+    showToast('Material removido', 'success');
+  }
+}
+
+async function adminDeleteLesson(lessonId) {
+  if (!confirm('Excluir esta aula permanentemente?')) return;
+  const res = await api('DELETE', `/courses/admin/lessons/${lessonId}`);
+  if (!res.ok) { showToast('Erro ao excluir aula', 'error'); return; }
+  const el = document.querySelector('.lesson-accordion-item[data-lesson-id="' + lessonId + '"]');
+  if (el) el.remove();
+  document.querySelectorAll('#lessonAccordion .lesson-accordion-item').forEach((el, i) => {
+    const num = el.querySelector('.lesson-order-num');
+    if (num) num.textContent = i + 1;
+  });
+  showToast('Aula excluída', 'success');
+}
+
+async function addNewLesson(courseId) {
+  const title = prompt('Título da nova aula:');
+  if (!title || !title.trim()) return;
+  const res = await api('POST', `/courses/${courseId}/modulos`, {nome: title.trim()});
+  if (!res.ok) { showToast('Erro ao criar aula', 'error'); return; }
+  openCourseEditor(courseId);
+}
+
+async function saveCourseHeader() {
+  const nameEl = document.getElementById('courseEditName');
+  const name = nameEl ? nameEl.value.trim() : '';
+  if (!name) { showToast('Nome é obrigatório', 'error'); return; }
+  const catEl = document.getElementById('courseEditCategory');
+  const colorEl = document.getElementById('courseEditColor');
+  const descEl = document.getElementById('courseEditDescription');
+  const res = await api('PUT', `/courses/${_editCourseId}`, {
+    name,
+    tag: catEl ? catEl.value.trim() : '',
+    resumo: descEl ? descEl.value : '',
+    color: colorEl ? colorEl.value : '#008ea8'
+  });
+  if (!res.ok) { showToast('Erro ao salvar', 'error'); return; }
+  showToast('Curso atualizado!', 'success');
 }
 
 async function addCourse(){
@@ -3293,6 +3802,464 @@ function endTour(){
 function removeTourTooltip(){
   if(_tourEl){ _tourEl.remove(); _tourEl = null; }
 }
+// ═══════════════════════════════════════════════════════════════
+// SPRINT 4: Admin Trails Management
+// ═══════════════════════════════════════════════════════════════
+
+let _adminTrails = [], _editTrailId = null, _trailSortable = null;
+
+async function renderAdminTrails() {
+  document.getElementById('main-content').innerHTML =
+    '<div class="admin-page-header">'
+    +'<h1 class="text-h2">'+icon('trails','24')+' Gerenciar Trilhas</h1>'
+    +'<button class="btn btn-primary" onclick="openNewTrailModal()">'+icon('plus','16')+' Nova Trilha</button>'
+    +'</div>'
+    +'<div class="admin-trail-grid" id="adminTrailGrid"><p style="color:var(--gray)">Carregando...</p></div>';
+  const res = await api('GET', '/trails/admin/trails');
+  if (!res.ok) { showToast('Erro ao carregar trilhas', 'error'); return; }
+  const data = await res.json();
+  _adminTrails = data.trails;
+  _renderAdminTrailGrid();
+}
+
+function _renderAdminTrailGrid() {
+  const grid = document.getElementById('adminTrailGrid');
+  if (!grid) return;
+  if (!_adminTrails.length) {
+    grid.innerHTML = '<div class="empty-state"><div class="empty-icon">'+icon('trails','48','icon--primary')+'</div><p>Nenhuma trilha criada.</p></div>';
+    return;
+  }
+  grid.innerHTML = _adminTrails.map(t =>
+    '<div class="admin-trail-card" style="--trail-color:'+t.color+'" onclick="openTrailEditor('+t.id+')">'
+    +'<div class="admin-trail-card-icon">'+icon(t.icon||'trails','28')+'</div>'
+    +'<h3 class="admin-trail-card-name">'+t.name+'</h3>'
+    +'<div class="admin-trail-card-stats">'
+    +'<span>'+icon('books','14')+' '+t.total_courses+' cursos</span>'
+    +'<span>'+icon('users','14')+' '+t.enrolled_users+' alunos</span>'
+    +'</div>'
+    +'<button class="btn btn-outline btn-sm btn-full" onclick="event.stopPropagation();openTrailEditor('+t.id+')">Editar</button>'
+    +'</div>'
+  ).join('');
+}
+
+async function openTrailEditor(trailId) {
+  _editTrailId = trailId;
+  const t = _adminTrails.find(x => x.id === trailId);
+  if (!t) return;
+  const avRes = await api('GET', '/trails/admin/courses/available-for-trail/'+trailId);
+  const available = avRes.ok ? (await avRes.json()).courses : [];
+
+  document.getElementById('main-content').innerHTML =
+    '<div class="admin-page-header">'
+    +'<h2 class="text-h3">'+icon('trails','20')+' Editar Trilha</h2>'
+    +'<button class="btn btn-outline" onclick="renderAdminTrails()">'+icon('chevron-left','16')+' Voltar</button>'
+    +'</div>'
+    +'<div class="trail-editor">'
+    +'<div>'
+    +'<div class="form-group"><label>Nome da Trilha</label>'
+    +'<input type="text" id="trailEditName" class="form-control" value="'+t.name.replace(/"/g,\'&quot;\')+'"></div>'
+    +'<div class="form-group"><label>Descricao</label>'
+    +'<textarea id="trailEditDescription" class="form-control" rows="3">'+t.description+'</textarea></div>'
+    +'<div style="display:flex;gap:var(--space-md)">'
+    +'<div class="form-group" style="flex:1"><label>Cor</label>'
+    +'<input type="color" id="trailEditColor" class="form-control" value="'+(t.color||'#008ea8')+'" oninput="updateTrailPreview()"></div>'
+    +'<div class="form-group" style="flex:1"><label>Pontos bonus</label>'
+    +'<input type="number" id="trailEditXpBonus" class="form-control" value="'+(t.xp_bonus||0)+'"></div>'
+    +'</div>'
+    +'<div class="form-group"><label>Nome do Certificado</label>'
+    +'<input type="text" id="trailEditCertName" class="form-control" value="'+(t.certificate_name||'').replace(/"/g,\'&quot;\')+'"></div>'
+    +'<h3 class="text-h4" style="margin-top:var(--space-lg)">Cursos <small style="color:var(--gray);font-size:var(--text-sm);font-weight:400">(arraste para reordenar)</small></h3>'
+    +'<ul class="sortable-course-list" id="sortableCourseList">'
+    +t.courses.map((c,i) =>
+      '<li class="sortable-course-item" data-course-id="'+c.id+'">'
+      +'<span class="drag-handle">'+icon('drag-handle','18')+'</span>'
+      +'<span class="course-order-num">'+(i+1)+'</span>'
+      +'<span class="course-name-item">'+c.name+'</span>'
+      +'<button class="btn-icon-only" onclick="removeCourseFromTrail('+c.id+')" title="Remover">'+icon('x-circle','18')+'</button>'
+      +'</li>'
+    ).join('')
+    +'</ul>'
+    +'<div class="add-course-row">'
+    +'<select id="addCourseSelect" class="form-control">'
+    +'<option value="">Selecionar curso...</option>'
+    +available.map(c => '<option value="'+c.id+'">'+c.name+'</option>').join('')
+    +'</select>'
+    +'<button class="btn btn-outline" onclick="addCourseToTrail()">'+icon('plus','16')+' Adicionar</button>'
+    +'</div>'
+    +'<div class="trail-editor-actions">'
+    +'<button class="btn btn-outline" onclick="renderAdminTrails()">Cancelar</button>'
+    +'<button class="btn btn-primary" onclick="saveTrailEdits()">Salvar Trilha</button>'
+    +'</div>'
+    +'</div>'
+    +'<div class="trail-editor-preview">'
+    +'<h3 class="text-h4">'+icon('eye','16')+' Preview</h3>'
+    +'<div id="trailPreviewPath"></div>'
+    +'</div>'
+    +'</div>';
+
+  if (typeof Sortable !== 'undefined') {
+    _trailSortable = new Sortable(document.getElementById('sortableCourseList'), {
+      handle: '.drag-handle', animation: 150, ghostClass: 'sortable-ghost',
+      onEnd: updateTrailPreview
+    });
+  }
+  updateTrailPreview();
+}
+
+function updateTrailPreview() {
+  const items = document.querySelectorAll('#sortableCourseList .sortable-course-item');
+  items.forEach((el, i) => {
+    const numEl = el.querySelector('.course-order-num');
+    if (numEl) numEl.textContent = i + 1;
+  });
+  const preview = document.getElementById('trailPreviewPath');
+  if (!preview) return;
+  const courses = Array.from(items).map((el, i) => ({
+    id: parseInt(el.dataset.courseId),
+    name: el.querySelector('.course-name-item')?.textContent || '',
+    order: i + 1
+  }));
+  const color = document.getElementById('trailEditColor')?.value || '#008ea8';
+  if (!courses.length) {
+    preview.innerHTML = '<p style="color:var(--gray);font-size:var(--text-sm)">Adicione cursos para ver o preview.</p>';
+    return;
+  }
+  preview.innerHTML = '<div class="trail-path" style="--trail-color:'+color+'">'
+    +courses.map((c, i) =>
+      '<div class="trail-step '+(i===0?'current':'locked')+'">'
+      +'<div class="trail-step-marker">'+(i===0?'&#9654;':icon('lock','12','icon--disabled'))+'</div>'
+      +'<div class="trail-step-content">'
+      +'<span class="trail-step-num">Passo '+c.order+'</span>'
+      +'<span class="trail-step-name">'+c.name+'</span>'
+      +(i===0?'<span class="trail-step-status" style="color:var(--primary);font-size:var(--text-xs);font-weight:700">VOCE ESTA AQUI</span>':'')
+      +'</div></div>'
+    ).join('')
+    +'<div class="trail-step certificate-step">'
+    +'<div class="trail-step-marker">'+icon('certificates','16','icon--gold')+'</div>'
+    +'<div class="trail-step-content"><span class="trail-step-name" style="color:var(--primary)">Certificado de Conclusao</span></div>'
+    +'</div></div>';
+}
+
+async function addCourseToTrail() {
+  const sel = document.getElementById('addCourseSelect');
+  const courseId = parseInt(sel?.value || '0');
+  if (!courseId) { showToast('Selecione um curso', 'error'); return; }
+  const res = await api('POST', '/trails/admin/trails/'+_editTrailId+'/courses', {course_id: courseId});
+  if (!res.ok) { const e = await res.json().catch(()=>({})); showToast(e.error||'Erro ao adicionar', 'error'); return; }
+  const r2 = await api('GET', '/trails/admin/trails');
+  if (r2.ok) _adminTrails = (await r2.json()).trails;
+  openTrailEditor(_editTrailId);
+}
+
+async function removeCourseFromTrail(courseId) {
+  if (!confirm('Remover curso desta trilha?')) return;
+  const res = await api('DELETE', '/trails/admin/trails/'+_editTrailId+'/courses/'+courseId);
+  if (!res.ok) { showToast('Erro ao remover', 'error'); return; }
+  const r2 = await api('GET', '/trails/admin/trails');
+  if (r2.ok) _adminTrails = (await r2.json()).trails;
+  openTrailEditor(_editTrailId);
+}
+
+async function saveTrailEdits() {
+  const name = document.getElementById('trailEditName')?.value.trim();
+  if (!name) { showToast('Nome obrigatorio', 'error'); return; }
+  const r1 = await api('PUT', '/trails/admin/trails/'+_editTrailId, {
+    name,
+    description: document.getElementById('trailEditDescription')?.value || '',
+    color: document.getElementById('trailEditColor')?.value || '#008ea8',
+    xp_bonus: parseInt(document.getElementById('trailEditXpBonus')?.value || 0),
+    certificate_name: document.getElementById('trailEditCertName')?.value || ''
+  });
+  if (!r1.ok) { showToast('Erro ao salvar trilha', 'error'); return; }
+  const items = document.querySelectorAll('#sortableCourseList .sortable-course-item');
+  const courseIds = Array.from(items).map(el => parseInt(el.dataset.courseId));
+  await api('PUT', '/trails/admin/trails/'+_editTrailId+'/courses/reorder', {course_ids: courseIds});
+  showToast('Trilha salva!', 'success');
+  const r3 = await api('GET', '/trails/admin/trails');
+  if (r3.ok) _adminTrails = (await r3.json()).trails;
+  renderAdminTrails();
+}
+
+async function openNewTrailModal() {
+  const name = prompt('Nome da nova trilha:');
+  if (!name?.trim()) return;
+  const res = await api('POST', '/trails', {name: name.trim(), description: '', xp_bonus: 100});
+  if (!res.ok) { showToast('Erro ao criar trilha', 'error'); return; }
+  showToast('Trilha criada!', 'success');
+  await renderAdminTrails();
+}
+
+// ===============================================================
+// SPRINT 4: Admin Courses Management
+// ===============================================================
+
+let _editCourseId = null, _lessonSortable = null;
+
+async function renderAdminCoursesMgmt() {
+  document.getElementById('main-content').innerHTML =
+    '<div class="admin-page-header">'
+    +'<h1 class="text-h2">'+icon('books','24')+' Gerenciar Cursos</h1>'
+    +'<button class="btn btn-primary" onclick="showNewCourse()">'+icon('plus','16')+' Novo Curso</button>'
+    +'</div>'
+    +'<div class="admin-course-list" id="adminCourseList"><p style="color:var(--gray)">Carregando...</p></div>';
+  const res = await api('GET', '/courses/admin/courses');
+  if (!res.ok) { showToast('Erro ao carregar cursos', 'error'); return; }
+  const data = await res.json();
+  const list = document.getElementById('adminCourseList');
+  if (!list) return;
+  if (!data.courses.length) {
+    list.innerHTML = '<div class="empty-state"><p>Nenhum curso criado.</p></div>';
+    return;
+  }
+  list.innerHTML = data.courses.map(c =>
+    '<div class="admin-course-card" onclick="openCourseEditor('+c.id+')">'
+    +'<div class="admin-course-card-icon" style="background:'+(c.color||'var(--primary)')+'">'+icon('books','28','icon--white')+'</div>'
+    +'<div class="admin-course-card-info">'
+    +'<h3 class="admin-course-card-name">'+c.name+'</h3>'
+    +'<p class="admin-course-card-meta">'+c.category+' &middot; '+c.total_lessons+' aulas &middot; '+c.enrolled_users+' alunos &middot; '+c.avg_progress+'% medio'+(c.trail_name?' &middot; Trilha: '+c.trail_name:'')+'</p>'
+    +'<div class="admin-course-card-flags">'
+    +(c.has_video?'<span class="flag-badge">'+icon('play-circle','12')+' Video</span>':'')
+    +(c.has_pdf?'<span class="flag-badge">'+icon('file','12')+' PDF</span>':'')
+    +'</div></div>'
+    +'<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openCourseEditor('+c.id+')">Editar</button>'
+    +'</div>'
+  ).join('');
+}
+
+async function openCourseEditor(courseId) {
+  _editCourseId = courseId;
+  const [cRes, lRes] = await Promise.all([
+    api('GET', '/courses/'+courseId),
+    api('GET', '/courses/admin/courses/'+courseId+'/lessons')
+  ]);
+  if (!cRes.ok || !lRes.ok) { showToast('Erro ao carregar curso', 'error'); return; }
+  const c = await cRes.json();
+  const {lessons} = await lRes.json();
+
+  document.getElementById('main-content').innerHTML =
+    '<div class="admin-page-header">'
+    +'<h2 class="text-h3">'+icon('books','20')+' Editar Curso</h2>'
+    +'<button class="btn btn-outline" onclick="renderAdminCoursesMgmt()">'+icon('chevron-left','16')+' Voltar</button>'
+    +'</div>'
+    +'<div class="course-editor-header">'
+    +'<input type="text" id="courseEditName" class="input-title" value="'+(c.name||'').replace(/"/g,\'&quot;\')+'"> '
+    +'<div style="display:flex;gap:var(--space-md)">'
+    +'<div class="form-group" style="flex:1"><label>Tag / Categoria</label>'
+    +'<input type="text" id="courseEditTag" class="form-control" value="'+(c.tag||'').replace(/"/g,\'&quot;\')+'"></div>'
+    +'<div class="form-group"><label>Cor</label>'
+    +'<input type="color" id="courseEditColor" class="form-control" value="'+(c.color||'#008ea8')+'"></div>'
+    +'</div>'
+    +'<div class="form-group"><label>Resumo</label>'
+    +'<textarea id="courseEditResumo" class="form-control" rows="2">'+(c.resumo||'')+'</textarea></div>'
+    +'<div style="display:flex;gap:var(--space-sm);margin-top:var(--space-md)">'
+    +'<button class="btn btn-outline" onclick="renderAdminCoursesMgmt()">Cancelar</button>'
+    +'<button class="btn btn-primary" onclick="saveCourseHeader()">Salvar Informacoes</button>'
+    +'</div></div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-md)">'
+    +'<h3 class="text-h4">Aulas ('+lessons.length+')</h3>'
+    +'<button class="btn btn-sm btn-outline" onclick="adminAddNewLesson('+courseId+')">'+icon('plus','16')+' Nova Aula</button>'
+    +'</div>'
+    +'<div class="lesson-accordion" id="lessonAccordion">'
+    +lessons.map((l, i) => _renderLessonItem(l, i)).join('')
+    +'</div>';
+
+  if (typeof Sortable !== 'undefined') {
+    _lessonSortable = new Sortable(document.getElementById('lessonAccordion'), {
+      handle: '.drag-handle', animation: 150, ghostClass: 'sortable-ghost',
+      onEnd: async function() {
+        const items = document.querySelectorAll('#lessonAccordion .lesson-accordion-item');
+        const ids = Array.from(items).map(el => parseInt(el.dataset.lessonId));
+        await api('PUT', '/courses/admin/courses/'+_editCourseId+'/lessons/reorder', {lesson_ids: ids});
+        items.forEach((el, i) => { const n=el.querySelector('.lesson-order-num'); if(n) n.textContent=i+1; });
+      }
+    });
+  }
+}
+
+function _renderLessonItem(l, i) {
+  const opts = (l.exercise&&l.exercise.options)||[\'\',\'\',\'\',\'\'];
+  const correctIdx = (l.exercise&&l.exercise.correct_index)||0;
+  const lid = l.id;
+  return '<div class="lesson-accordion-item" data-lesson-id="'+lid+'">'
+    +'<div class="lesson-accordion-header" onclick="toggleLessonAccordion('+lid+')">'
+    +'<span class="drag-handle">'+icon('drag-handle','18')+'</span>'
+    +'<span class="lesson-order-num">'+(i+1)+'</span>'
+    +'<span class="lesson-title-label">'+(l.nome||'Aula '+(i+1))+'</span>'
+    +'<span class="lesson-flags">'
+    +(l.video_url?icon('play-circle','16'):'')+((l.materials&&l.materials.length)?icon('file','16'):'')+((l.exercise)?icon('document-text','16'):'')
+    +'</span>'
+    +'<span class="accordion-chevron">'+icon('chevron-down','18')+'</span>'
+    +'</div>'
+    +'<div class="lesson-accordion-body" id="lessonBody_'+lid+'" style="display:none">'
+    +'<div class="form-group"><label>Titulo</label>'
+    +'<input type="text" id="lt_'+lid+'" class="form-control" value="'+(l.nome||'').replace(/"/g,\'&quot;\')+'"></div>'
+    +'<div class="form-group"><label>Duracao (ex: 30 min)</label>'
+    +'<input type="text" id="ld_'+lid+'" class="form-control" value="'+(l.dur||'').replace(/"/g,\'&quot;\')+'"></div>'
+    +'<div class="form-group"><label>'+icon('play-circle','14')+' URL do Video (YouTube/Vimeo)</label>'
+    +'<input type="text" id="lv_'+lid+'" class="form-control" value="'+(l.video_url||'').replace(/"/g,\'&quot;\')+'"></div>'
+    +'<div class="form-group"><label>'+icon('file','14')+' Materiais</label>'
+    +'<div class="material-list-edit" id="matList_'+lid+'">'
+    +((l.materials||[]).map(m =>
+      '<div class="material-edit-item" id="matItem_'+m.id+'">'
+      +'<span>'+icon(m.tipo===\'pdf\'?\'file\':\'document-text\',\'14\')+\'  \'+m.name+\'</span>\'
+      +\'<button class="btn-icon-only" onclick="adminRemoveMaterial(\'+m.id+\',\'+lid+\')" title="Remover">\'+icon(\'x-circle\',\'16\')+\'</button>\'
+      +\'</div>\'
+    ).join(\'\'))
+    +\'</div>\'
+    +\'<div class="material-source-toggle">\'
+    +\'<label><input type="radio" name="mSrc_\'+lid+\'" value="link" checked onchange="toggleMatInput(\'+lid+\',&apos;link&apos;)"> Link</label>\'
+    +\'<label><input type="radio" name="mSrc_\'+lid+\'" value="upload" onchange="toggleMatInput(\'+lid+\',&apos;upload&apos;)"> Upload PDF</label>\'
+    +\'</div>\'
+    +\'<div id="matInputLink_\'+lid+\'" style="display:flex;gap:8px">\'
+    +\'<input type="text" id="matName_\'+lid+\'" class="form-control" placeholder="Nome" style="flex:1">\'
+    +\'<input type="text" id="matUrl_\'+lid+\'" class="form-control" placeholder="URL" style="flex:2">\'
+    +\'</div>\'
+    +\'<div id="matInputUpload_\'+lid+\'" style="display:none;gap:8px">\'
+    +\'<input type="text" id="matNameUp_\'+lid+\'" class="form-control" placeholder="Nome" style="flex:1">\'
+    +\'<input type="file" id="matFile_\'+lid+\'" accept=".pdf" class="form-control" style="flex:2">\'
+    +\'</div>\'
+    +\'<button class="btn btn-sm btn-outline" style="margin-top:8px" onclick="adminAddMaterial(\'+lid+\')">\'+icon(\'plus\',\'14\')+\' Adicionar</button>\'
+    +\'</div>\'
+    +\'<div class="form-group"><label>\'+icon(\'document-text\',\'14\')+\' Exercicio</label>\'
+    +\'<textarea id="eq_\'+lid+\'" class="form-control" rows="2" placeholder="Pergunta">\'+((l.exercise&&l.exercise.question)||\'\')+\'</textarea>\'
+    +\'<div class="exercise-options">\'
+    +[0,1,2,3].map(j =>
+      \'<div class="exercise-option">\'
+      +\'<input type="radio" name="correctOpt_\'+lid+\'" value="\'+j+\'" \'+((correctIdx===j)?\'checked\':\'\')+\'>\'
+      +\'<input type="text" id="eo_\'+lid+\'_\'+j+\'" class="form-control" placeholder="Opcao \'+( j+1)+\'" value="\'+((opts[j]||\'\')).replace(/"/g,\'&quot;\')+\'">\'
+      +\'</div>\'
+    ).join(\'\')
+    +\'</div><small style="color:var(--gray)">Selecione o radio da resposta correta</small>\'
+    +\'</div>\'
+    +\'<div class="lesson-actions">\'
+    +\'<button class="btn btn-outline btn-sm" style="color:var(--danger,#e74c3c);border-color:var(--danger,#e74c3c)" onclick="adminDeleteLesson(\'+lid+\')">\'+icon(\'x-circle\',\'14\')+\' Excluir</button>\'
+    +\'<button class="btn btn-primary btn-sm" onclick="adminSaveLesson(\'+lid+\')">Salvar Aula</button>\'
+    +\'</div>\'
+    +\'</div></div>\';
+}
+
+function toggleLessonAccordion(lessonId) {
+  const body = document.getElementById(\'lessonBody_\'+lessonId);
+  const item = body&&body.closest(\'.lesson-accordion-item\');
+  if (!body) return;
+  const isOpen = body.style.display !== \'none\';
+  document.querySelectorAll(\'.lesson-accordion-body\').forEach(b => b.style.display = \'none\');
+  document.querySelectorAll(\'.lesson-accordion-item\').forEach(el => el.classList.remove(\'expanded\'));
+  if (!isOpen) { body.style.display = \'flex\'; if(item) item.classList.add(\'expanded\'); }
+}
+
+function toggleMatInput(lessonId, type) {
+  const link = document.getElementById(\'matInputLink_\'+lessonId);
+  const upload = document.getElementById(\'matInputUpload_\'+lessonId);
+  if(link) link.style.display = type===\'link\'?\'flex\':\'none\';
+  if(upload) upload.style.display = type===\'upload\'?\'flex\':\'none\';
+}
+
+async function adminSaveLesson(lessonId) {
+  const nome = document.getElementById(\'lt_\'+lessonId)&&document.getElementById(\'lt_\'+lessonId).value.trim();
+  if (!nome) { showToast(\'Titulo obrigatorio\', \'error\'); return; }
+  const videoUrl = document.getElementById(\'lv_\'+lessonId)&&document.getElementById(\'lv_\'+lessonId).value.trim();
+  const dur = document.getElementById(\'ld_\'+lessonId)&&document.getElementById(\'ld_\'+lessonId).value.trim();
+  const r1 = await api(\'PUT\', \'/courses/admin/lessons/\'+lessonId, {nome, video_url: videoUrl, dur});
+  if (!r1.ok) { const e=await r1.json().catch(()=>({})); showToast(e.error||\'Erro ao salvar\', \'error\'); return; }
+  const qEl = document.getElementById(\'eq_\'+lessonId);
+  const question = qEl&&qEl.value.trim();
+  if (question) {
+    const options = [0,1,2,3].map(j => { const el=document.getElementById(\'eo_\'+lessonId+\'_\'+j); return el?el.value.trim():\'\'; });
+    const correctRadio = document.querySelector(\'input[name="correctOpt_\'+lessonId+\'"]:checked\');
+    const correct_index = correctRadio ? parseInt(correctRadio.value) : 0;
+    await api(\'PUT\', \'/courses/admin/lessons/\'+lessonId+\'/exercise\', {question, options, correct_index});
+  }
+  showToast(\'Aula salva!\', \'success\');
+  const titleLabel = document.querySelector(\'.lesson-accordion-item[data-lesson-id="\'+lessonId+\'"] .lesson-title-label\');
+  if (titleLabel) titleLabel.textContent = nome;
+}
+
+async function adminAddMaterial(lessonId) {
+  const radio = document.querySelector(\'input[name="mSrc_\'+lessonId+\'"]:checked\');
+  const tipo = radio?radio.value:\'link\';
+  if (tipo === \'link\') {
+    const nameEl = document.getElementById(\'matName_\'+lessonId);
+    const urlEl = document.getElementById(\'matUrl_\'+lessonId);
+    const name = nameEl&&nameEl.value.trim();
+    const url = urlEl&&urlEl.value.trim();
+    if (!name||!url) { showToast(\'Nome e URL obrigatorios\', \'error\'); return; }
+    const res = await api(\'POST\', \'/courses/admin/lessons/\'+lessonId+\'/materials\', {name, url, tipo:\'link\'});
+    if (!res.ok) { showToast(\'Erro ao adicionar\', \'error\'); return; }
+    const mat = await res.json();
+    _appendMaterialItem(mat, lessonId);
+    nameEl.value=\'\'; urlEl.value=\'\';
+  } else {
+    const nameEl = document.getElementById(\'matNameUp_\'+lessonId);
+    const fileInput = document.getElementById(\'matFile_\'+lessonId);
+    const name = nameEl&&nameEl.value.trim();
+    const file = fileInput&&fileInput.files[0];
+    if (!name||!file) { showToast(\'Nome e arquivo obrigatorios\', \'error\'); return; }
+    const fd = new FormData(); fd.append(\'file\', file);
+    const uploadRes = await fetch(\'/api/upload\', {method:\'POST\', credentials:\'include\', body:fd});
+    if (!uploadRes.ok) { showToast(\'Erro no upload\', \'error\'); return; }
+    const uploadData = await uploadRes.json();
+    const res = await api(\'POST\', \'/courses/admin/lessons/\'+lessonId+\'/materials\', {name, url:uploadData.url, tipo:\'pdf\'});
+    if (!res.ok) { showToast(\'Erro ao salvar material\', \'error\'); return; }
+    const mat = await res.json();
+    _appendMaterialItem(mat, lessonId);
+  }
+  showToast(\'Material adicionado!\', \'success\');
+}
+
+function _appendMaterialItem(mat, lessonId) {
+  const list = document.getElementById(\'matList_\'+lessonId);
+  if (!list) return;
+  const div = document.createElement(\'div\');
+  div.className = \'material-edit-item\'; div.id = \'matItem_\'+mat.id;
+  div.innerHTML = \'<span>\'+icon(mat.tipo===\'pdf\'?\'file\':\'document-text\',\'14\')+\' \'+mat.name+\'</span>\'
+    +\'<button class="btn-icon-only" onclick="adminRemoveMaterial(\'+mat.id+\',\'+lessonId+\')">\'+icon(\'x-circle\',\'16\')+\'</button>\';
+  list.appendChild(div);
+}
+
+async function adminRemoveMaterial(materialId, lessonId) {
+  if (!confirm(\'Remover este material?\')) return;
+  const res = await api(\'DELETE\', \'/courses/admin/materials/\'+materialId);
+  if (res.ok) { const el=document.getElementById(\'matItem_\'+materialId); if(el) el.remove(); showToast(\'Removido\', \'success\'); }
+}
+
+async function adminDeleteLesson(lessonId) {
+  if (!confirm(\'Excluir esta aula? Materiais e exercicio serao perdidos.\')) return;
+  const res = await api(\'DELETE\', \'/courses/admin/lessons/\'+lessonId);
+  if (!res.ok) { showToast(\'Erro ao excluir\', \'error\'); return; }
+  const el = document.querySelector(\'.lesson-accordion-item[data-lesson-id="\'+lessonId+\'"]\');
+  if(el) el.remove();
+  document.querySelectorAll(\'#lessonAccordion .lesson-accordion-item\').forEach((el, i) => {
+    const n=el.querySelector(\'.lesson-order-num\'); if(n) n.textContent=i+1;
+  });
+  showToast(\'Aula excluida\', \'success\');
+}
+
+async function adminAddNewLesson(courseId) {
+  const title = prompt(\'Titulo da nova aula:\');
+  if (!title||!title.trim()) return;
+  const res = await api(\'POST\', \'/courses/\'+courseId+\'/modules\', {nome: title.trim()});
+  if (!res.ok) { showToast(\'Erro ao criar aula\', \'error\'); return; }
+  openCourseEditor(courseId);
+}
+
+async function saveCourseHeader() {
+  const nameEl = document.getElementById(\'courseEditName\');
+  const name = nameEl&&nameEl.value.trim();
+  if (!name) { showToast(\'Nome obrigatorio\', \'error\'); return; }
+  const tagEl = document.getElementById(\'courseEditTag\');
+  const resumoEl = document.getElementById(\'courseEditResumo\');
+  const colorEl = document.getElementById(\'courseEditColor\');
+  const res = await api(\'PUT\', \'/courses/\'+_editCourseId, {
+    name,
+    tag: tagEl?tagEl.value.trim():\'\',
+    resumo: resumoEl?resumoEl.value:\'\',
+    color: colorEl?colorEl.value:\'#008ea8\'
+  });
+  if (!res.ok) { showToast(\'Erro ao salvar\', \'error\'); return; }
+  showToast(\'Curso atualizado!\', \'success\');
+}
+
 </script>
 
 <!-- Toast container -->

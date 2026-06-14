@@ -248,3 +248,129 @@ def submit_onboarding():
         'ok': True,
         'recommended_trail': trail.to_dict(include_courses=True) if trail else None,
     })
+
+
+# ═══════════════════════════════════════════════════════════════
+# ADMIN: Trails management (Sprint 4)
+# ═══════════════════════════════════════════════════════════════
+
+def _admin_required():
+    uid = session.get('user_id')
+    user = User.query.get(uid) if uid else None
+    if not user or user.role != 'admin':
+        return None, (jsonify({'error': 'Acesso negado'}), 403)
+    return user, None
+
+@trails_bp.route('/admin/trails', methods=['GET'])
+def admin_list_trails():
+    user, err = _admin_required()
+    if err: return err
+    from models import Course
+    trails = Trail.query.all()
+    result = []
+    for t in trails:
+        trail_courses = TrailCourse.query.filter_by(trail_id=t.id).order_by(TrailCourse.position).all()
+        enrolled = UserTrail.query.filter_by(trail_id=t.id).count()
+        completed = UserTrail.query.filter_by(trail_id=t.id).filter(UserTrail.completed_at.isnot(None)).count()
+        courses_data = []
+        for tc in trail_courses:
+            c = Course.query.get(tc.course_id)
+            if c:
+                courses_data.append({'id': c.id, 'name': c.name, 'position': tc.position})
+        result.append({
+            'id': t.id, 'name': t.name, 'icon': t.icon or 'trails',
+            'color': t.color or '#008ea8', 'description': t.description or '',
+            'xp_bonus': t.xp_bonus or 0, 'certificate_name': t.certificate_name or '',
+            'total_courses': len(trail_courses), 'enrolled_users': enrolled,
+            'completed_users': completed, 'courses': courses_data
+        })
+    return jsonify({'trails': result})
+
+@trails_bp.route('/admin/trails/<int:trail_id>', methods=['PUT'])
+def admin_update_trail(trail_id):
+    user, err = _admin_required()
+    if err: return err
+    t = Trail.query.get_or_404(trail_id)
+    data = request.get_json() or {}
+    if 'name' in data: t.name = data['name']
+    if 'description' in data: t.description = data['description']
+    if 'icon' in data: t.icon = data['icon']
+    if 'color' in data: t.color = data['color']
+    if 'xp_bonus' in data: t.xp_bonus = int(data['xp_bonus'])
+    if 'certificate_name' in data: t.certificate_name = data['certificate_name']
+    db.session.commit()
+    return jsonify({'success': True})
+
+@trails_bp.route('/admin/trails/<int:trail_id>/courses/reorder', methods=['PUT'])
+def admin_reorder_trail_courses(trail_id):
+    user, err = _admin_required()
+    if err: return err
+    data = request.get_json() or {}
+    course_ids = data.get('course_ids', [])
+    for idx, cid in enumerate(course_ids, 1):
+        tc = TrailCourse.query.filter_by(trail_id=trail_id, course_id=cid).first()
+        if tc:
+            tc.position = idx
+    db.session.commit()
+    return jsonify({'success': True})
+
+@trails_bp.route('/admin/trails/<int:trail_id>/courses', methods=['POST'])
+def admin_add_course_to_trail(trail_id):
+    user, err = _admin_required()
+    if err: return err
+    data = request.get_json() or {}
+    course_id = data.get('course_id')
+    if not course_id:
+        return jsonify({'error': 'course_id required'}), 400
+    existing = TrailCourse.query.filter_by(trail_id=trail_id, course_id=course_id).first()
+    if existing:
+        return jsonify({'error': 'Curso já na trilha'}), 409
+    max_pos = db.session.query(db.func.max(TrailCourse.position)).filter_by(trail_id=trail_id).scalar() or 0
+    tc = TrailCourse(trail_id=trail_id, course_id=course_id, position=max_pos + 1)
+    db.session.add(tc)
+    db.session.commit()
+    return jsonify({'success': True})
+
+@trails_bp.route('/admin/trails/<int:trail_id>/courses/<int:course_id>', methods=['DELETE'])
+def admin_remove_course_from_trail(trail_id, course_id):
+    user, err = _admin_required()
+    if err: return err
+    tc = TrailCourse.query.filter_by(trail_id=trail_id, course_id=course_id).first()
+    if tc:
+        db.session.delete(tc)
+        db.session.commit()
+    return jsonify({'success': True})
+
+@trails_bp.route('/admin/courses/available-for-trail/<int:trail_id>', methods=['GET'])
+def admin_available_courses_for_trail(trail_id):
+    user, err = _admin_required()
+    if err: return err
+    from models import Course
+    trail_course_ids = {tc.course_id for tc in TrailCourse.query.filter_by(trail_id=trail_id).all()}
+    all_courses = Course.query.all()
+    available = [{'id': c.id, 'name': c.name} for c in all_courses if c.id not in trail_course_ids]
+    return jsonify({'courses': available})
+
+
+
+@trails_bp.route('', methods=['POST'])
+def create_trail():
+    uid = session.get('user_id')
+    user = User.query.get(uid) if uid else None
+    if not user or user.role != 'admin':
+        return jsonify({'error': 'Acesso negado'}), 403
+    
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'error': 'name é obrigatório'}), 400
+    
+    t = Trail(
+        name=name,
+        description=data.get('description', ''),
+        xp_bonus=int(data.get('xp_bonus', 100)),
+        color=data.get('color', '#008ea8')
+    )
+    db.session.add(t)
+    db.session.commit()
+    return jsonify({'id': t.id, 'name': t.name}), 201

@@ -116,7 +116,7 @@ def update_course(course_id):
 
     data = request.get_json(silent=True) or {}
 
-    for field in ('name', 'icon', 'acesso', 'resumo', 'duracao'):
+    for field in ('name', 'icon', 'acesso', 'resumo', 'duracao', 'tag', 'description', 'color'):
         if field in data:
             setattr(course, field, data[field])
 
@@ -243,3 +243,158 @@ def delete_material(course_id, mat_id):
 def list_categories():
     cats = Category.query.all()
     return jsonify([c.to_dict() for c in cats]), 200
+
+
+# ═══════════════════════════════════════════════════════════════
+# ADMIN: Courses + Lessons management (Sprint 4)
+# ═══════════════════════════════════════════════════════════════
+
+def _course_admin_required():
+    uid = session.get('user_id')
+    user = User.query.get(uid) if uid else None
+    if not user or user.role not in ('admin', 'tutor'):
+        return None, (jsonify({'error': 'Acesso negado'}), 403)
+    return user, None
+
+@courses_bp.route('/admin/courses', methods=['GET'])
+def admin_list_courses():
+    user, err = _course_admin_required()
+    if err: return err
+    from models import TrailCourse, Trail, Progress
+    courses = Course.query.all()
+    result = []
+    for c in courses:
+        modules = c.modules
+        all_mats = []
+        for m in modules:
+            all_mats.extend(m.materials)
+        has_video = any(m.video_url for m in modules)
+        has_pdf = any(mat.tipo == 'pdf' for mat in all_mats)
+        enrolled_ids = {p.user_id for p in Progress.query.filter_by(course_id=c.id).all()}
+        total_lessons = len(modules)
+        avg_progress = 0
+        if enrolled_ids and total_lessons > 0:
+            user_pcts = []
+            for uid2 in enrolled_ids:
+                passed = Progress.query.filter_by(course_id=c.id, user_id=uid2, passed=True).count()
+                user_pcts.append(round(passed / total_lessons * 100))
+            avg_progress = round(sum(user_pcts) / len(user_pcts)) if user_pcts else 0
+        tc = TrailCourse.query.filter_by(course_id=c.id).first()
+        trail_name = None
+        if tc:
+            t = Trail.query.get(tc.trail_id)
+            trail_name = t.name if t else None
+        result.append({
+            'id': c.id, 'name': c.name,
+            'category': c.tag or c.resumo[:30] if c.resumo else 'Geral',
+            'color': c.color or '#008ea8',
+            'total_lessons': total_lessons,
+            'enrolled_users': len(enrolled_ids),
+            'avg_progress': avg_progress,
+            'has_video': has_video,
+            'has_pdf': has_pdf,
+            'trail_name': trail_name
+        })
+    return jsonify({'courses': result})
+
+@courses_bp.route('/admin/courses/<int:course_id>/lessons', methods=['GET'])
+def admin_get_lessons(course_id):
+    user, err = _course_admin_required()
+    if err: return err
+    modules = Module.query.filter_by(course_id=course_id).order_by(Module.position).all()
+    result = []
+    for m in modules:
+        quiz = Quiz.query.filter_by(module_id=m.id).first()
+        exercise = None
+        if quiz:
+            exercise = {'id': quiz.id, 'question': quiz.q, 'options': quiz.opts or [], 'correct_index': quiz.ans or 0}
+        result.append({
+            'id': m.id, 'nome': m.nome, 'position': m.position or 0,
+            'dur': m.dur or '',
+            'video_url': m.video_url or '',
+            'materials': [{'id': mat.id, 'name': mat.name, 'url': mat.url, 'tipo': mat.tipo} for mat in m.materials],
+            'exercise': exercise
+        })
+    return jsonify({'lessons': result})
+
+@courses_bp.route('/admin/courses/<int:course_id>/lessons/reorder', methods=['PUT'])
+def admin_reorder_lessons(course_id):
+    user, err = _course_admin_required()
+    if err: return err
+    data = request.get_json() or {}
+    lesson_ids = data.get('lesson_ids', [])
+    for idx, lid in enumerate(lesson_ids, 1):
+        m = Module.query.get(lid)
+        if m and m.course_id == course_id:
+            m.position = idx
+    db.session.commit()
+    return jsonify({'success': True})
+
+@courses_bp.route('/admin/lessons/<int:lesson_id>', methods=['PUT'])
+def admin_update_lesson(lesson_id):
+    user, err = _course_admin_required()
+    if err: return err
+    m = Module.query.get_or_404(lesson_id)
+    data = request.get_json() or {}
+    if 'nome' in data: m.nome = data['nome']
+    if 'dur' in data: m.dur = data['dur']
+    if 'video_url' in data:
+        url = (data['video_url'] or '').strip()
+        if url:
+            allowed = ('youtube.com', 'youtu.be', 'vimeo.com')
+            if not any(d in url for d in allowed):
+                return jsonify({'error': 'URL de vídeo inválida. Use YouTube ou Vimeo.'}), 400
+        m.video_url = url or None
+    db.session.commit()
+    return jsonify({'success': True})
+
+@courses_bp.route('/admin/lessons/<int:lesson_id>/materials', methods=['POST'])
+def admin_add_material(lesson_id):
+    user, err = _course_admin_required()
+    if err: return err
+    m = Module.query.get_or_404(lesson_id)
+    data = request.get_json() or {}
+    mat = Material(course_id=m.course_id, module_id=m.id,
+                   name=data.get('name', 'Material'),
+                   url=data.get('url', ''),
+                   tipo=data.get('tipo', 'link'))
+    db.session.add(mat)
+    db.session.commit()
+    return jsonify({'success': True, 'id': mat.id, 'name': mat.name, 'url': mat.url, 'tipo': mat.tipo})
+
+@courses_bp.route('/admin/materials/<int:material_id>', methods=['DELETE'])
+def admin_delete_material(material_id):
+    user, err = _course_admin_required()
+    if err: return err
+    mat = Material.query.get_or_404(material_id)
+    db.session.delete(mat)
+    db.session.commit()
+    return jsonify({'success': True})
+
+@courses_bp.route('/admin/lessons/<int:lesson_id>/exercise', methods=['PUT'])
+def admin_update_exercise(lesson_id):
+    user, err = _course_admin_required()
+    if err: return err
+    m = Module.query.get_or_404(lesson_id)
+    data = request.get_json() or {}
+    quiz = Quiz.query.filter_by(module_id=m.id).first()
+    if not quiz:
+        quiz = Quiz(course_id=m.course_id, module_id=m.id,
+                    q=data.get('question', ''), opts=data.get('options', []), ans=data.get('correct_index', 0))
+        db.session.add(quiz)
+    else:
+        quiz.q = data.get('question', quiz.q)
+        quiz.opts = data.get('options', quiz.opts)
+        quiz.ans = data.get('correct_index', quiz.ans)
+    db.session.commit()
+    return jsonify({'success': True})
+
+@courses_bp.route('/admin/lessons/<int:lesson_id>', methods=['DELETE'])
+def admin_delete_lesson(lesson_id):
+    user, err = _course_admin_required()
+    if err: return err
+    m = Module.query.get_or_404(lesson_id)
+    db.session.delete(m)  # cascade deletes materials, quiz, progress
+    db.session.commit()
+    return jsonify({'success': True})
+
