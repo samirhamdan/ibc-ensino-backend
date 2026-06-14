@@ -32,7 +32,7 @@ class User(db.Model):
     active_trail_id = db.Column(db.Integer, db.ForeignKey('trails.id', use_alter=True, name='fk_user_active_trail'), nullable=True)
 
     progress = db.relationship('Progress', backref='user', lazy=True, cascade='all, delete-orphan')
-    questions = db.relationship('Question', backref='author', lazy=True, cascade='all, delete-orphan')
+    questions = db.relationship('Question', backref='author', lazy=True, cascade='all, delete-orphan', foreign_keys='Question.user_id')
 
     def set_password(self, plain: str):
         self.password_hash = bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
@@ -220,16 +220,33 @@ class Progress(db.Model):
         }
 
 
+class TutorCourse(db.Model):
+    __tablename__ = 'tutor_courses'
+
+    id = db.Column(db.Integer, primary_key=True)
+    tutor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
+    assigned_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    tutor = db.relationship('User', foreign_keys=[tutor_id])
+    course = db.relationship('Course', foreign_keys=[course_id])
+
+    __table_args__ = (db.UniqueConstraint('tutor_id', 'course_id', name='uq_tutor_course'),)
+
+
 class Question(db.Model):
     __tablename__ = 'questions'
 
     id = db.Column(db.Integer, primary_key=True)
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    assigned_tutor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     texto = db.Column(db.Text, nullable=False)
     resposta = db.Column(db.Text, default='')
     respondido_por = db.Column(db.String(150), default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    assigned_tutor = db.relationship('User', foreign_keys=[assigned_tutor_id])
 
     def to_dict(self):
         return {
@@ -239,6 +256,8 @@ class Question(db.Model):
             'texto': self.texto,
             'resposta': self.resposta,
             'respondido_por': self.respondido_por,
+            'assigned_tutor_id': self.assigned_tutor_id,
+            'assigned_tutor_name': self.assigned_tutor.name if self.assigned_tutor else None,
             'created_at': self.created_at.isoformat(),
         }
 

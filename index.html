@@ -212,6 +212,10 @@
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-books"></use></svg></span>
           <div class="ci-text"><div class="ci-name">Gerenciar Cursos</div></div>
         </div>
+        <div class="course-item" id="nav-admin-tutors" onclick="showAdminPanel('tutors')" style="display:none">
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-user-check"></use></svg></span>
+          <div class="ci-text"><div class="ci-name">Tutores</div></div>
+        </div>
         <div class="course-item" id="nav-admin-users" onclick="showAdminPanel('users')">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-users"></use></svg></span>
           <div class="ci-text"><div class="ci-name">Usuários</div></div>
@@ -364,7 +368,7 @@ function setupUI(){
   document.getElementById('admin-nav-section').style.display = (isAdmin()||isTutor()) ? 'block' : 'none';
   const isAdminUser = isAdmin();
   const isTutorUser = isTutor();
-  ['nav-admin-dashboard','nav-admin-categories','nav-admin-courses','nav-admin-trails'].forEach(id=>{
+  ['nav-admin-dashboard','nav-admin-categories','nav-admin-courses','nav-admin-trails','nav-admin-tutors'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.style.display = isAdminUser ? 'flex' : 'none';
   });
@@ -1665,7 +1669,8 @@ function showAdminPanel(panel){
   const navEl=document.getElementById('nav-admin-'+panel);
   if(navEl) navEl.classList.add('active');
   if(currentCourse){document.querySelectorAll('.course-item[id^=course-nav]').forEach(x=>x.classList.remove('active'));currentCourse=null;}
-  if(panel==='users') renderAdminUsers();
+  if(panel==='users') renderAdminUsersV2();
+  else if(panel==='tutors') renderAdminTutors();
   else if(panel==='dashboard') renderDashboard();
   else if(panel==='catalog') renderAdminCatalog();
   else if(panel==='categories') renderAdminCategories();
@@ -2359,6 +2364,366 @@ async function removeCourse(id){
     renderCourseList();
     renderAdminCourses();
   } else { alert('Erro ao remover curso.'); }
+}
+
+// ── Admin: Tutors (Sprint 4 Part 2) ──
+let _allCoursesList = [], _adminTutors = [];
+
+async function renderAdminTutors() {
+  document.getElementById('main-content').innerHTML =
+    '<div class="admin-page-header"><h1 class="course-title">'+icon('user-check','22')+' Gerenciar Tutores</h1></div>'
+    +'<div id="tutors-content"><div class="admin-section-body" style="text-align:center;padding:2rem;color:var(--muted)">Carregando...</div></div>';
+
+  const [tutorsRes, coursesRes, questionsRes] = await Promise.all([
+    api('GET', '/admin/tutors'),
+    api('GET', '/admin/courses/list-simple'),
+    api('GET', '/admin/questions/unassigned'),
+  ]);
+
+  if (!tutorsRes.ok) { document.getElementById('tutors-content').innerHTML = '<p style="color:red">Acesso negado.</p>'; return; }
+
+  _adminTutors = await tutorsRes.json();
+  _allCoursesList = coursesRes.ok ? await coursesRes.json() : [];
+  const unassignedQs = questionsRes.ok ? await questionsRes.json() : [];
+
+  document.getElementById('tutors-content').innerHTML = _renderTutorsContent(_adminTutors, _allCoursesList, unassignedQs);
+}
+
+function _renderTutorsContent(tutors, courses, unassignedQs) {
+  const tutorOptions = tutors.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+
+  const tutorCards = tutors.length === 0
+    ? '<div class="admin-section"><div class="admin-section-body" style="text-align:center;color:var(--muted);padding:2rem">Nenhum tutor cadastrado. Promova um usuário ao perfil Tutor na gestão de Usuários.</div></div>'
+    : '<div class="admin-tutors-grid">' + tutors.map(t => {
+        const availableCourses = courses.filter(c => !t.assigned_courses.find(ac => ac.id === c.id));
+        const courseOptions = availableCourses.map(c => `<option value="${c.id}">${c.icon||'📘'} ${c.name}</option>`).join('');
+        const chips = t.assigned_courses.map(c =>
+          `<span class="tutor-course-chip">${c.icon||'📘'} ${c.name}<button onclick="adminUnassignCourse(${t.id},${c.id})" title="Remover">×</button></span>`
+        ).join('') || '<span style="font-size:.78rem;color:var(--muted)">Nenhum curso atribuído</span>';
+
+        return `<div class="admin-tutor-card" id="tutor-card-${t.id}">
+          <div class="admin-tutor-card-header">
+            <div class="admin-tutor-avatar">${t.name.charAt(0).toUpperCase()}</div>
+            <div>
+              <div style="font-weight:600;font-size:.95rem">${t.name}</div>
+              <div style="font-size:.75rem;color:var(--muted)">${t.email}</div>
+            </div>
+          </div>
+          <div class="admin-tutor-stats">
+            <div class="admin-tutor-stat">Pendentes: <strong>${t.pending_questions}</strong></div>
+            <div class="admin-tutor-stat">Respondidas: <strong>${t.total_answered}</strong></div>
+            <div class="admin-tutor-stat">Cursos: <strong>${t.assigned_courses.length}</strong></div>
+          </div>
+          <div>
+            <div class="profile-section-title">Cursos atribuídos</div>
+            <div class="tutor-course-chips" id="chips-${t.id}">${chips}</div>
+          </div>
+          ${courseOptions ? `<div class="tutor-assign-row">
+            <select id="assign-course-sel-${t.id}"><option value="">Atribuir curso...</option>${courseOptions}</select>
+            <button class="btn btn-primary" style="white-space:nowrap" onclick="adminAssignCourse(${t.id})">Atribuir</button>
+          </div>` : ''}
+        </div>`;
+      }).join('') + '</div>';
+
+  const queueHtml = unassignedQs.length === 0
+    ? '<p style="color:var(--muted);font-size:.85rem;text-align:center;padding:1rem">Nenhuma pergunta sem tutor atribuído. 🎉</p>'
+    : '<div class="questions-queue">' + unassignedQs.map(q =>
+        `<div class="question-queue-item" id="qqueue-${q.id}">
+          <div class="question-queue-meta">
+            <div class="q-course">${q.course_name}</div>
+            <div class="q-text">${q.texto}</div>
+            <div class="q-author">por ${q.student_name || q.autor}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            <select class="question-assign-select" id="qsel-${q.id}">
+              <option value="">Atribuir tutor...</option>
+              ${tutorOptions}
+            </select>
+            <button class="btn btn-primary" style="font-size:.8rem;padding:6px 10px" onclick="adminAssignQuestion(${q.id})">OK</button>
+          </div>
+        </div>`
+      ).join('') + '</div>';
+
+  return `<div class="admin-section">
+    <div class="admin-section-header">${icon('user-check','16')} Tutores (${tutors.length})</div>
+    <div class="admin-section-body" style="padding:0 0 var(--space-sm)">${tutorCards}</div>
+  </div>
+  <div class="admin-section">
+    <div class="admin-section-header">${icon('filter','16')} Perguntas sem tutor (${unassignedQs.length})</div>
+    <div class="admin-section-body">${queueHtml}</div>
+  </div>`;
+}
+
+async function adminAssignCourse(tutorId) {
+  const sel = document.getElementById('assign-course-sel-'+tutorId);
+  const courseId = parseInt(sel.value);
+  if (!courseId) return;
+  const res = await api('POST', `/admin/tutors/${tutorId}/assign-course`, {course_id: courseId});
+  if (res.ok) {
+    renderAdminTutors();
+  } else {
+    const d = await res.json();
+    alert(d.error || 'Erro ao atribuir curso.');
+  }
+}
+
+async function adminUnassignCourse(tutorId, courseId) {
+  const res = await api('DELETE', `/admin/tutors/${tutorId}/assign-course/${courseId}`);
+  if (res.ok) renderAdminTutors();
+  else alert('Erro ao remover atribuição.');
+}
+
+async function adminAssignQuestion(questionId) {
+  const sel = document.getElementById('qsel-'+questionId);
+  const tutorId = parseInt(sel.value);
+  if (!tutorId) return;
+  const res = await api('POST', `/admin/questions/${questionId}/assign`, {tutor_id: tutorId});
+  if (res.ok) {
+    const item = document.getElementById('qqueue-'+questionId);
+    if (item) item.remove();
+  } else {
+    alert('Erro ao atribuir tutor.');
+  }
+}
+
+// ── Admin: Users V2 (Sprint 4 Part 2) ──
+let _adminUsers = [], _adminUsersSelected = new Set(), _adminUsersDebounce = null;
+
+async function renderAdminUsersV2() {
+  const trailsRes = await api('GET', '/trails');
+  const trails = trailsRes.ok ? await trailsRes.json() : [];
+
+  const trailOpts = trails.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+  const trailSelectBulk = trails.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+
+  document.getElementById('main-content').innerHTML =
+    `<div class="admin-page-header">
+      <h1 class="course-title">${icon('users','22')} Gerenciar Usuários</h1>
+    </div>
+    <div class="admin-section">
+      <div class="admin-section-body">
+        <div class="admin-users-toolbar">
+          <div class="admin-users-search-wrap">
+            ${icon('search','18')}
+            <input type="text" class="admin-users-search" id="users-search" placeholder="Buscar por nome ou e-mail..." oninput="adminUsersDebounceSearch()">
+          </div>
+          <select class="admin-users-filter" id="users-role-filter" onchange="adminUsersLoad()">
+            <option value="">Todos os perfis</option>
+            <option value="admin">Administrador</option>
+            <option value="tutor">Tutor</option>
+            <option value="aluno_interno">Aluno Interno</option>
+            <option value="aluno_externo">Aluno Externo</option>
+          </select>
+          <select class="admin-users-filter" id="users-trail-filter" onchange="adminUsersLoad()">
+            <option value="">Todas as trilhas</option>
+            ${trailOpts}
+          </select>
+        </div>
+        <div class="admin-bulk-bar hidden" id="users-bulk-bar">
+          <span id="users-sel-count">0</span> selecionado(s)
+          <select id="bulk-trail-sel" style="font-size:.82rem;padding:4px 8px;border:1px solid #ddd;border-radius:6px">
+            <option value="">Trilha...</option>${trailSelectBulk}
+          </select>
+          <button class="btn btn-primary" style="font-size:.82rem;padding:6px 12px" onclick="adminBulkEnroll()">Matricular na trilha</button>
+          <button class="btn" style="font-size:.82rem;padding:6px 12px;background:#eee" onclick="adminClearSelection()">Cancelar</button>
+        </div>
+        <div id="users-table-container"><div style="text-align:center;padding:2rem;color:var(--muted)">Carregando...</div></div>
+      </div>
+    </div>
+    <div class="user-profile-panel" id="user-profile-panel">
+      <div class="user-profile-panel-header">
+        <button class="btn-icon-only" onclick="closeUserProfile()" title="Fechar">${icon('x','20')}</button>
+        <span id="panel-user-name" style="font-weight:600"></span>
+      </div>
+      <div class="user-profile-panel-body" id="user-profile-body">Carregando...</div>
+    </div>`;
+
+  await adminUsersLoad();
+}
+
+function adminUsersDebounceSearch() {
+  clearTimeout(_adminUsersDebounce);
+  _adminUsersDebounce = setTimeout(adminUsersLoad, 300);
+}
+
+async function adminUsersLoad() {
+  const search = (document.getElementById('users-search')||{}).value || '';
+  const role = (document.getElementById('users-role-filter')||{}).value || '';
+  const trail = (document.getElementById('users-trail-filter')||{}).value || '';
+
+  let url = '/admin/users?';
+  if (search) url += 'search='+encodeURIComponent(search)+'&';
+  if (role) url += 'role='+encodeURIComponent(role)+'&';
+  if (trail) url += 'trail='+encodeURIComponent(trail)+'&';
+
+  const res = await api('GET', url);
+  if (!res.ok) { document.getElementById('users-table-container').innerHTML = '<p style="color:red">Acesso negado.</p>'; return; }
+
+  _adminUsers = await res.json();
+  _adminUsersSelected.clear();
+  _updateBulkBar();
+  _renderUsersTable();
+}
+
+function _renderUsersTable() {
+  if (!_adminUsers.length) {
+    document.getElementById('users-table-container').innerHTML =
+      '<div style="text-align:center;padding:2rem;color:var(--muted)">Nenhum usuário encontrado.</div>';
+    return;
+  }
+
+  const roleLabels = {admin:'Administrador',tutor:'Tutor',aluno_interno:'Aluno Interno',aluno_externo:'Aluno Externo'};
+  const rows = _adminUsers.map(u => {
+    const initials = u.name.split(' ').slice(0,2).map(n=>n.charAt(0).toUpperCase()).join('');
+    const checked = _adminUsersSelected.has(u.id) ? 'checked' : '';
+    return `<tr>
+      <td><input type="checkbox" ${checked} onchange="adminToggleUserSelect(${u.id}, this.checked)"></td>
+      <td>
+        <div class="user-name-cell">
+          <div class="user-avatar-sm">${initials}</div>
+          <div>
+            <div style="font-weight:500;font-size:.85rem">${u.name}</div>
+            <div style="font-size:.72rem;color:var(--muted)">${u.email}</div>
+          </div>
+        </div>
+      </td>
+      <td>${roleBadge(u.role)}</td>
+      <td style="font-size:.82rem">${u.trail_count} trilha(s)</td>
+      <td style="font-size:.82rem">${icon('star-o','14')} ${u.total_points} pts · Nível ${u.current_level}</td>
+      <td><button class="btn-link" onclick="openUserProfile(${u.id})">Ver perfil</button></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('users-table-container').innerHTML =
+    `<div class="admin-users-table-wrap">
+      <table class="admin-users-tbl">
+        <thead><tr>
+          <th><input type="checkbox" onchange="adminToggleSelectAll(this.checked)"></th>
+          <th>Usuário</th><th>Perfil</th><th>Trilhas</th><th>Pontos</th><th>Ação</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function adminToggleUserSelect(id, checked) {
+  if (checked) _adminUsersSelected.add(id);
+  else _adminUsersSelected.delete(id);
+  _updateBulkBar();
+}
+
+function adminToggleSelectAll(checked) {
+  _adminUsers.forEach(u => { if(checked) _adminUsersSelected.add(u.id); else _adminUsersSelected.delete(u.id); });
+  _renderUsersTable();
+  _updateBulkBar();
+}
+
+function _updateBulkBar() {
+  const bar = document.getElementById('users-bulk-bar');
+  const cnt = document.getElementById('users-sel-count');
+  if (!bar) return;
+  if (_adminUsersSelected.size > 0) {
+    bar.classList.remove('hidden');
+    cnt.textContent = _adminUsersSelected.size;
+  } else {
+    bar.classList.add('hidden');
+  }
+}
+
+function adminClearSelection() {
+  _adminUsersSelected.clear();
+  _renderUsersTable();
+  _updateBulkBar();
+}
+
+async function adminBulkEnroll() {
+  const trailId = parseInt(document.getElementById('bulk-trail-sel').value);
+  if (!trailId) { alert('Selecione uma trilha.'); return; }
+  const res = await api('POST', '/admin/users/bulk-action', {
+    action: 'enroll_trail',
+    user_ids: [..._adminUsersSelected],
+    trail_id: trailId,
+  });
+  if (res.ok) {
+    const d = await res.json();
+    alert(`${d.enrolled} usuário(s) matriculado(s) com sucesso.`);
+    adminClearSelection();
+  } else {
+    const d = await res.json();
+    alert(d.error || 'Erro ao matricular usuários.');
+  }
+}
+
+async function openUserProfile(userId) {
+  const panel = document.getElementById('user-profile-panel');
+  panel.classList.add('open');
+  document.getElementById('panel-user-name').textContent = 'Carregando...';
+  document.getElementById('user-profile-body').innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted)">Carregando...</div>';
+
+  const res = await api('GET', `/admin/users/${userId}/profile`);
+  if (!res.ok) { document.getElementById('user-profile-body').innerHTML = '<p style="color:red">Erro ao carregar perfil.</p>'; return; }
+  const u = await res.json();
+
+  document.getElementById('panel-user-name').textContent = u.name;
+
+  const trailItems = u.trails.length === 0
+    ? '<p style="font-size:.82rem;color:var(--muted)">Nenhuma trilha matriculada.</p>'
+    : u.trails.map(t => `<div class="profile-trail-item">
+        <span style="font-size:1.2rem">${t.icon||'📚'}</span>
+        <div style="flex:1">
+          <div style="font-size:.85rem;font-weight:500">${t.name}</div>
+          <div style="font-size:.75rem;color:var(--muted)">${t.completed_courses}/${t.total_courses} cursos${t.completed_at ? ' · Concluída' : ''}</div>
+        </div>
+        ${!t.completed_at ? `<button class="btn-link" style="font-size:.72rem" onclick="adminSetActiveTrail(${userId},${t.id})">Ativar</button>` : ''}
+      </div>`).join('');
+
+  const certItems = u.certificates.length === 0
+    ? '<p style="font-size:.82rem;color:var(--muted)">Nenhum certificado emitido.</p>'
+    : u.certificates.map(c => `<div class="profile-cert-item">🏅 ${c.course_name}<span style="margin-left:auto;font-size:.72rem;color:var(--muted)">${(c.issued_at||'').slice(0,10)}</span></div>`).join('');
+
+  document.getElementById('user-profile-body').innerHTML =
+    `<div class="profile-stat-row">
+      <div class="profile-stat"><div class="stat-val">${u.gamification.total_points}</div><div class="stat-lbl">Pontos</div></div>
+      <div class="profile-stat"><div class="stat-val">${u.gamification.current_level}</div><div class="stat-lbl">Nível</div></div>
+      <div class="profile-stat"><div class="stat-val">${u.trails.length}</div><div class="stat-lbl">Trilhas</div></div>
+      <div class="profile-stat"><div class="stat-val">${u.certificates.length}</div><div class="stat-lbl">Certificados</div></div>
+    </div>
+    <div>
+      <div class="profile-section-title">Trilhas</div>
+      ${trailItems}
+    </div>
+    <div>
+      <div class="profile-section-title">Certificados</div>
+      ${certItems}
+    </div>
+    <div class="profile-actions">
+      <div class="profile-section-title">Ações</div>
+      <button class="btn btn-danger" onclick="adminResetUserProgress(${userId},'${u.name}')">Zerar progresso (mantém certificados)</button>
+    </div>`;
+}
+
+function closeUserProfile() {
+  const panel = document.getElementById('user-profile-panel');
+  if (panel) panel.classList.remove('open');
+}
+
+async function adminSetActiveTrail(userId, trailId) {
+  const res = await api('PUT', `/admin/users/${userId}/trail`, {trail_id: trailId});
+  if (res.ok) openUserProfile(userId);
+  else alert('Erro ao alterar trilha ativa.');
+}
+
+async function adminResetUserProgress(userId, userName) {
+  if (!confirm('Zerar TODO o progresso de '+userName+'? Esta ação não pode ser desfeita. Certificados serão mantidos.')) return;
+  const res = await api('POST', `/admin/users/${userId}/reset-progress`);
+  if (res.ok) {
+    alert('Progresso zerado com sucesso.');
+    closeUserProfile();
+    adminUsersLoad();
+  } else {
+    const d = await res.json();
+    alert(d.error || 'Erro ao zerar progresso.');
+  }
 }
 
 // ── Admin: Dashboard ──
