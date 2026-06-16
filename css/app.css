@@ -241,3 +241,8 @@
     .sidebar{width:100%;border-right:none;border-bottom:1px solid #e8e0d4}
     .main-body{flex-direction:column}
   }
+
+.register-link{text-align:center;font-size:.82rem;color:#888;margin-top:.6rem}
+.register-link a{color:var(--primary,#008ea8);font-weight:600;text-decoration:none}
+.register-link a:hover{text-decoration:underline}
+.login-success{font-size:.82rem;color:#27ae60;text-align:center;margin-top:.6rem;background:rgba(39,174,96,.08);border-radius:6px;padding:6px 10px}

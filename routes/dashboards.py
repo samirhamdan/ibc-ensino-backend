@@ -46,7 +46,7 @@ def admin_dashboard():
     if not user or user.role != 'admin':
         return jsonify({'error': 'Acesso negado'}), 403
 
-    alunos = User.query.filter(User.role.in_(('aluno_interno', 'aluno_externo'))).count()
+    alunos = User.query.filter(User.role == 'aluno').count()
     tutores = User.query.filter_by(role='tutor').count()
     admins = User.query.filter_by(role='admin').count()
     total_users = alunos + tutores + admins
@@ -142,7 +142,7 @@ def tutor_dashboard():
     week_ago = datetime.utcnow() - timedelta(days=7)
     new_questions = Question.query.filter(Question.course_id.in_(course_ids), Question.created_at >= week_ago).count()
     answered = Question.query.filter(Question.course_id.in_(course_ids), Question.created_at >= week_ago, Question.resposta != '').count()
-    new_students = User.query.filter(User.created_at >= week_ago, User.role.in_(('aluno_interno', 'aluno_externo'))).count()
+    new_students = User.query.filter(User.created_at >= week_ago, User.role == 'aluno').count()
 
     return jsonify({
         'pending_questions': pending_questions,
@@ -216,7 +216,7 @@ def aluno_dashboard():
     }), 200
 
 
-# ── Aluno externo / visitante ────────────────────────────────────────────
+# ── Aluno dashboard ────────────────────────────────────────────
 
 @dashboards_bp.route('/aluno-externo/dashboard', methods=['GET'])
 def aluno_externo_dashboard():

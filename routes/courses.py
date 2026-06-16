@@ -41,10 +41,7 @@ def _can_edit_course(user, course):
 def list_courses():
     user = _current_user()
     query = Course.query
-
-    # Alunos externos e usuários não autenticados only see public courses
-    if not user or user.role == 'aluno_externo':
-        query = query.filter_by(acesso='publico')
+    # All authenticated users see all courses
 
     category = request.args.get('category')
     if category:
@@ -60,9 +57,6 @@ def list_courses():
 def get_course(course_id):
     user = _current_user()
     course = Course.query.get_or_404(course_id)
-
-    if course.acesso == 'interno' and (not user or user.role == 'aluno_externo'):
-        return jsonify({'error': 'Acesso negado'}), 403
 
     return jsonify(course.to_dict(include_details=True)), 200
 

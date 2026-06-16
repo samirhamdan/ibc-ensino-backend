@@ -70,7 +70,7 @@
     </div>
   </div>
   <div class="login-form-side">
-  <div class="login-card">
+  <div class="login-card" id="login-card">
     <div class="login-logo">
       <h1 style="font-family:var(--font-display);font-size:1.4rem;color:var(--primary);margin:0">IBC Ensino</h1>
       <p style="font-size:.75rem;color:#888;letter-spacing:.05em;text-transform:uppercase;margin-top:.2rem">Plataforma de Estudos</p>
@@ -83,13 +83,48 @@
       <label>Senha</label>
       <div class="password-input-wrapper">
         <input type="password" id="login-pass" placeholder="••••••">
-        <button type="button" class="btn-show-password" onclick="togglePassword()" aria-label="Mostrar senha"><svg class="icon icon-eye" viewBox="0 0 24 24"><use href="#icon-eye"></use></svg></button>
+        <button type="button" class="btn-show-password" onclick="togglePassword('login-pass')" aria-label="Mostrar senha"><svg class="icon icon-eye" viewBox="0 0 24 24"><use href="#icon-eye"></use></svg></button>
       </div>
     </div>
     <button class="btn-primary" onclick="doLogin()">Entrar</button>
     <div class="login-error" id="login-error"></div>
+    <div id="login-success-msg" class="login-success" style="display:none"></div>
     <div style="text-align:center;margin-top:.8rem">
+      <p class="register-link">Não tem conta? <a href="#" onclick="showRegisterForm();return false;">Criar conta grátis</a></p>
       <a href="#" onclick="showForgotPassword()" style="font-size:.82rem;color:var(--navy-light);text-decoration:none">Esqueceu sua senha?</a>
+    </div>
+  </div>
+  <div id="register-card" class="login-card" style="display:none">
+    <div class="login-logo">
+      <h1 style="font-family:var(--font-display);font-size:1.4rem;color:var(--primary);margin:0">Criar Conta</h1>
+      <p style="font-size:.75rem;color:#888;letter-spacing:.05em;text-transform:uppercase;margin-top:.2rem">Junte-se à comunidade IBC Ensino</p>
+    </div>
+    <div class="field">
+      <label>Nome completo</label>
+      <input type="text" id="reg-name" placeholder="Seu nome completo" autocomplete="name">
+    </div>
+    <div class="field">
+      <label>E-mail</label>
+      <input type="email" id="reg-email" placeholder="seu@email.com" autocomplete="email">
+    </div>
+    <div class="field">
+      <label>Senha</label>
+      <div class="password-input-wrapper">
+        <input type="password" id="reg-pass" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+        <button type="button" class="btn-show-password" onclick="togglePassword('reg-pass',this)" aria-label="Mostrar senha"><svg class="icon icon-eye" viewBox="0 0 24 24"><use href="#icon-eye"></use></svg></button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Confirmar Senha</label>
+      <div class="password-input-wrapper">
+        <input type="password" id="reg-confirm" placeholder="Repita a senha" autocomplete="new-password">
+        <button type="button" class="btn-show-password" onclick="togglePassword('reg-confirm',this)" aria-label="Mostrar senha"><svg class="icon icon-eye" viewBox="0 0 24 24"><use href="#icon-eye"></use></svg></button>
+      </div>
+    </div>
+    <button class="btn-primary" id="reg-btn" onclick="handleRegister()">Criar Conta</button>
+    <div class="login-error" id="reg-error"></div>
+    <div style="text-align:center;margin-top:.8rem">
+      <p class="register-link">Já tem conta? <a href="#" onclick="showLoginCard();return false;">Fazer login</a></p>
     </div>
   </div>
   <div class="login-footer">
@@ -98,8 +133,6 @@
       <a href="https://wa.me/5567999999999" target="_blank" rel="noopener" class="whatsapp-link">💬 WhatsApp: (67) 99999-9999</a>
     </p>
   </div>
-  </div>
-</div>
 
 <!-- FORGOT PASSWORD -->
 <div id="screen-forgot" class="screen" style="align-items:center;justify-content:center;background:var(--bg)">
@@ -248,9 +281,7 @@ let allUsers = [];
 function nr(r){ return r ? r.replace(/_/g,'-') : r; }
 function isAdmin(u){ u=u||currentUser; return nr(u.role)==='admin'; }
 function isTutor(u){ u=u||currentUser; return nr(u.role)==='tutor'; }
-function isAlunoInterno(u){ u=u||currentUser; return nr(u.role)==='aluno-interno'; }
-function isAlunoExterno(u){ u=u||currentUser; return nr(u.role)==='aluno-externo'; }
-function isAluno(u){ u=u||currentUser; const r=nr(u.role); return r==='aluno-interno'||r==='aluno-externo'||r==='aluno'; }
+function isAluno(u){ u=u||currentUser; const r=nr(u.role); return r==='aluno'; }
 function canManageCourse(u,cid){
   u=u||currentUser;
   if(isAdmin(u)) return true;
@@ -264,8 +295,6 @@ function roleBadge(role){
   const map={
     'admin':     {cls:'badge-admin',     label:'Admin'},
     'tutor':     {cls:'badge-tutor',     label:'Professor/Tutor'},
-    'aluno-interno': {cls:'badge-aluno-interno', label:'Aluno Interno'},
-    'aluno-externo': {cls:'badge-aluno-externo', label:'Aluno Externo'},
     'aluno':     {cls:'badge-aluno',     label:'Aluno'},
   };
   const r=map[role]||{cls:'badge-aluno',label:role};
@@ -273,16 +302,14 @@ function roleBadge(role){
 }
 function roleIcon(role){
   role=nr(role);
-  return {admin:'🛡️',tutor:'🎓','aluno-interno':'✝️','aluno-externo':'👤',aluno:'👤'}[role]||'👤';
+  return {admin:'🛡️',tutor:'🎓',aluno:'👤'}[role]||'👤';
 }
 function roleDesc(role){
   role=nr(role);
   return {
     admin:'Acesso total à plataforma: cursos, usuários, dashboard e configurações.',
     tutor:'Acesso total aos cursos vinculados: editar conteúdo, responder perguntas e ver progresso dos alunos.',
-    'aluno-interno':'Membro da igreja. Acesso a todos os cursos disponíveis.',
-    'aluno-externo':'Visitante ou externo. Acesso aos cursos permitidos para o público geral.',
-    aluno:'Aluno.',
+    aluno:'Acesso a todos os cursos e trilhas disponíveis.',
   }[role]||'';
 }
 
@@ -362,7 +389,7 @@ async function loadCategories(){
 function setupUI(){
   const u = currentUser;
   document.getElementById('topbar-name').textContent = u.name;
-  const roleLabels={'admin':'Administrador','tutor':'Professor/Tutor','aluno_interno':'Aluno Interno','aluno_externo':'Aluno Externo','aluno':'Aluno'};
+  const roleLabels={'admin':'Administrador','tutor':'Professor/Tutor','aluno':'Aluno'};
   document.getElementById('topbar-role').textContent = roleLabels[u.role]||u.role;
   document.getElementById('topbar-avatar').textContent = u.name.charAt(0).toUpperCase();
   document.getElementById('admin-nav-section').style.display = (isAdmin()||isTutor()) ? 'block' : 'none';
@@ -406,9 +433,49 @@ function setupUI(){
 function icon(name, size='20', extra=''){
   return `<svg class="icon icon-${name}${extra?' '+extra:''}" width="${size}" height="${size}" viewBox="0 0 24 24"><use href="#icon-${name}"></use></svg>`;
 }
-function togglePassword(){
-  const inp = document.getElementById('login-pass');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
+function togglePassword(id){
+  const inp = document.getElementById(id || 'login-pass');
+  if(inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+function showRegisterForm(){
+  document.getElementById('login-card').style.display='none';
+  document.getElementById('register-card').style.display='';
+  document.getElementById('reg-error').textContent='';
+}
+function showLoginCard(){
+  document.getElementById('register-card').style.display='none';
+  document.getElementById('login-card').style.display='';
+  document.getElementById('login-error').textContent='';
+}
+async function handleRegister(){
+  const name=document.getElementById('reg-name').value.trim();
+  const email=document.getElementById('reg-email').value.trim();
+  const password=document.getElementById('reg-pass').value;
+  const confirm=document.getElementById('reg-confirm').value;
+  const errEl=document.getElementById('reg-error');
+  errEl.textContent='';
+  if(!name||name.length<3){errEl.textContent='Nome deve ter pelo menos 3 caracteres';return;}
+  if(!email||!email.includes('@')){errEl.textContent='E-mail inválido';return;}
+  if(!password||password.length<6){errEl.textContent='Senha deve ter pelo menos 6 caracteres';return;}
+  if(password!==confirm){errEl.textContent='As senhas não coincidem';return;}
+  const btn=document.getElementById('reg-btn');
+  btn.disabled=true; btn.textContent='Criando conta...';
+  try{
+    const res=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,email,password,confirm_password:confirm})});
+    const data=await res.json();
+    if(res.ok&&data.success){
+      showLoginCard();
+      const sEl=document.getElementById('login-success-msg');
+      if(sEl){sEl.textContent='✅ Conta criada! Faça login para continuar.';sEl.style.display='block';}
+    } else {
+      errEl.textContent=data.error||'Erro ao criar conta.';
+      btn.disabled=false; btn.textContent='Criar Conta';
+    }
+  }catch(e){
+    errEl.textContent='Erro de conexão. Tente novamente.';
+    btn.disabled=false; btn.textContent='Criar Conta';
+  }
 }
 async function doLogin(){
   const email = document.getElementById('login-email').value.trim().toLowerCase();
@@ -434,7 +501,7 @@ function detectarPerfilEAtualizarDashboard(){
   if(!currentUser){ renderAlunoExternoDashboard(); return; }
   if(isAdmin()) renderAdminDashboard();
   else if(isTutor()) renderTutorPanelDashboard();
-  else if(isAlunoInterno()) renderAlunoDashboard();
+  else if(isAluno()) renderAlunoDashboard();
   else renderAlunoExternoDashboard();
 }
 document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
@@ -1715,8 +1782,7 @@ async function renderAdminUsers(){
           <div class="form-group"><label>Senha</label><input type="text" id="new-pass" placeholder="Senha inicial (mín. 6 chars)"></div>
           <div class="form-group"><label>Perfil</label>
             <select id="new-role">
-              <option value="aluno_interno">✝️ Aluno Interno</option>
-              <option value="aluno_externo">👤 Aluno Externo</option>
+              <option value="aluno">👤 Aluno</option>
               <option value="tutor">🎓 Professor / Tutor</option>
               <option value="admin">🛡️ Administrador</option>
             </select>
@@ -1733,8 +1799,7 @@ async function renderAdminUsers(){
         ${[
           {role:'admin',     icon:'🛡️', bg:'#e8edf7', items:['Acesso total','Criar/remover cursos','Gerenciar usuários','Ver todos os relatórios']},
           {role:'tutor',     icon:'🎓', bg:'#fff9e6', items:['Editar cursos vinculados','Adicionar materiais e módulos','Responder perguntas dos alunos']},
-          {role:'aluno_interno', icon:'✝️', bg:'#e8f4f6', items:['Acesso a todos os cursos','Fazer perguntas ao tutor','Acompanhar próprio progresso']},
-          {role:'aluno_externo', icon:'👤', bg:'#f3e8ff', items:['Acesso a cursos públicos','Fazer perguntas ao tutor','Acompanhar próprio progresso']},
+          {role:'aluno', icon:'👤', bg:'#e8f4f6', items:['Acesso a todos os cursos','Fazer perguntas ao tutor','Acompanhar próprio progresso']},
         ].map(p=>`
           <div class="perfil-card">
             <div class="perfil-icon" style="background:${p.bg}">${p.icon}</div>
@@ -2517,8 +2582,7 @@ async function renderAdminUsersV2() {
             <option value="">Todos os perfis</option>
             <option value="admin">Administrador</option>
             <option value="tutor">Tutor</option>
-            <option value="aluno_interno">Aluno Interno</option>
-            <option value="aluno_externo">Aluno Externo</option>
+            <option value="aluno">Aluno</option>
           </select>
           <select class="admin-users-filter" id="users-trail-filter" onchange="adminUsersLoad()">
             <option value="">Todas as trilhas</option>
@@ -2578,7 +2642,7 @@ function _renderUsersTable() {
     return;
   }
 
-  const roleLabels = {admin:'Administrador',tutor:'Tutor',aluno_interno:'Aluno Interno',aluno_externo:'Aluno Externo'};
+  const roleLabels = {admin:'Administrador',tutor:'Tutor',aluno:'Aluno'};
   const rows = _adminUsers.map(u => {
     const initials = u.name.split(' ').slice(0,2).map(n=>n.charAt(0).toUpperCase()).join('');
     const checked = _adminUsersSelected.has(u.id) ? 'checked' : '';
@@ -3580,7 +3644,7 @@ async function updateContinueButton(){
   lastInProgressCourseId = null;
   if(!currentUser || !isAluno()) return;
   try{
-    const path = isAlunoInterno() ? '/aluno/dashboard' : '/aluno-externo/dashboard';
+    const path = '/aluno-externo/dashboard';
     const res = await api('GET', path);
     if(!res.ok) return;
     const d = await res.json();
@@ -3607,8 +3671,7 @@ function renderHero(userData, stats){
   const roleCtx = {
     admin: 'Gerencie a plataforma e acompanhe o crescimento da comunidade.',
     tutor: 'Veja as dúvidas pendentes e acompanhe seus alunos.',
-    aluno_interno: 'Continue sua jornada de fé e desbloqueie novas conquistas.',
-    aluno_externo: 'Explore os cursos e comece sua jornada hoje.',
+    aluno: 'Continue sua jornada de fé e desbloqueie novas conquistas.',
   };
   const s = stats || {};
   const level = s.level || 1;

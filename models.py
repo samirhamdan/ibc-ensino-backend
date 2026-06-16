@@ -25,8 +25,8 @@ class User(db.Model):
     name = db.Column(db.String(150), nullable=False)
     email = db.Column(db.String(150), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.String(20), nullable=False, default='aluno_externo')
-    # roles: admin | tutor | aluno_interno | aluno_externo
+    role = db.Column(db.String(20), nullable=False, default='aluno')
+    # roles: admin | tutor | aluno
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     onboarding_completed = db.Column(db.Boolean, default=False)
     active_trail_id = db.Column(db.Integer, db.ForeignKey('trails.id', use_alter=True, name='fk_user_active_trail'), nullable=True)

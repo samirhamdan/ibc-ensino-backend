@@ -45,8 +45,8 @@ def seed():
         users = [
             User(name='Administrador', email='admin@ibc.com', role='admin'),
             User(name='Prof. Maria', email='tutor@ibc.com', role='tutor'),
-            User(name='João Silva', email='joao@ibc.com', role='aluno_interno'),
-            User(name='Pedro Costa', email='pedro@email.com', role='aluno_externo'),
+            User(name='João Silva', email='joao@ibc.com', role='aluno'),
+            User(name='Pedro Costa', email='pedro@email.com', role='aluno'),
         ]
         passwords = ['admin123', 'ibc2024', 'ibc2024', 'ibc2024']
         for u, pw in zip(users, passwords):

@@ -25,7 +25,7 @@ def signup():
     name = (data.get('name') or '').strip()
     email = (data.get('email') or '').strip().lower()
     password = data.get('password') or ''
-    role = data.get('role', 'aluno_externo')
+    role = data.get('role', 'aluno')
 
     if not name or not email or not password:
         return jsonify({'error': 'name, email e password são obrigatórios'}), 400
@@ -33,9 +33,9 @@ def signup():
     if len(password) < 6:
         return jsonify({'error': 'A senha deve ter ao menos 6 caracteres'}), 400
 
-    valid_roles = {'aluno_externo', 'aluno_interno', 'tutor', 'admin'}
+    valid_roles = {'aluno', 'tutor', 'admin'}
     if role not in valid_roles:
-        role = 'aluno_externo'
+        role = 'aluno'
 
     if User.query.filter_by(email=email).first():
         return jsonify({'error': 'Email já cadastrado'}), 409
@@ -129,6 +129,32 @@ def delete_user(user_id):
     db.session.delete(target)
     db.session.commit()
     return jsonify({'message': 'Usuário removido'}), 200
+
+
+@auth_bp.route('/register', methods=['POST'])
+def register():
+    data = request.get_json(silent=True) or {}
+    name = (data.get('name') or '').strip()
+    email = (data.get('email') or '').strip().lower()
+    password = data.get('password', '')
+    confirm_password = data.get('confirm_password', '')
+
+    if not name or len(name) < 3:
+        return jsonify({'error': 'Nome deve ter pelo menos 3 caracteres'}), 400
+    if not email or '@' not in email:
+        return jsonify({'error': 'E-mail inválido'}), 400
+    if User.query.filter_by(email=email).first():
+        return jsonify({'error': 'E-mail já cadastrado'}), 400
+    if len(password) < 6:
+        return jsonify({'error': 'Senha deve ter pelo menos 6 caracteres'}), 400
+    if password != confirm_password:
+        return jsonify({'error': 'As senhas não coincidem'}), 400
+
+    user = User(name=name, email=email, role='aluno')
+    user.set_password(password)
+    db.session.add(user)
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Conta criada com sucesso! Faça login para continuar.'}), 201
 
 
 def _send_reset_email(to_email, to_name, reset_url):

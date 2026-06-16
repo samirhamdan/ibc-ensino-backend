@@ -27,7 +27,7 @@ def _can_access_material(user, material):
         return False
     if course.acesso == 'publico':
         return True
-    return user.role == 'aluno_interno'
+    return user.role == 'aluno'
 
 
 @materials_bp.route('/<int:material_id>', methods=['GET'])
