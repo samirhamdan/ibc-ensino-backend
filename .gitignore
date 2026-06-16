@@ -5,3 +5,4 @@ instance/
 .env
 *.db
 uploads/
+.claude/
