@@ -3045,12 +3045,20 @@ async function renderAdminDashboard(){
   catch(e){ console.error('[ERRO] renderAdminDashboard:', e); _renderDashboardError(e, 'dashboard admin'); }
 }
 async function _renderAdminDashboardInner(){
+  console.log('[DEBUG] _renderAdminDashboardInner: início');
   const el=document.getElementById('main-content');
+  console.log('[DEBUG] el:', el);
+  if(!el){ console.error('[DEBUG] #main-content não encontrado!'); return; }
+  let heroHtml;
+  try { heroHtml = renderHero(currentUser, {}); console.log('[DEBUG] renderHero OK'); }
+  catch(e){ console.error('[DEBUG] renderHero ERRO:', e); throw e; }
   el.innerHTML=`
-    ${renderHero(currentUser, {})}
+    ${heroHtml}
     <div class="dash-heading">📊 Dashboard Executivo</div>
     <div id="admin-dash-body"><div class="alert alert-info"><span class="alert-icon">⏳</span><div class="alert-body">Carregando...</div></div></div>`;
+  console.log('[DEBUG] innerHTML loading state OK, chamando /admin/dashboard');
   const res=await api('GET','/admin/dashboard');
+  console.log('[DEBUG] /admin/dashboard res.ok:', res.ok, 'status:', res.status);
   if(!res.ok){ document.getElementById('admin-dash-body').innerHTML='<div class="alert alert-danger"><span class="alert-icon">'+icon('x-circle','16','icon--x-circle')+'</span><div class="alert-body">Não foi possível carregar o dashboard.</div></div>'; return; }
   const d=await res.json();
   const body=document.getElementById('admin-dash-body');
