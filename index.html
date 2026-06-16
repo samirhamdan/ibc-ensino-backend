@@ -2052,6 +2052,10 @@ function showNewCourseForm() {
         <div class="form-group" style="flex:1"><label>Visibilidade</label><select id="nc-acesso" class="form-control"><option value="interno">Alunos Internos</option><option value="publico">Público</option></select></div>
       </div>
       <div class="form-group"><label>Descrição</label><textarea id="nc-resumo" class="form-control" rows="2" placeholder="Breve descrição..."></textarea></div>
+      <div style="display:flex;gap:var(--space-md)">
+        <div class="form-group" style="flex:1"><label>Ícone (emoji ou nome)</label><input type="text" id="nc-icon" class="form-control" placeholder="Ex: 📚 ou book"></div>
+        <div class="form-group" style="flex:1"><label>Duração (semanas)</label><input type="number" id="nc-duracao" class="form-control" placeholder="Ex: 4" min="1" max="52"></div>
+      </div>
       <div style="display:flex;gap:var(--space-md);margin-top:var(--space-md)">
         <button class="btn btn-outline" onclick="renderAdminCourses()">Cancelar</button>
         <button class="btn btn-primary" onclick="addCourse()">Criar Curso</button>
@@ -2338,20 +2342,22 @@ async function saveCourseHeader() {
 
 async function addCourse(){
   const name=document.getElementById('nc-name').value.trim();
-  const category=document.getElementById('nc-tag').value.trim()||'Geral';
-  const icon=document.getElementById('nc-icon').value.trim()||'📚';
+  const category=document.getElementById('nc-tag').value.trim();
+  const iconVal=(document.getElementById('nc-icon').value.trim())||'📚';
   const acesso=document.getElementById('nc-acesso').value;
   const resumo=document.getElementById('nc-resumo').value.trim();
-  const duracao=document.getElementById('nc-duracao').value.trim();
-  if(!name){alert('Informe o nome do curso.');return;}
-  const res=await api('POST','/courses',{name,category,icon,acesso,resumo,duracao});
+  const duracao=parseInt(document.getElementById('nc-duracao').value)||4;
+  if(!name){showToast('❌ Informe o nome do curso.','error');return;}
+  if(!category){showToast('❌ Selecione uma categoria.','error');return;}
+  const res=await api('POST','/courses',{name,category,icon:iconVal,acesso,resumo,duracao});
   if(res.ok){
+    showToast('✅ Curso criado com sucesso!');
     await loadCourses();
     renderCourseList();
     renderAdminCourses();
   } else {
     const d=await res.json();
-    alert(d.error||'Erro ao criar curso.');
+    showToast('❌ '+(d.error||'Erro ao criar curso.'),'error');
   }
 }
 
