@@ -498,11 +498,10 @@ async function doLogin(){
 // ── Profile-specific dashboard dispatcher ──
 function detectarPerfilEAtualizarDashboard(){
   document.querySelectorAll('.course-item').forEach(x=>x.classList.remove('active'));
-  if(!currentUser){ renderAlunoExternoDashboard(); return; }
+  if(!currentUser){ renderAlunoDashboard(); return; }
   if(isAdmin()) renderAdminDashboard();
   else if(isTutor()) renderTutorPanelDashboard();
-  else if(isAluno()) renderAlunoDashboard();
-  else renderAlunoExternoDashboard();
+  else renderAlunoDashboard();
 }
 document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
@@ -3209,13 +3208,13 @@ async function loadGoalsSection(){
   }
 }
 
-async function renderAlunoExternoDashboard(){
+async function _renderDiscoverDashboard(){
   const el=document.getElementById('main-content');
   el.innerHTML=`
     <div class="dash-heading">🌍 Plataforma de Estudos Bíblicos</div>
     <div class="dash-subtitle">${currentUser?`Bem-vindo, ${currentUser.name.split(' ')[0]}!`:'Bem-vindo, visitante!'} "Descubra uma comunidade de aprendizado cristão" ✨</div>
     <div id="externo-dash-body"><div class="alert alert-info"><span class="alert-icon">⏳</span><div class="alert-body">Carregando...</div></div></div>`;
-  const res=await api('GET','/aluno-externo/dashboard');
+  const res=await api('GET','/aluno/dashboard');
   if(!res.ok){ document.getElementById('externo-dash-body').innerHTML='<div class="alert alert-danger"><span class="alert-icon">'+icon('x-circle','16','icon--x-circle')+'</span><div class="alert-body">Não foi possível carregar.</div></div>'; return; }
   const d=await res.json();
   const body=document.getElementById('externo-dash-body');
@@ -3644,7 +3643,7 @@ async function updateContinueButton(){
   lastInProgressCourseId = null;
   if(!currentUser || !isAluno()) return;
   try{
-    const path = '/aluno-externo/dashboard';
+    const path = '/aluno/dashboard';
     const res = await api('GET', path);
     if(!res.ok) return;
     const d = await res.json();
