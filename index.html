@@ -497,11 +497,24 @@ async function doLogin(){
 
 // ── Profile-specific dashboard dispatcher ──
 function detectarPerfilEAtualizarDashboard(){
+  console.log('[DEBUG] dispatcher chamado, currentUser:', currentUser);
   document.querySelectorAll('.course-item').forEach(x=>x.classList.remove('active'));
-  if(!currentUser){ renderAlunoDashboard(); return; }
-  if(isAdmin()) renderAdminDashboard();
-  else if(isTutor()) renderTutorPanelDashboard();
-  else renderAlunoDashboard();
+  if(!currentUser){ console.log('[DEBUG] sem currentUser → renderAlunoDashboard'); renderAlunoDashboard(); return; }
+  console.log('[DEBUG] role:', currentUser.role, 'isAdmin:', isAdmin(), 'isTutor:', isTutor(), 'isAluno:', isAluno());
+  try {
+    if(isAdmin()) { console.log('[DEBUG] → renderAdminDashboard'); renderAdminDashboard(); }
+    else if(isTutor()) { console.log('[DEBUG] → renderTutorPanelDashboard'); renderTutorPanelDashboard(); }
+    else { console.log('[DEBUG] → renderAlunoDashboard'); renderAlunoDashboard(); }
+  } catch(e){
+    console.error('[ERRO] dispatcher:', e);
+    _renderDashboardError(e, 'painel');
+  }
+}
+
+function _renderDashboardError(e, label){
+  const mc = document.getElementById('main-content');
+  if(!mc) return;
+  mc.innerHTML = '<div style="padding:2rem;color:#e74c3c;background:#fff;border-radius:12px;margin:2rem"><h3>Erro ao carregar '+label+'</h3><p><code>'+(e&&e.message?e.message:e)+'</code></p><button onclick="location.reload()" style="margin-top:1rem;padding:.5rem 1rem;background:#008ea8;color:#fff;border:none;border-radius:8px;cursor:pointer">Recarregar</button></div>';
 }
 document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
@@ -3028,6 +3041,10 @@ function gKpiCard(value, label, sub){
 }
 
 async function renderAdminDashboard(){
+  try { return await _renderAdminDashboardInner(); }
+  catch(e){ console.error('[ERRO] renderAdminDashboard:', e); _renderDashboardError(e, 'dashboard admin'); }
+}
+async function _renderAdminDashboardInner(){
   const el=document.getElementById('main-content');
   el.innerHTML=`
     ${renderHero(currentUser, {})}
@@ -3094,6 +3111,10 @@ async function renderAdminDashboard(){
 }
 
 async function renderTutorPanelDashboard(){
+  try { return await _renderTutorPanelDashboardInner(); }
+  catch(e){ console.error('[ERRO] renderTutorPanelDashboard:', e); _renderDashboardError(e, 'painel do tutor'); }
+}
+async function _renderTutorPanelDashboardInner(){
   const el=document.getElementById('main-content');
   el.innerHTML=`
     ${renderHero(currentUser, {})}
@@ -3140,6 +3161,10 @@ async function renderTutorPanelDashboard(){
 }
 
 async function renderAlunoDashboard(){
+  try { return await _renderAlunoDashboardInner(); }
+  catch(e){ console.error('[ERRO] renderAlunoDashboard:', e); _renderDashboardError(e, 'painel do aluno'); }
+}
+async function _renderAlunoDashboardInner(){
   const el=document.getElementById('main-content');
   el.innerHTML=`<div id="aluno-dash-body"><div class="alert alert-info"><span class="alert-icon">⏳</span><div class="alert-body">Carregando...</div></div></div>`;
   const res=await api('GET','/aluno/dashboard');
