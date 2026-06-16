@@ -3061,25 +3061,32 @@ async function _renderAdminDashboardInner(){
   console.log('[DEBUG] /admin/dashboard res.ok:', res.ok, 'status:', res.status);
   if(!res.ok){ document.getElementById('admin-dash-body').innerHTML='<div class="alert alert-danger"><span class="alert-icon">'+icon('x-circle','16','icon--x-circle')+'</span><div class="alert-body">Não foi possível carregar o dashboard.</div></div>'; return; }
   const d=await res.json();
+  console.log('[DEBUG] dashboard data:', JSON.stringify(d));
   const body=document.getElementById('admin-dash-body');
+  const totalUsers=d.total_users||{total:0,alunos:0,tutores:0};
+  const alerts=d.alerts||[];
+  const recentActivities=d.recent_activities||[];
+  const weeklyStats=d.weekly_stats||[];
+  const userDistribution=d.user_distribution||{alunos:0,tutores:0,admins:0};
+  console.log('[DEBUG] renderizando KPI cards...');
   body.innerHTML=`
     <div class="kpi-grid">
       <div class="stat-card stagger-item">
-        <div class="stat-value">${d.total_users.total}</div>
+        <div class="stat-value">${totalUsers.total}</div>
         <div class="stat-label">${icon('users','14')} Usuários</div>
-        <div style="font-size:var(--text-xs);color:var(--gray);margin-top:2px">${d.total_users.alunos} alunos · ${d.total_users.tutores} tutores</div>
+        <div style="font-size:var(--text-xs);color:var(--gray);margin-top:2px">${totalUsers.alunos} alunos · ${totalUsers.tutores} tutores</div>
         ${d.new_users_7d>0?`<div class="stat-trend stat-trend-up">↑ ${d.new_users_7d} novos (7d)</div>`:''}
       </div>
       <div class="stat-card stagger-item">
-        <div class="stat-value">${d.total_courses}</div>
+        <div class="stat-value">${d.total_courses||0}</div>
         <div class="stat-label">${icon('catalog','14')} Cursos</div>
       </div>
       <div class="stat-card stagger-item">
-        <div class="stat-value">${d.completion_rate}%</div>
+        <div class="stat-value">${d.completion_rate||0}%</div>
         <div class="stat-label">📊 Conclusão Média</div>
       </div>
       <div class="stat-card stagger-item">
-        <div class="stat-value">${d.new_users_7d}</div>
+        <div class="stat-value">${d.new_users_7d||0}</div>
         <div class="stat-label">📈 Novos (7 dias)</div>
         ${d.new_users_7d>0?`<div class="stat-trend stat-trend-up">↑ Esta semana</div>`:''}
       </div>
@@ -3096,13 +3103,13 @@ async function _renderAdminDashboardInner(){
     </div>
     <div class="dash-section">
       <div class="dash-section-title">🚨 Alertas</div>
-      ${d.alerts.length?d.alerts.map(a=>`<div class="alert ${a.severity==='high'?'alert-danger':a.severity==='warn'?'alert-warning':'alert-info'}"><span class="alert-icon">${a.severity==='high'?'❌':a.severity==='warn'?'⚠️':'✅'}</span><div class="alert-body">${a.message}</div></div>`).join(''):'<div class="alert alert-success"><span class="alert-icon">✅</span><div class="alert-body">Nenhum alerta no momento.</div></div>'}
+      ${alerts.length?alerts.map(a=>`<div class="alert ${a.severity==='high'?'alert-danger':a.severity==='warn'?'alert-warning':'alert-info'}"><span class="alert-icon">${a.severity==='high'?'❌':a.severity==='warn'?'⚠️':'✅'}</span><div class="alert-body">${a.message}</div></div>`).join(''):'<div class="alert alert-success"><span class="alert-icon">✅</span><div class="alert-body">Nenhum alerta no momento.</div></div>'}
     </div>
     <div class="card" style="margin-bottom:var(--space-xl)">
       <div class="card-header"><h3 class="card-title">📋 Atividades Recentes</h3></div>
       <div class="card-body">
         <div class="activity-list">
-          ${d.recent_activities.length?d.recent_activities.map(a=>`<div class="activity-item"><div class="activity-dot"></div><div class="activity-text"><strong>${a.user}</strong> ${a.action}</div><div class="activity-time">${a.timestamp?new Date(a.timestamp).toLocaleString('pt-BR'):''}</div></div>`).join(''):'<p style="color:var(--gray);font-size:var(--text-sm)">Nenhuma atividade recente.</p>'}
+          ${recentActivities.length?recentActivities.map(a=>`<div class="activity-item"><div class="activity-dot"></div><div class="activity-text"><strong>${a.user}</strong> ${a.action}</div><div class="activity-time">${a.timestamp?new Date(a.timestamp).toLocaleString('pt-BR'):''}</div></div>`).join(''):'<p style="color:var(--gray);font-size:var(--text-sm)">Nenhuma atividade recente.</p>'}
         </div>
       </div>
     </div>
@@ -3111,11 +3118,14 @@ async function _renderAdminDashboardInner(){
       <button class="btn btn-outline" onclick="showAdminPanel('users')">Gerenciar Tutores</button>
       <button class="btn btn-outline" onclick="showAdminPanel('catalog')">Ver Relatórios</button>
     </div>`;
+  console.log('[DEBUG] innerHTML inserido com sucesso!');
   animateStatValues(body);
+  console.log('[DEBUG] renderizando gráficos...');
   if(window.Chart){
-    new Chart(document.getElementById('admin-chart-line'),{type:'line',data:{labels:d.weekly_stats.map(w=>w.day),datasets:[{label:'Logins',data:d.weekly_stats.map(w=>w.logins),borderColor:'#008ea8',backgroundColor:'rgba(0,142,168,.12)',tension:.4,fill:true,pointBackgroundColor:'#008ea8'}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.05)'}},x:{grid:{color:'rgba(0,0,0,.05)'}}}}});
-    new Chart(document.getElementById('admin-chart-pie'),{type:'pie',data:{labels:['Alunos','Tutores','Admins'],datasets:[{data:[d.user_distribution.alunos,d.user_distribution.tutores,d.user_distribution.admins],backgroundColor:['#008ea8','#27ae60','#f39c12'],borderWidth:0}]},options:{plugins:{legend:{position:'bottom',labels:{padding:16,font:{size:12}}}}}});
+    new Chart(document.getElementById('admin-chart-line'),{type:'line',data:{labels:weeklyStats.map(w=>w.day),datasets:[{label:'Logins',data:weeklyStats.map(w=>w.logins),borderColor:'#008ea8',backgroundColor:'rgba(0,142,168,.12)',tension:.4,fill:true,pointBackgroundColor:'#008ea8'}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.05)'}},x:{grid:{color:'rgba(0,0,0,.05)'}}}}});
+    new Chart(document.getElementById('admin-chart-pie'),{type:'pie',data:{labels:['Alunos','Tutores','Admins'],datasets:[{data:[userDistribution.alunos,userDistribution.tutores,userDistribution.admins],backgroundColor:['#008ea8','#27ae60','#f39c12'],borderWidth:0}]},options:{plugins:{legend:{position:'bottom',labels:{padding:16,font:{size:12}}}}}});
   }
+  console.log('[DEBUG] _renderAdminDashboardInner: concluído com sucesso');
 }
 
 async function renderTutorPanelDashboard(){
