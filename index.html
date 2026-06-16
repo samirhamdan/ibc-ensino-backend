@@ -498,6 +498,13 @@ async function doLogin(){
 // ── Profile-specific dashboard dispatcher ──
 function detectarPerfilEAtualizarDashboard(){
   console.log('[DEBUG] dispatcher chamado, currentUser:', currentUser);
+  // Garante que o layout principal (tela + sidebar + área de conteúdo) está visível
+  const screenMain = document.getElementById('screen-main');
+  if(screenMain){ screenMain.style.display = 'flex'; screenMain.style.visibility = 'visible'; screenMain.style.opacity = '1'; }
+  const sidebarEl = document.getElementById('sidebar');
+  if(sidebarEl){ sidebarEl.style.visibility = 'visible'; sidebarEl.style.opacity = '1'; }
+  const mc = document.getElementById('main-content');
+  if(mc){ mc.style.display = 'block'; mc.style.visibility = 'visible'; mc.style.opacity = '1'; }
   document.querySelectorAll('.course-item').forEach(x=>x.classList.remove('active'));
   if(!currentUser){ console.log('[DEBUG] sem currentUser → renderAlunoDashboard'); renderAlunoDashboard(); return; }
   console.log('[DEBUG] role:', currentUser.role, 'isAdmin:', isAdmin(), 'isTutor:', isTutor(), 'isAluno:', isAluno());
