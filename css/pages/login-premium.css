@@ -110,3 +110,14 @@
   .login-visual-logo { width: 160px; }
   #screen-login .login-card { padding: var(--space-lg); }
 }
+
+/* ── Register / Login toggle ── */
+.register-link { text-align:center; font-size:.85rem; color:var(--muted,#888); margin-top:var(--space-md,1rem); }
+.register-link a { color:var(--primary,#008ea8); font-weight:600; text-decoration:none; }
+.register-link a:hover { text-decoration:underline; }
+.forgot-link { display:block; text-align:center; font-size:.85rem; color:var(--muted,#888); margin-top:.5rem; text-decoration:none; }
+.forgot-link:hover { color:var(--primary,#008ea8); }
+
+/* ── Login alerts ── */
+.login-success { background:rgba(39,174,96,.1); color:#27ae60; border:1px solid rgba(39,174,96,.2); border-radius:8px; padding:10px 14px; font-size:.85rem; margin-bottom:.75rem; }
+.alert-error { background:rgba(231,76,60,.1); color:#e74c3c; border:1px solid rgba(231,76,60,.2); border-radius:8px; padding:10px 14px; font-size:.85rem; }
