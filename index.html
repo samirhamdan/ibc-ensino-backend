@@ -44,6 +44,8 @@
 <link rel="stylesheet" href="css/components/lesson-sections.css">
 <link rel="stylesheet" href="css/components/icons.css">
 <link rel="stylesheet" href="css/components/chrome-premium.css">
+<link rel="stylesheet" href="css/components/announcements.css">
+<link rel="stylesheet" href="css/components/notifications.css">
 <link rel="stylesheet" href="css/pages/login-premium.css">
 <link rel="stylesheet" href="css/pages/admin-ux.css">
 
@@ -187,6 +189,19 @@
     </div>
     <div class="topbar-user">
       <button id="continueBtn" class="btn-gold" style="display:none;padding:.35rem .9rem;font-size:.78rem;border-radius:6px" onclick="continueLastLesson()"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-play"></use></svg> Continuar</button>
+      <div style="position:relative">
+        <button class="topbar-bell" id="topbar-bell-btn" onclick="toggleNotificationsDropdown()" title="Notificações">
+          <svg class="icon" width="20" height="20" viewBox="0 0 24 24"><use href="#icon-bell"></use></svg>
+          <span class="bell-badge hidden" id="bell-badge-count">0</span>
+        </button>
+        <div class="notifications-dropdown" id="notifications-dropdown">
+          <div class="notifications-header">
+            <span class="notifications-header-title">Notificações</span>
+            <button class="notifications-mark-all" onclick="markAllNotificationsRead()">marcar todas como lidas</button>
+          </div>
+          <div id="notifications-list"><div class="notifications-empty">Carregando...</div></div>
+        </div>
+      </div>
       <div class="avatar" id="topbar-avatar">A</div>
       <div style="display:flex;flex-direction:column;align-items:flex-start"><span style="font-size:.82rem;color:rgba(255,255,255,.85);line-height:1.2" id="topbar-name">Usuário</span><span style="font-size:.65rem;color:rgba(255,255,255,.5)" id="topbar-role">—</span></div>
       <button class="btn-logout" onclick="doLogout()">Sair</button>
@@ -217,7 +232,7 @@
         <div class="sidebar-label">Minhas Trilhas</div>
         <div id="sidebar-trail-list"></div>
       </div>
-      <div class="sidebar-section">
+      <div class="sidebar-section" id="my-courses-section">
         <div class="sidebar-label">Meus Cursos</div>
         <div id="course-list"></div>
       </div>
@@ -255,9 +270,16 @@
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-users"></use></svg></span>
           <div class="ci-text"><div class="ci-name">Usuários</div></div>
         </div>
+        <div class="course-item" id="nav-admin-announcements" onclick="showAdminPanel('announcements')" style="display:none">
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-megaphone"></use></svg></span>
+          <div class="ci-text"><div class="ci-name">Comunicação</div></div>
+        </div>
       </div>
     </div>
-    <div class="content" id="main-content"></div>
+    <div class="content">
+      <div id="announcements-banner-area"></div>
+      <div id="main-content"></div>
+    </div>
   </div>
 </div>
 
@@ -397,7 +419,7 @@ function setupUI(){
   document.getElementById('admin-nav-section').style.display = (isAdmin()||isTutor()) ? 'block' : 'none';
   const isAdminUser = isAdmin();
   const isTutorUser = isTutor();
-  ['nav-admin-dashboard','nav-admin-categories','nav-admin-courses','nav-admin-trails','nav-admin-tutors'].forEach(id=>{
+  ['nav-admin-dashboard','nav-admin-categories','nav-admin-courses','nav-admin-trails','nav-admin-tutors','nav-admin-announcements'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.style.display = isAdminUser ? 'flex' : 'none';
   });
@@ -413,10 +435,15 @@ function setupUI(){
   if(certNav) certNav.style.display = isAluno() ? 'flex' : 'none';
   const myTrailsSection=document.getElementById('my-trails-section');
   if(myTrailsSection) myTrailsSection.style.display = isAluno() ? 'block' : 'none';
+  const myCoursesSection=document.getElementById('my-courses-section');
+  if(myCoursesSection) myCoursesSection.style.display = isAdminUser ? 'none' : 'block';
   renderCourseList();
   if(isAluno()) renderSidebarTrails();
   updateContinueButton();
   checkAndShowOnboarding();
+  loadNotifications();
+  setInterval(loadNotifications, 60000);
+  renderAnnouncementsBanner();
 }
 
 // ── SVG Icon Helper ──────────────────────────────────────
@@ -1763,6 +1790,7 @@ function showAdminPanel(panel){
   else if(panel==='catalog') renderAdminCatalog();
   else if(panel==='categories') renderAdminCategories();
   else if(panel==='trails') renderAdminTrails();
+  else if(panel==='announcements') renderAdminAnnouncements();
   else renderAdminCourses();
 }
 
@@ -2591,6 +2619,7 @@ async function renderAdminUsersV2() {
   document.getElementById('main-content').innerHTML =
     `<div class="admin-page-header">
       <h1 class="course-title">${icon('users','22')} Gerenciar Usuários</h1>
+      <button class="btn btn-primary" onclick="openInviteUserModal()">Convidar Usuário</button>
     </div>
     <div class="admin-section">
       <div class="admin-section-body">
@@ -2772,8 +2801,16 @@ async function openUserProfile(userId) {
     ? '<p style="font-size:.82rem;color:var(--muted)">Nenhum certificado emitido.</p>'
     : u.certificates.map(c => `<div class="profile-cert-item">🏅 ${c.course_name}<span style="margin-left:auto;font-size:.72rem;color:var(--muted)">${(c.issued_at||'').slice(0,10)}</span></div>`).join('');
 
+  const statusBadge = u.is_active
+    ? '<span class="user-status-badge active">Ativo</span>'
+    : '<span class="user-status-badge inactive">Desativado</span>';
+
   document.getElementById('user-profile-body').innerHTML =
-    `<div class="profile-stat-row">
+    `<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem">
+      ${statusBadge}
+      <span style="font-size:.78rem;color:var(--muted)">Último acesso: ${formatLastLogin(u.last_login)}</span>
+    </div>
+    <div class="profile-stat-row">
       <div class="profile-stat"><div class="stat-val">${u.gamification.total_points}</div><div class="stat-lbl">Pontos</div></div>
       <div class="profile-stat"><div class="stat-val">${u.gamification.current_level}</div><div class="stat-lbl">Nível</div></div>
       <div class="profile-stat"><div class="stat-val">${u.trails.length}</div><div class="stat-lbl">Trilhas</div></div>
@@ -2789,6 +2826,9 @@ async function openUserProfile(userId) {
     </div>
     <div class="profile-actions">
       <div class="profile-section-title">Ações</div>
+      <button class="btn" style="background:#eee" onclick="openEditUserModal(${userId},'${(u.name||'').replace(/'/g,"\\'")}','${(u.email||'').replace(/'/g,"\\'")}','${u.role}')">${icon('pencil','14')} Editar</button>
+      <button class="btn" style="background:#eee" onclick="openResetPasswordModal(${userId})">${icon('key','14')} Resetar Senha</button>
+      <button class="btn ${u.is_active ? 'btn-danger' : ''}" onclick="toggleUserActive(${userId})">${u.is_active ? 'Desativar' : 'Reativar'}</button>
       <button class="btn btn-danger" onclick="adminResetUserProgress(${userId},'${u.name}')">Zerar progresso (mantém certificados)</button>
     </div>`;
 }
@@ -2814,6 +2854,356 @@ async function adminResetUserProgress(userId, userName) {
   } else {
     const d = await res.json();
     alert(d.error || 'Erro ao zerar progresso.');
+  }
+}
+
+// ── Generic modal helper (Sprint 5.1) ──
+function showModal(title, bodyHtml, footerHtml){
+  document.getElementById('app-modal-title').textContent = title;
+  document.getElementById('app-modal-body').innerHTML = bodyHtml;
+  document.getElementById('app-modal-footer').innerHTML = footerHtml || '';
+  document.getElementById('app-modal-overlay').classList.remove('hidden');
+}
+function closeModal(){
+  document.getElementById('app-modal-overlay').classList.add('hidden');
+}
+
+// ── Gestão Avançada de Usuários ──
+function generateTempPassword(){
+  const digits = Math.floor(1000 + Math.random()*9000);
+  return 'IBC'+digits+'!';
+}
+
+function openInviteUserModal(){
+  const tempPass = generateTempPassword();
+  showModal('Convidar Usuário', `
+    <label class="form-label">Nome<input type="text" id="invite-name" class="form-control"></label>
+    <label class="form-label">Email<input type="email" id="invite-email" class="form-control"></label>
+    <label class="form-label">Perfil
+      <select id="invite-role" class="form-control">
+        <option value="aluno">Aluno</option>
+        <option value="tutor">Tutor</option>
+        <option value="admin">Administrador</option>
+      </select>
+    </label>
+    <label class="form-label">Senha temporária<input type="text" id="invite-password" class="form-control" value="${tempPass}"></label>
+  `, `
+    <button class="btn" style="background:#eee" onclick="closeModal()">Cancelar</button>
+    <button class="btn btn-primary" onclick="submitInvite()">Convidar</button>
+  `);
+}
+
+async function submitInvite(){
+  const name = document.getElementById('invite-name').value.trim();
+  const email = document.getElementById('invite-email').value.trim();
+  const role = document.getElementById('invite-role').value;
+  const password = document.getElementById('invite-password').value;
+
+  if(!name || !email || !password){ showToast('Preencha todos os campos.', 'error'); return; }
+
+  const res = await api('POST', '/admin/users/invite', {name, email, role, password});
+  if(res.ok){
+    showToast('Usuário convidado com sucesso.', 'success');
+    closeModal();
+    adminUsersLoad();
+  } else {
+    const d = await res.json().catch(()=>({}));
+    showToast(d.error || 'Erro ao convidar usuário.', 'error');
+  }
+}
+
+function openEditUserModal(userId, name, email, role){
+  showModal('Editar Usuário', `
+    <label class="form-label">Nome<input type="text" id="edit-user-name" class="form-control" value="${(name||'').replace(/"/g,'&quot;')}"></label>
+    <label class="form-label">Email<input type="email" id="edit-user-email" class="form-control" value="${(email||'').replace(/"/g,'&quot;')}"></label>
+    <label class="form-label">Perfil
+      <select id="edit-user-role" class="form-control">
+        <option value="aluno" ${role==='aluno'?'selected':''}>Aluno</option>
+        <option value="tutor" ${role==='tutor'?'selected':''}>Tutor</option>
+        <option value="admin" ${role==='admin'?'selected':''}>Administrador</option>
+      </select>
+    </label>
+  `, `
+    <button class="btn" style="background:#eee" onclick="closeModal()">Cancelar</button>
+    <button class="btn btn-primary" onclick="submitEditUser(${userId})">Salvar</button>
+  `);
+}
+
+async function submitEditUser(userId){
+  const name = document.getElementById('edit-user-name').value.trim();
+  const email = document.getElementById('edit-user-email').value.trim();
+  const role = document.getElementById('edit-user-role').value;
+
+  if(!name || !email){ showToast('Preencha todos os campos.', 'error'); return; }
+
+  const res = await api('PUT', `/admin/users/${userId}`, {name, email, role});
+  if(res.ok){
+    showToast('Usuário atualizado com sucesso.', 'success');
+    closeModal();
+    adminUsersLoad();
+    openUserProfile(userId);
+  } else {
+    const d = await res.json().catch(()=>({}));
+    showToast(d.error || 'Erro ao atualizar usuário.', 'error');
+  }
+}
+
+function openResetPasswordModal(userId){
+  showModal('Resetar Senha', `
+    <label class="form-label">Nova senha<input type="text" id="reset-pass-new" class="form-control" value="${generateTempPassword()}"></label>
+  `, `
+    <button class="btn" style="background:#eee" onclick="closeModal()">Cancelar</button>
+    <button class="btn btn-primary" onclick="submitResetPassword(${userId})">Resetar</button>
+  `);
+}
+
+async function submitResetPassword(userId){
+  const new_password = document.getElementById('reset-pass-new').value;
+  if(!new_password || new_password.length < 6){ showToast('A senha deve ter ao menos 6 caracteres.', 'error'); return; }
+
+  const res = await api('POST', `/admin/users/${userId}/reset-password`, {new_password});
+  if(res.ok){
+    showToast('Senha redefinida com sucesso.', 'success');
+    closeModal();
+  } else {
+    const d = await res.json().catch(()=>({}));
+    showToast(d.error || 'Erro ao resetar senha.', 'error');
+  }
+}
+
+async function toggleUserActive(userId){
+  const res = await api('POST', `/admin/users/${userId}/toggle-active`);
+  if(res.ok){
+    showToast('Status do usuário atualizado.', 'success');
+    adminUsersLoad();
+    openUserProfile(userId);
+  } else {
+    const d = await res.json().catch(()=>({}));
+    showToast(d.error || 'Erro ao alterar status.', 'error');
+  }
+}
+
+function formatLastLogin(iso){
+  if(!iso) return 'nunca acessou';
+  const date = new Date(iso);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffHours = diffMs / (1000*60*60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if(diffHours < 1) return 'há menos de 1 hora';
+  if(diffHours < 24) return 'há '+Math.floor(diffHours)+' hora(s)';
+  if(diffDays === 1) return 'ontem';
+  if(diffDays < 30) return 'há '+diffDays+' dias';
+  return date.toLocaleDateString('pt-BR');
+}
+
+// ── Comunicação in-app: notificações ──
+let _notificationsOpen = false;
+
+async function loadNotifications(){
+  try{
+    const res = await api('GET', '/notifications');
+    if(!res.ok) return;
+    const data = await res.json();
+    const badge = document.getElementById('bell-badge-count');
+    if(badge){
+      if(data.unread_count > 0){
+        badge.textContent = data.unread_count > 99 ? '99+' : data.unread_count;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+    _renderNotificationsList(data.notifications || []);
+  }catch(e){}
+}
+
+function _renderNotificationsList(notifications){
+  const list = document.getElementById('notifications-list');
+  if(!list) return;
+  if(!notifications.length){
+    list.innerHTML = '<div class="notifications-empty">Nenhuma notificação.</div>';
+    return;
+  }
+  list.innerHTML = notifications.map(n => `
+    <div class="notification-item ${n.is_read ? '' : 'unread'}" onclick="readNotification(${n.id}${n.link ? ",'"+n.link.replace(/'/g,"\\'")+"'" : ''})">
+      <div class="notification-title">${n.title}</div>
+      <div class="notification-message">${n.message}</div>
+      <div class="notification-time">${formatRelativeTime(n.created_at)}</div>
+    </div>
+  `).join('');
+}
+
+function formatRelativeTime(iso){
+  if(!iso) return '';
+  const date = new Date(iso);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMin = Math.floor(diffMs / (1000*60));
+  const diffHours = Math.floor(diffMin / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if(diffMin < 1) return 'agora';
+  if(diffMin < 60) return 'há '+diffMin+' min';
+  if(diffHours < 24) return 'há '+diffHours+' h';
+  if(diffDays === 1) return 'ontem';
+  if(diffDays < 30) return 'há '+diffDays+' dias';
+  return date.toLocaleDateString('pt-BR');
+}
+
+function toggleNotificationsDropdown(){
+  const dd = document.getElementById('notifications-dropdown');
+  if(!dd) return;
+  _notificationsOpen = !_notificationsOpen;
+  dd.classList.toggle('open', _notificationsOpen);
+  if(_notificationsOpen) loadNotifications();
+}
+
+document.addEventListener('click', function(e){
+  const dd = document.getElementById('notifications-dropdown');
+  const btn = document.getElementById('topbar-bell-btn');
+  if(!dd || !_notificationsOpen) return;
+  if(!dd.contains(e.target) && e.target !== btn && !btn.contains(e.target)){
+    _notificationsOpen = false;
+    dd.classList.remove('open');
+  }
+});
+
+async function readNotification(id, link){
+  await api('POST', `/notifications/${id}/read`).catch(()=>{});
+  loadNotifications();
+  if(link) window.location.href = link;
+}
+
+async function markAllNotificationsRead(){
+  await api('POST', '/notifications/read-all').catch(()=>{});
+  loadNotifications();
+}
+
+// ── Comunicação in-app: avisos (announcements) ──
+async function renderAnnouncementsBanner(){
+  const area = document.getElementById('announcements-banner-area');
+  if(!area) return;
+  try{
+    const res = await api('GET', '/announcements/active');
+    if(!res.ok){ area.innerHTML=''; return; }
+    const announcements = await res.json();
+    area.innerHTML = announcements.map(a => `
+      <div class="announcement-banner ${a.severity}" id="announcement-banner-${a.id}">
+        <div class="announcement-banner-content">
+          <div class="announcement-banner-title">${a.title}</div>
+          <div class="announcement-banner-message">${a.message}</div>
+        </div>
+        <button class="announcement-banner-close" onclick="dismissAnnouncement(${a.id})" title="Dispensar">&times;</button>
+      </div>
+    `).join('');
+  }catch(e){ area.innerHTML=''; }
+}
+
+async function dismissAnnouncement(id){
+  await api('POST', `/announcements/${id}/dismiss`).catch(()=>{});
+  const el = document.getElementById('announcement-banner-'+id);
+  if(el) el.remove();
+}
+
+// ── Admin: Comunicação (gerenciar avisos) ──
+async function renderAdminAnnouncements(){
+  document.getElementById('main-content').innerHTML = `
+    <div class="admin-page-header">
+      <h1 class="course-title">${icon('megaphone','22')} Comunicação</h1>
+      <button class="btn btn-primary" onclick="openNewAnnouncementModal()">Novo Aviso</button>
+    </div>
+    <div class="admin-section">
+      <div class="admin-section-body" id="announcements-admin-list">Carregando...</div>
+    </div>
+  `;
+  await _loadAdminAnnouncements();
+}
+
+async function _loadAdminAnnouncements(){
+  const res = await api('GET', '/admin/announcements');
+  const container = document.getElementById('announcements-admin-list');
+  if(!res.ok){ container.innerHTML = '<p style="color:red">Erro ao carregar avisos.</p>'; return; }
+  const announcements = await res.json();
+  if(!announcements.length){
+    container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted)">Nenhum aviso cadastrado.</div>';
+    return;
+  }
+  const severityLabels = {info:'Informação', warning:'Atenção', success:'Sucesso'};
+  const roleLabels = {aluno:'Alunos', tutor:'Tutores', all:'Todos'};
+  container.innerHTML = announcements.map(a => `
+    <div class="announcement-admin-row">
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:.9rem">${a.title} ${a.is_active ? '' : '<span style="color:#c0392b;font-size:.72rem">(arquivado)</span>'}</div>
+        <div style="font-size:.82rem;color:var(--muted)">${a.message}</div>
+        <div class="announcement-admin-meta">
+          ${severityLabels[a.severity]||a.severity} · Público: ${roleLabels[a.target_role]||a.target_role} ·
+          Dispensado por ${a.dismissed_count} usuário(s)
+          ${a.expires_at ? ' · Expira em '+new Date(a.expires_at).toLocaleDateString('pt-BR') : ''}
+        </div>
+      </div>
+      ${a.is_active ? `<button class="btn" style="background:#eee" onclick="archiveAnnouncement(${a.id})">Arquivar</button>` : ''}
+    </div>
+  `).join('');
+}
+
+function openNewAnnouncementModal(){
+  showModal('Novo Aviso', `
+    <label class="form-label">Título<input type="text" id="ann-title" class="form-control"></label>
+    <label class="form-label">Mensagem<textarea id="ann-message" class="form-control" rows="3"></textarea></label>
+    <label class="form-label">Severidade
+      <select id="ann-severity" class="form-control">
+        <option value="info">Informação</option>
+        <option value="warning">Atenção</option>
+        <option value="success">Sucesso</option>
+      </select>
+    </label>
+    <label class="form-label">Público
+      <select id="ann-target-role" class="form-control">
+        <option value="all">Todos</option>
+        <option value="aluno">Alunos</option>
+        <option value="tutor">Tutores</option>
+      </select>
+    </label>
+    <label class="form-label">Expira em (opcional)<input type="date" id="ann-expires" class="form-control"></label>
+  `, `
+    <button class="btn" style="background:#eee" onclick="closeModal()">Cancelar</button>
+    <button class="btn btn-primary" onclick="submitNewAnnouncement()">Publicar</button>
+  `);
+}
+
+async function submitNewAnnouncement(){
+  const title = document.getElementById('ann-title').value.trim();
+  const message = document.getElementById('ann-message').value.trim();
+  const severity = document.getElementById('ann-severity').value;
+  const target_role = document.getElementById('ann-target-role').value;
+  const expiresRaw = document.getElementById('ann-expires').value;
+
+  if(!title || !message){ showToast('Preencha título e mensagem.', 'error'); return; }
+
+  const body = {title, message, severity, target_role};
+  if(expiresRaw) body.expires_at = expiresRaw+'T23:59:59';
+
+  const res = await api('POST', '/admin/announcements', body);
+  if(res.ok){
+    showToast('Aviso publicado com sucesso.', 'success');
+    closeModal();
+    _loadAdminAnnouncements();
+  } else {
+    const d = await res.json().catch(()=>({}));
+    showToast(d.error || 'Erro ao publicar aviso.', 'error');
+  }
+}
+
+async function archiveAnnouncement(id){
+  if(!confirm('Arquivar este aviso?')) return;
+  const res = await api('DELETE', `/admin/announcements/${id}`);
+  if(res.ok){
+    showToast('Aviso arquivado.', 'success');
+    _loadAdminAnnouncements();
+  } else {
+    showToast('Erro ao arquivar aviso.', 'error');
   }
 }
 
@@ -4291,6 +4681,18 @@ function removeTourTooltip(){
 
 <!-- Toast container -->
 <div id="toastContainer" class="toast-container"></div>
+
+<!-- Generic app modal (Sprint 5.1) -->
+<div id="app-modal-overlay" class="app-modal-overlay hidden" onclick="if(event.target===this) closeModal()">
+  <div class="app-modal-box">
+    <div class="app-modal-header">
+      <span class="app-modal-title" id="app-modal-title"></span>
+      <button class="app-modal-close" onclick="closeModal()"><svg class="icon" width="18" height="18" viewBox="0 0 24 24"><use href="#icon-x"></use></svg></button>
+    </div>
+    <div class="app-modal-body" id="app-modal-body"></div>
+    <div class="app-modal-footer" id="app-modal-footer"></div>
+  </div>
+</div>
 
 <!-- Onboarding modal -->
 <div id="onboardingModal" class="onboarding-modal" style="display:none">

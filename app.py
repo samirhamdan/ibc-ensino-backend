@@ -52,7 +52,7 @@ def create_app(config_name='development'):
     # Context
     with app.app_context():
         # Importar modelos
-        from models import User, Course, Material, Module, Quiz, Progress, Question, Category, Trail, TrailCourse, UserTrail, OnboardingAnswer, Certificate
+        from models import User, Course, Material, Module, Quiz, Progress, Question, Category, Trail, TrailCourse, UserTrail, OnboardingAnswer, Certificate, Announcement, Notification, AnnouncementDismissal
         
         # Criar tabelas
         db.create_all()
@@ -69,6 +69,7 @@ def create_app(config_name='development'):
         from routes.trails import trails_bp, onboarding_bp
         from routes.certificates import certificates_bp
         from routes.admin import admin_bp
+        from routes.notifications import notifications_bp
 
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
         app.register_blueprint(courses_bp, url_prefix='/api/courses')
@@ -82,6 +83,7 @@ def create_app(config_name='development'):
         app.register_blueprint(onboarding_bp, url_prefix='/api/onboarding')
         app.register_blueprint(certificates_bp, url_prefix='/api/certificates')
         app.register_blueprint(admin_bp, url_prefix='/api/admin')
+        app.register_blueprint(notifications_bp, url_prefix='/api')
 
         # Convenience alias so GET /api/user works alongside /api/auth/user
         @app.route('/api/user', methods=['GET'])

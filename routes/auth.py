@@ -3,6 +3,7 @@ Auth routes: signup, login, logout, user info, password reset
 """
 import os
 import smtplib
+from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import Blueprint, request, jsonify, session
@@ -61,6 +62,12 @@ def login():
     user = User.query.filter_by(email=email).first()
     if not user or not user.check_password(password):
         return jsonify({'error': 'Email ou senha inválidos'}), 401
+
+    if not user.is_active:
+        return jsonify({'error': 'Conta desativada. Contate o administrador.'}), 403
+
+    user.last_login = datetime.utcnow()
+    db.session.commit()
 
     session['user_id'] = user.id
     return jsonify(user.to_dict()), 200

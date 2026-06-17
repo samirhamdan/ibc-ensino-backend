@@ -1,11 +1,12 @@
 """
 Admin-only routes: tutor management, user management, question assignment
 """
+from datetime import datetime
 from flask import Blueprint, request, jsonify, session
 from extensions import db
 from models import (
     User, Course, Question, TutorCourse, UserTrail, UserPoints,
-    Certificate, Progress, Trail
+    Certificate, Progress, Trail, Notification, Announcement, AnnouncementDismissal
 )
 from sqlalchemy import func
 
@@ -196,6 +197,7 @@ def list_users():
             'current_level': pts.current_level if pts else 1,
             'trail_count': trail_count,
             'active_trail_id': u.active_trail_id,
+            'is_active': u.is_active,
         })
 
     return jsonify(result), 200
@@ -263,6 +265,8 @@ def get_user_profile(user_id):
         'created_at': u.created_at.isoformat() if u.created_at else None,
         'active_trail_id': u.active_trail_id,
         'onboarding_completed': u.onboarding_completed,
+        'last_login': u.last_login.isoformat() if u.last_login else None,
+        'is_active': u.is_active,
         'gamification': pts.to_dict() if pts else {'total_points': 0, 'current_level': 1, 'points_in_level': 0},
         'trails': trails,
         'certificates': certs,
@@ -352,3 +356,201 @@ def bulk_action_users():
         return jsonify({'ok': True}), 200
 
     return jsonify({'error': 'Ação desconhecida'}), 400
+
+
+@admin_bp.route('/users/<int:user_id>', methods=['PUT'])
+def update_user(user_id):
+    admin_user, err = _admin_required()
+    if err:
+        return err
+
+    u = User.query.get_or_404(user_id)
+    data = request.get_json(silent=True) or {}
+    name = (data.get('name') or '').strip()
+    email = (data.get('email') or '').strip().lower()
+    role = data.get('role')
+
+    if not name or not email or not role:
+        return jsonify({'error': 'name, email e role são obrigatórios'}), 400
+
+    valid_roles = {'admin', 'tutor', 'aluno'}
+    if role not in valid_roles:
+        return jsonify({'error': 'role inválido'}), 400
+
+    existing = User.query.filter(User.email == email, User.id != user_id).first()
+    if existing:
+        return jsonify({'error': 'Email já em uso por outro usuário'}), 409
+
+    if user_id == admin_user.id and role != 'admin':
+        return jsonify({'error': 'Não é possível alterar o próprio papel de administrador'}), 400
+
+    u.name = name
+    u.email = email
+    u.role = role
+    db.session.commit()
+    return jsonify(u.to_dict()), 200
+
+
+@admin_bp.route('/users/<int:user_id>/toggle-active', methods=['POST'])
+def toggle_user_active(user_id):
+    _, err = _admin_required()
+    if err:
+        return err
+
+    u = User.query.get_or_404(user_id)
+    u.is_active = not u.is_active
+    db.session.commit()
+    return jsonify(u.to_dict()), 200
+
+
+@admin_bp.route('/users/<int:user_id>/reset-password', methods=['POST'])
+def admin_reset_user_password(user_id):
+    _, err = _admin_required()
+    if err:
+        return err
+
+    u = User.query.get_or_404(user_id)
+    data = request.get_json(silent=True) or {}
+    new_password = data.get('new_password') or ''
+
+    if len(new_password) < 6:
+        return jsonify({'error': 'A nova senha deve ter ao menos 6 caracteres'}), 400
+
+    u.set_password(new_password)
+    db.session.commit()
+    return jsonify({'ok': True}), 200
+
+
+@admin_bp.route('/users/invite', methods=['POST'])
+def invite_user():
+    admin_user, err = _admin_required()
+    if err:
+        return err
+
+    data = request.get_json(silent=True) or {}
+    name = (data.get('name') or '').strip()
+    email = (data.get('email') or '').strip().lower()
+    role = data.get('role')
+    password = data.get('password') or ''
+
+    if not name or not email or not role or not password:
+        return jsonify({'error': 'name, email, role e password são obrigatórios'}), 400
+
+    valid_roles = {'admin', 'tutor', 'aluno'}
+    if role not in valid_roles:
+        return jsonify({'error': 'role inválido'}), 400
+
+    if len(password) < 6:
+        return jsonify({'error': 'A senha deve ter ao menos 6 caracteres'}), 400
+
+    if User.query.filter_by(email=email).first():
+        return jsonify({'error': 'Email já cadastrado'}), 409
+
+    u = User(
+        name=name,
+        email=email,
+        role=role,
+        is_active=True,
+        onboarding_completed=True,
+        created_at=datetime.utcnow(),
+    )
+    u.set_password(password)
+    db.session.add(u)
+    db.session.commit()
+    return jsonify(u.to_dict()), 201
+
+
+@admin_bp.route('/users/<int:user_id>/message', methods=['POST'])
+def send_user_message(user_id):
+    admin_user, err = _admin_required()
+    if err:
+        return err
+
+    target = User.query.get_or_404(user_id)
+    data = request.get_json(silent=True) or {}
+    title = (data.get('title') or '').strip()
+    message = (data.get('message') or '').strip()
+
+    if not title or not message:
+        return jsonify({'error': 'title e message são obrigatórios'}), 400
+
+    notif = Notification(
+        user_id=target.id,
+        title=title,
+        message=message,
+        type='message',
+        created_by=admin_user.id,
+    )
+    db.session.add(notif)
+    db.session.commit()
+    return jsonify(notif.to_dict()), 201
+
+
+# ── Announcements (admin) ──────────────────────────────────────────────────
+
+@admin_bp.route('/announcements', methods=['POST'])
+def create_announcement():
+    admin_user, err = _admin_required()
+    if err:
+        return err
+
+    data = request.get_json(silent=True) or {}
+    title = (data.get('title') or '').strip()
+    message = (data.get('message') or '').strip()
+    severity = data.get('severity') or 'info'
+    target_role = data.get('target_role') or 'all'
+    expires_at_raw = data.get('expires_at')
+
+    if not title or not message:
+        return jsonify({'error': 'title e message são obrigatórios'}), 400
+
+    if severity not in ('info', 'warning', 'success'):
+        return jsonify({'error': 'severity inválido'}), 400
+    if target_role not in ('aluno', 'tutor', 'all'):
+        return jsonify({'error': 'target_role inválido'}), 400
+
+    expires_at = None
+    if expires_at_raw:
+        try:
+            expires_at = datetime.fromisoformat(expires_at_raw)
+        except ValueError:
+            return jsonify({'error': 'expires_at inválido'}), 400
+
+    ann = Announcement(
+        title=title,
+        message=message,
+        severity=severity,
+        target_role=target_role,
+        created_by=admin_user.id,
+        expires_at=expires_at,
+    )
+    db.session.add(ann)
+    db.session.commit()
+    return jsonify(ann.to_dict()), 201
+
+
+@admin_bp.route('/announcements', methods=['GET'])
+def list_announcements():
+    _, err = _admin_required()
+    if err:
+        return err
+
+    anns = Announcement.query.order_by(Announcement.created_at.desc()).all()
+    result = []
+    for a in anns:
+        d = a.to_dict()
+        d['dismissed_count'] = AnnouncementDismissal.query.filter_by(announcement_id=a.id).count()
+        result.append(d)
+    return jsonify(result), 200
+
+
+@admin_bp.route('/announcements/<int:announcement_id>', methods=['DELETE'])
+def delete_announcement(announcement_id):
+    _, err = _admin_required()
+    if err:
+        return err
+
+    ann = Announcement.query.get_or_404(announcement_id)
+    ann.is_active = False
+    db.session.commit()
+    return jsonify({'ok': True}), 200
