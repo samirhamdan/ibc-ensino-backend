@@ -48,6 +48,7 @@
 <link rel="stylesheet" href="css/components/notifications.css">
 <link rel="stylesheet" href="css/pages/login-premium.css">
 <link rel="stylesheet" href="css/pages/admin-ux.css">
+<link rel="stylesheet" href="css/pages/meu-perfil.css">
 
 <!-- Scripts -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -222,6 +223,10 @@
         <div class="course-item" id="nav-certificados" onclick="navigateToCertificados()" style="display:none">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-certificates"></use></svg></span>
           <div class="ci-text"><div class="ci-name">Meus Certificados</div></div>
+        </div>
+        <div class="course-item" id="nav-meu-perfil" onclick="navigateToMeuPerfil()" style="display:none">
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-user"></use></svg></span>
+          <div class="ci-text"><div class="ci-name">Meu Perfil</div></div>
         </div>
         <div class="course-item" id="nav-catalog" onclick="showCatalog()">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-catalog"></use></svg></span>
@@ -454,6 +459,8 @@ function setupUI(){
   if(trilhasNav) trilhasNav.style.display = isAluno() ? 'flex' : 'none';
   const certNav=document.getElementById('nav-certificados');
   if(certNav) certNav.style.display = isAluno() ? 'flex' : 'none';
+  const perfilNav=document.getElementById('nav-meu-perfil');
+  if(perfilNav) perfilNav.style.display = isAluno() ? 'flex' : 'none';
   const myTrailsSection=document.getElementById('my-trails-section');
   if(myTrailsSection) myTrailsSection.style.display = isAluno() ? 'block' : 'none';
   const myCoursesSection=document.getElementById('my-courses-section');
@@ -537,12 +544,16 @@ async function doLogin(){
     return;
   }
   currentUser = await res.json();
+  const loginAchievements = currentUser.new_achievements;
   await loadCourses();
   await loadCategories();
   await loadAllTrails();
   setupUI();
   show('main');
   detectarPerfilEAtualizarDashboard();
+  if(loginAchievements && loginAchievements.length){
+    setTimeout(()=>showAchievementPopups(loginAchievements), 800);
+  }
 }
 
 // ── Profile-specific dashboard dispatcher ──
@@ -1215,6 +1226,9 @@ async function submitAulaQuiz(){
     if(aulaQuizFeedback.passed && !wasPassedBefore){
       gamiAddPoints('quiz_passed', {course_id: currentAula.course.id, attempts: getAttempts(moduleId)});
     }
+    if(aulaQuizFeedback.new_achievements && aulaQuizFeedback.new_achievements.length){
+      setTimeout(()=>showAchievementPopups(aulaQuizFeedback.new_achievements), 900);
+    }
     renderAulaPage();
   } else {
     alert('Erro ao enviar respostas.');
@@ -1237,6 +1251,9 @@ async function renderConclusion(){
       certCode = d.cert && d.cert.cert_code;
       if(d.certificate_issued){
         setTimeout(()=>showTrophyModal('🎓','Certificado conquistado!',`Seu certificado de "${c.name}" está disponível!`), 600);
+      }
+      if(d.new_achievements && d.new_achievements.length){
+        setTimeout(()=>showAchievementPopups(d.new_achievements), d.certificate_issued ? 1500 : 600);
       }
     }
   }catch(e){}
@@ -1287,9 +1304,13 @@ async function sendQuestion(courseId){
   if(!texto){ msgEl.style.color='var(--danger)'; msgEl.textContent='Digite sua pergunta.'; return; }
   const res=await api('POST',`/questions/${courseId}`,{texto});
   if(res.ok){
+    const qd = await res.json();
     msgEl.style.color='var(--success)';
     msgEl.textContent='✅ Pergunta enviada! O tutor responderá em breve.';
     gamiAddPoints('question_asked', {course_id: courseId});
+    if(qd.new_achievements && qd.new_achievements.length){
+      setTimeout(()=>showAchievementPopups(qd.new_achievements), 600);
+    }
     setTimeout(()=>{ const m=document.getElementById('ask-question-modal'); if(m) m.remove(); },1500);
   } else {
     msgEl.style.color='var(--danger)';
@@ -1784,6 +1805,9 @@ async function enviarPergunta(){
     const q=await res.json();
     currentQuestions=[q,...currentQuestions];
     renderTabContent();
+    if(q.new_achievements && q.new_achievements.length){
+      setTimeout(()=>showAchievementPopups(q.new_achievements), 400);
+    }
   } else { alert('Erro ao enviar pergunta.'); }
 }
 
@@ -4712,6 +4736,181 @@ async function navigateToCertificados(){
   }catch(e){
     el.innerHTML='<p style="color:var(--danger);padding:1.5rem">Erro ao carregar certificados.</p>';
   }
+}
+
+// ── Meu Perfil (Sprint 6.1) ─────────────────────────────────────────────
+
+function shareCertificateWhatsApp(cert){
+  shareWhatsApp(cert);
+}
+
+async function navigateToMeuPerfil(){
+  document.querySelectorAll('.course-item').forEach(x=>x.classList.remove('active'));
+  const nav = document.getElementById('nav-meu-perfil');
+  if(nav) nav.classList.add('active');
+  await renderMeuPerfil();
+}
+
+async function renderMeuPerfil(){
+  const el = document.getElementById('main-content');
+  el.innerHTML = '<div style="padding:2rem;color:var(--gray)">Carregando perfil...</div>';
+  try{
+    const [statsRes, achRes, certRes] = await Promise.all([
+      api('GET', '/aluno/stats'),
+      api('GET', '/aluno/achievements'),
+      api('GET', '/aluno/certificates'),
+    ]);
+    if(!statsRes.ok || !achRes.ok || !certRes.ok){
+      el.innerHTML = '<p style="color:var(--danger);padding:1.5rem">Erro ao carregar seu perfil.</p>';
+      return;
+    }
+    const stats = await statsRes.json();
+    const achievements = await achRes.json();
+    const certs = await certRes.json();
+
+    const earnedCount = achievements.filter(a=>a.earned).length;
+
+    el.innerHTML = `
+      <div class="course-header">
+        <span class="course-tag">Aluno</span>
+        <h1 class="course-title">${icon('user','24')} Meu Perfil</h1>
+        <div class="course-meta">
+          <button class="btn btn-outline" onclick="openEditProfileModal()">${icon('edit','14')} Editar Perfil</button>
+          <button class="btn btn-outline" onclick="openChangePasswordModal()">${icon('key','14')} Alterar Senha</button>
+        </div>
+      </div>
+
+      <div class="profile-stats-grid">
+        <div class="profile-stat-card"><div class="psc-value">${stats.total_points}</div><div class="psc-label">${icon('points','14','icon--gold')} Pontos</div></div>
+        <div class="profile-stat-card"><div class="psc-value">${stats.current_level}</div><div class="psc-label">Nível — ${stats.level_name}</div></div>
+        <div class="profile-stat-card"><div class="psc-value">${stats.lessons_completed}</div><div class="psc-label">Aulas Concluídas</div></div>
+        <div class="profile-stat-card"><div class="psc-value">${stats.courses_completed}</div><div class="psc-label">Cursos Concluídos</div></div>
+        <div class="profile-stat-card"><div class="psc-value">${stats.trails_completed}</div><div class="psc-label">Trilhas Concluídas</div></div>
+        <div class="profile-stat-card"><div class="psc-value">${stats.questions_count}</div><div class="psc-label">Perguntas Feitas</div></div>
+        <div class="profile-stat-card"><div class="psc-value">${stats.certificates_count}</div><div class="psc-label">Certificados</div></div>
+      </div>
+
+      <div class="profile-section-title" style="margin-top:var(--space-lg)">${icon('achievements','18','icon--gold')} Conquistas (${earnedCount}/${achievements.length})</div>
+      <div class="achievements-grid">
+        ${achievements.map(a => `
+          <div class="achievement-card ${a.earned ? 'earned' : 'locked'}" title="${a.description||''}">
+            <div class="ach-icon">${a.earned ? a.icon : icon('lock','22')}</div>
+            <div class="ach-name">${a.name}</div>
+            ${a.earned
+              ? `<div class="ach-date">Conquistada em ${new Date(a.earned_at).toLocaleDateString('pt-BR')}</div>`
+              : `<div class="ach-desc">${a.description||''}</div>`}
+          </div>`).join('')}
+      </div>
+
+      <div class="profile-section-title" style="margin-top:var(--space-lg)">${icon('certificates','18')} Meus Certificados (${certs.length})</div>
+      ${certs.length === 0
+        ? `<div class="card" style="text-align:center;padding:2rem">
+             <p style="color:var(--gray)">Nenhum certificado ainda. Conclua um curso ou trilha para ganhar o primeiro!</p>
+           </div>`
+        : certs.map(cert => `
+            <div class="card" style="display:flex;align-items:center;gap:1rem;margin-bottom:var(--space-md);flex-wrap:wrap">
+              <div style="font-size:2.2rem">🎓</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:700;color:var(--dark)">${cert.title}</div>
+                <div style="font-size:.8rem;color:var(--gray);margin:.2rem 0">
+                  ${cert.cert_type==='trail'?'Trilha':'Curso'} · Emitido em ${new Date(cert.issued_at).toLocaleDateString('pt-BR')}
+                </div>
+                <div style="font-size:.75rem;color:var(--gray-dark);font-weight:600">Código: ${cert.cert_code}</div>
+              </div>
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+                <button class="btn btn-outline" onclick="downloadCertificate('${cert.cert_code}')">⬇ Baixar PDF</button>
+                <button class="btn btn-success" onclick="shareCertificateWhatsApp(${JSON.stringify(cert).replace(/"/g,'&quot;')})">💚 WhatsApp</button>
+              </div>
+            </div>`).join('')}
+    `;
+  }catch(e){
+    el.innerHTML = '<p style="color:var(--danger);padding:1.5rem">Erro ao carregar seu perfil.</p>';
+  }
+}
+
+function openEditProfileModal(){
+  const name = (currentUser && currentUser.name) || '';
+  showModal('Editar Perfil', `
+    <div class="form-group">
+      <label>Nome</label>
+      <input type="text" id="edit-profile-name" value="${name.replace(/"/g,'&quot;')}" placeholder="Seu nome">
+    </div>
+    <div id="edit-profile-error" style="color:var(--danger);font-size:.85rem;margin-top:.4rem"></div>
+  `, `
+    <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+    <button class="btn btn-primary" onclick="saveProfile()">Salvar</button>
+  `);
+}
+
+async function saveProfile(){
+  const name = (document.getElementById('edit-profile-name').value || '').trim();
+  const errEl = document.getElementById('edit-profile-error');
+  errEl.textContent = '';
+  if(name.length < 3){ errEl.textContent = 'Nome deve ter pelo menos 3 caracteres'; return; }
+  try{
+    const r = await api('PUT', '/auth/profile', {name});
+    const d = await r.json();
+    if(!r.ok){ errEl.textContent = d.error || 'Erro ao salvar perfil.'; return; }
+    currentUser = d;
+    const nameEl = document.getElementById('topbar-name');
+    if(nameEl) nameEl.textContent = d.name;
+    closeModal();
+    showToast('Perfil atualizado com sucesso!');
+    if(document.querySelector('.course-title')) navigateToMeuPerfil();
+  }catch(e){
+    errEl.textContent = 'Erro ao salvar perfil.';
+  }
+}
+
+function openChangePasswordModal(){
+  showModal('Alterar Senha', `
+    <div class="form-group">
+      <label>Senha atual</label>
+      <input type="password" id="change-pass-current" placeholder="Senha atual">
+    </div>
+    <div class="form-group">
+      <label>Nova senha</label>
+      <input type="password" id="change-pass-new" placeholder="Nova senha (mín. 6 caracteres)">
+    </div>
+    <div class="form-group">
+      <label>Confirmar nova senha</label>
+      <input type="password" id="change-pass-confirm" placeholder="Confirme a nova senha">
+    </div>
+    <div id="change-pass-error" style="color:var(--danger);font-size:.85rem;margin-top:.4rem"></div>
+  `, `
+    <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+    <button class="btn btn-primary" onclick="changePassword()">Alterar Senha</button>
+  `);
+}
+
+async function changePassword(){
+  const current_password = document.getElementById('change-pass-current').value || '';
+  const new_password = document.getElementById('change-pass-new').value || '';
+  const confirm_password = document.getElementById('change-pass-confirm').value || '';
+  const errEl = document.getElementById('change-pass-error');
+  errEl.textContent = '';
+  if(!current_password || !new_password || !confirm_password){ errEl.textContent = 'Preencha todos os campos.'; return; }
+  if(new_password.length < 6){ errEl.textContent = 'A nova senha deve ter ao menos 6 caracteres.'; return; }
+  if(new_password !== confirm_password){ errEl.textContent = 'As senhas não coincidem.'; return; }
+  try{
+    const r = await api('PUT', '/auth/password', {current_password, new_password, confirm_password});
+    const d = await r.json();
+    if(!r.ok){ errEl.textContent = d.error || 'Erro ao alterar senha.'; return; }
+    closeModal();
+    showToast('Senha alterada com sucesso!');
+  }catch(e){
+    errEl.textContent = 'Erro ao alterar senha.';
+  }
+}
+
+function showAchievementPopup(achievement){
+  if(!achievement) return;
+  showTrophyModal(achievement.icon, achievement.name, achievement.description || 'Você desbloqueou uma nova conquista!');
+}
+
+function showAchievementPopups(achievements){
+  if(!achievements || !achievements.length) return;
+  achievements.forEach((a, i) => setTimeout(()=>showAchievementPopup(a), i * 700));
 }
 
 // ── Public verification page (accessible without login) ──────────────────

@@ -1,0 +1,101 @@
+/* ─── Meu Perfil page (Sprint 6.1) ──────────────────────────────── */
+
+.profile-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-md);
+  margin-top: var(--space-lg);
+}
+
+.profile-stat-card {
+  background: #fff;
+  border: 1px solid var(--border, #e8e0d4);
+  border-radius: var(--radius-lg, 12px);
+  padding: var(--space-lg);
+  text-align: center;
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,.06));
+}
+
+.psc-value {
+  font-family: var(--font-display);
+  font-size: var(--text-xl, 1.5rem);
+  font-weight: 700;
+  color: var(--dark);
+}
+
+.psc-label {
+  font-size: var(--text-sm, .82rem);
+  color: var(--gray);
+  margin-top: .25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .25rem;
+}
+
+.profile-section-title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg, 1.1rem);
+  font-weight: 700;
+  color: var(--dark);
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  margin-bottom: var(--space-md);
+}
+
+.achievements-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.achievement-card {
+  background: #fff;
+  border: 1px solid var(--border, #e8e0d4);
+  border-radius: var(--radius-lg, 12px);
+  padding: var(--space-md);
+  text-align: center;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.achievement-card.earned {
+  border-color: #e9c46a;
+  background: linear-gradient(135deg, #fffaf0 0%, #fff 100%);
+  box-shadow: 0 2px 8px rgba(233, 196, 106, .25);
+}
+
+.achievement-card.earned:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(233, 196, 106, .35);
+}
+
+.achievement-card.locked {
+  opacity: .55;
+  filter: grayscale(.4);
+}
+
+.ach-icon {
+  font-size: 2rem;
+  margin-bottom: .4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ach-icon svg {
+  color: var(--gray);
+}
+
+.ach-name {
+  font-weight: 600;
+  font-size: .88rem;
+  color: var(--dark);
+}
+
+.ach-desc, .ach-date {
+  font-size: .72rem;
+  color: var(--gray);
+  margin-top: .25rem;
+}

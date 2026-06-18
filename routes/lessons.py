@@ -5,7 +5,7 @@ import re
 from flask import Blueprint, request, jsonify, session
 from extensions import db
 from models import Course, Module, LessonProgress, User, UserPoints, Badge, UserBadge, Certificate
-from routes.gamification import award_points
+from routes.gamification import award_points, check_and_grant_achievements
 
 lessons_bp = Blueprint('lessons', __name__)
 
@@ -197,6 +197,8 @@ def submit_aula_quiz(course_id, aula_num):
                 certificate_issued = True
                 cert_code = code
 
+    new_achievements = check_and_grant_achievements(user.id) if passed else []
+
     return jsonify({
         'score': score,
         'total': total,
@@ -208,6 +210,7 @@ def submit_aula_quiz(course_id, aula_num):
         'is_last_lesson': is_last,
         'certificate_issued': certificate_issued,
         'cert_code': cert_code,
+        'new_achievements': new_achievements,
     }), 200
 
 

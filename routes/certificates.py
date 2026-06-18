@@ -59,7 +59,11 @@ def issue_certificate():
         cert = Certificate(user_id=user.id, trail_id=entity_id, cert_type='trail', cert_code=code)
     db.session.add(cert)
     db.session.commit()
-    return jsonify({'certificate_issued': True, 'cert': cert.to_dict()}), 201
+
+    from routes.gamification import check_and_grant_achievements
+    new_achievements = check_and_grant_achievements(user.id)
+
+    return jsonify({'certificate_issued': True, 'cert': cert.to_dict(), 'new_achievements': new_achievements}), 201
 
 
 # ── List my certificates ───────────────────────────────────────────────────

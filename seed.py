@@ -3,7 +3,7 @@ Seed the database with initial demo data from BRIEFING.md.
 Run once: python seed.py
 """
 from app import create_app, db
-from models import User, Category, Course, Module, Quiz, Material, Badge, Trail, TrailCourse, Certificate, PlatformConfig, Level
+from models import User, Category, Course, Module, Quiz, Material, Badge, Trail, TrailCourse, Certificate, PlatformConfig, Level, Achievement
 
 LEVELS = [
     (1, 'Iniciante', 0, '#95a5a6'),
@@ -71,6 +71,35 @@ def seed_badges():
     print("Badges criadas.")
 
 
+ACHIEVEMENTS = [
+    ('primeira_aula', 'Primeira Aula Concluída', 'Concluiu sua primeira aula na plataforma', '🎬', 'lessons_completed', 1, 10),
+    ('dez_aulas', '10 Aulas Concluídas', 'Concluiu 10 aulas na plataforma', '📚', 'lessons_completed', 10, 30),
+    ('vinte_cinco_aulas', '25 Aulas Concluídas', 'Concluiu 25 aulas na plataforma', '📘', 'lessons_completed', 25, 60),
+    ('primeiro_curso', 'Primeiro Curso Concluído', 'Concluiu seu primeiro curso completo', '🎓', 'courses_completed', 1, 50),
+    ('cinco_cursos', '5 Cursos Concluídos', 'Concluiu 5 cursos completos', '🏅', 'courses_completed', 5, 150),
+    ('dez_cursos', '10 Cursos Concluídos', 'Concluiu 10 cursos completos', '🏆', 'courses_completed', 10, 300),
+    ('primeira_trilha', 'Primeira Trilha Concluída', 'Concluiu sua primeira trilha de aprendizado', '🛤️', 'trails_completed', 1, 100),
+    ('duas_trilhas', '2 Trilhas Concluídas', 'Concluiu 2 trilhas de aprendizado', '🗺️', 'trails_completed', 2, 200),
+    ('primeira_pergunta', 'Primeira Pergunta', 'Fez sua primeira pergunta a um tutor', '💬', 'questions_created', 1, 10),
+    ('cinco_perguntas', '5 Perguntas Feitas', 'Fez 5 perguntas a tutores', '🙋', 'questions_created', 5, 25),
+    ('primeiro_certificado', 'Primeiro Certificado', 'Conquistou seu primeiro certificado', '📜', 'certificates_earned', 1, 50),
+    ('cinco_certificados', '5 Certificados', 'Conquistou 5 certificados', '🎖️', 'certificates_earned', 5, 150),
+]
+
+
+def seed_achievements():
+    for code, name, desc, icon, criteria_type, criteria_value, points_reward in ACHIEVEMENTS:
+        if Achievement.query.filter_by(code=code).first():
+            continue
+        db.session.add(Achievement(
+            code=code, name=name, description=desc, icon=icon,
+            criteria_type=criteria_type, criteria_value=criteria_value,
+            points_reward=points_reward,
+        ))
+    db.session.commit()
+    print("Conquistas (achievements) verificadas/criadas.")
+
+
 def seed():
     app = create_app()
     with app.app_context():
@@ -78,6 +107,7 @@ def seed():
         seed_badges()
         seed_config()
         seed_levels()
+        seed_achievements()
 
         if User.query.first():
             print("Database already seeded — skipping.")

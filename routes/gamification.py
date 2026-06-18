@@ -5,7 +5,8 @@ from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, session
 from extensions import db
 from models import (User, Badge, UserBadge, UserPoints, LessonProgress,
-                    Question, Course, Module)
+                    Question, Course, Module, Achievement, UserAchievement,
+                    UserTrail, Certificate)
 
 gamification_bp = Blueprint('gamification', __name__)
 
@@ -254,6 +255,77 @@ def add_points():
     msg = f"+{result['points_awarded']} XP! (Total: {result['total_points']})"
     result['message'] = msg
     return jsonify(result), 201
+
+
+# ── Achievements ("Conquistas") — Sprint 6.1 ────────────────────────────
+# NOTE: this is a NEW, separate system from the legacy Badge/UserBadge tables
+# above (already surfaced as "Conquistas" in the hero/dashboard UI). Both
+# exist concurrently for now — see final report for the flagged duplication.
+
+def get_completed_lessons_count(user_id):
+    return LessonProgress.query.filter_by(user_id=user_id, passed=True).count()
+
+
+def get_completed_courses_count(user_id):
+    """Count courses where the user has passed all modules. Reuses the same
+    logic as the legacy _completed_courses_count() helper above."""
+    return _completed_courses_count(user_id)
+
+
+def get_completed_trails_count(user_id):
+    return UserTrail.query.filter(UserTrail.user_id == user_id,
+                                   UserTrail.completed_at.isnot(None)).count()
+
+
+def get_questions_count(user_id):
+    return Question.query.filter_by(user_id=user_id).count()
+
+
+def get_certificates_count(user_id):
+    return Certificate.query.filter_by(user_id=user_id).count()
+
+
+def _achievement_progress_value(user_id, criteria_type):
+    if criteria_type == 'lessons_completed':
+        return get_completed_lessons_count(user_id)
+    if criteria_type == 'courses_completed':
+        return get_completed_courses_count(user_id)
+    if criteria_type == 'trails_completed':
+        return get_completed_trails_count(user_id)
+    if criteria_type == 'questions_created':
+        return get_questions_count(user_id)
+    if criteria_type == 'certificates_earned':
+        return get_certificates_count(user_id)
+    if criteria_type == 'points_total':
+        up = UserPoints.query.filter_by(user_id=user_id).first()
+        return up.total_points if up else 0
+    return 0
+
+
+def check_and_grant_achievements(user_id):
+    """Checks all Achievement rows not yet earned by the user; grants any
+    whose criteria is now met (creating UserAchievement + awarding points).
+    Returns a list of newly granted Achievement dicts (for popup display)."""
+    earned_ids = {ua.achievement_id for ua in UserAchievement.query.filter_by(user_id=user_id).all()}
+    newly_granted = []
+
+    for ach in Achievement.query.all():
+        if ach.id in earned_ids:
+            continue
+        current = _achievement_progress_value(user_id, ach.criteria_type)
+        if current >= ach.criteria_value:
+            ua = UserAchievement(user_id=user_id, achievement_id=ach.id)
+            db.session.add(ua)
+            if ach.points_reward:
+                up = _get_or_create_points(user_id)
+                up.total_points = (up.total_points or 0) + ach.points_reward
+                up.current_level, up.points_in_level = calculate_level(up.total_points)
+            db.session.flush()
+            newly_granted.append(ach.to_dict())
+
+    if newly_granted:
+        db.session.commit()
+    return newly_granted
 
 
 @gamification_bp.route('/check-badge-progress', methods=['POST'])

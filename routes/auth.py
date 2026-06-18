@@ -70,7 +70,13 @@ def login():
     db.session.commit()
 
     session['user_id'] = user.id
-    return jsonify(user.to_dict()), 200
+
+    from routes.gamification import check_and_grant_achievements
+    new_achievements = check_and_grant_achievements(user.id)
+
+    data_out = user.to_dict()
+    data_out['new_achievements'] = new_achievements
+    return jsonify(data_out), 200
 
 
 @auth_bp.route('/logout', methods=['POST'])
@@ -95,6 +101,56 @@ def reset_password():
 
     if not user.check_password(old_password):
         return jsonify({'error': 'Senha atual incorreta'}), 401
+
+    if len(new_password) < 6:
+        return jsonify({'error': 'A nova senha deve ter ao menos 6 caracteres'}), 400
+
+    user.set_password(new_password)
+    db.session.commit()
+    return jsonify({'message': 'Senha alterada com sucesso'}), 200
+
+
+@auth_bp.route('/profile', methods=['PUT'])
+def update_profile():
+    """Allows an authenticated user to update their own editable profile fields."""
+    user = _current_user()
+    if not user:
+        return jsonify({'error': 'Não autenticado'}), 401
+
+    data = request.get_json(silent=True) or {}
+    name = (data.get('name') or '').strip()
+
+    if not name:
+        return jsonify({'error': 'name é obrigatório'}), 400
+    if len(name) < 3:
+        return jsonify({'error': 'Nome deve ter pelo menos 3 caracteres'}), 400
+
+    user.name = name
+    db.session.commit()
+    return jsonify(user.to_dict()), 200
+
+
+@auth_bp.route('/password', methods=['PUT'])
+def change_password():
+    """New password-change flow for the 'Meu Perfil' UI (Sprint 6.1).
+    Separate from the legacy POST /reset-password endpoint, left untouched."""
+    user = _current_user()
+    if not user:
+        return jsonify({'error': 'Não autenticado'}), 401
+
+    data = request.get_json(silent=True) or {}
+    current_password = data.get('current_password') or ''
+    new_password = data.get('new_password') or ''
+    confirm_password = data.get('confirm_password') or ''
+
+    if not current_password or not new_password or not confirm_password:
+        return jsonify({'error': 'current_password, new_password e confirm_password são obrigatórios'}), 400
+
+    if not user.check_password(current_password):
+        return jsonify({'error': 'Senha atual incorreta'}), 401
+
+    if new_password != confirm_password:
+        return jsonify({'error': 'As senhas não coincidem'}), 400
 
     if len(new_password) < 6:
         return jsonify({'error': 'A nova senha deve ter ao menos 6 caracteres'}), 400

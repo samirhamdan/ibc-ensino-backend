@@ -42,7 +42,13 @@ def ask_question(course_id):
     q = Question(course_id=course_id, user_id=user.id, texto=texto)
     db.session.add(q)
     db.session.commit()
-    return jsonify(q.to_dict()), 201
+
+    from routes.gamification import check_and_grant_achievements
+    new_achievements = check_and_grant_achievements(user.id)
+
+    result = q.to_dict()
+    result['new_achievements'] = new_achievements
+    return jsonify(result), 201
 
 
 @questions_bp.route('/<int:question_id>/responder', methods=['POST'])

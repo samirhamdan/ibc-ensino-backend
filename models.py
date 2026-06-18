@@ -588,3 +588,54 @@ class Level(db.Model):
             'min_points': self.min_points,
             'color': self.color,
         }
+
+
+class Achievement(db.Model):
+    """New 'Conquistas' system (Sprint 6.1) — distinct from the legacy
+    Badge/UserBadge tables used in the hero/dashboard. See routes/gamification.py
+    for the criteria checking logic."""
+    __tablename__ = 'achievements'
+
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(50), unique=True, nullable=False)
+    name = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.Text, default='')
+    icon = db.Column(db.String(10), default='🏆')
+    criteria_type = db.Column(db.String(30), nullable=False)
+    # criteria_type: lessons_completed | courses_completed | trails_completed |
+    #                questions_created | certificates_earned | points_total
+    criteria_value = db.Column(db.Integer, nullable=False, default=1)
+    points_reward = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'code': self.code,
+            'name': self.name,
+            'description': self.description,
+            'icon': self.icon,
+            'criteria_type': self.criteria_type,
+            'criteria_value': self.criteria_value,
+            'points_reward': self.points_reward,
+        }
+
+
+class UserAchievement(db.Model):
+    __tablename__ = 'user_achievements'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    achievement_id = db.Column(db.Integer, db.ForeignKey('achievements.id'), nullable=False)
+    earned_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    achievement = db.relationship('Achievement')
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'achievement_id', name='uq_user_achievement'),)
+
+    def to_dict(self):
+        return {
+            'user_id': self.user_id,
+            'achievement_id': self.achievement_id,
+            'earned_at': self.earned_at.isoformat() if self.earned_at else None,
+        }
