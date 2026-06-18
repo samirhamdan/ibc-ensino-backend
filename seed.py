@@ -3,7 +3,47 @@ Seed the database with initial demo data from BRIEFING.md.
 Run once: python seed.py
 """
 from app import create_app, db
-from models import User, Category, Course, Module, Quiz, Material, Badge, Trail, TrailCourse, Certificate
+from models import User, Category, Course, Module, Quiz, Material, Badge, Trail, TrailCourse, Certificate, PlatformConfig, Level
+
+LEVELS = [
+    (1, 'Iniciante', 0, '#95a5a6'),
+    (2, 'Aprendiz', 100, '#3498db'),
+    (3, 'Dedicado', 300, '#27ae60'),
+    (4, 'Comprometido', 600, '#f39c12'),
+    (5, 'Mestre', 1000, '#e74c3c'),
+    (6, 'Discípulo', 2000, '#9b59b6'),
+    (7, 'Líder', 5000, '#e67e22'),
+]
+
+
+def seed_config():
+    if PlatformConfig.query.first():
+        return
+    db.session.add(PlatformConfig(
+        platform_name='IBC Ensino',
+        platform_short='IBC',
+        whatsapp='(67) 99999-9999',
+        support_email='contato@ibccg.org.br',
+        support_hours='Seg-Sex, 8h-17h',
+        verse_text='Lâmpada para os meus pés é a tua palavra e luz para o meu caminho.',
+        verse_reference='Salmos 119:105',
+        points_read_material=10,
+        points_complete_video=10,
+        points_correct_exercise=20,
+        points_complete_course=50,
+        points_complete_trail=200,
+    ))
+    db.session.commit()
+    print("Configuração da plataforma criada.")
+
+
+def seed_levels():
+    if Level.query.first():
+        return
+    for number, name, min_points, color in LEVELS:
+        db.session.add(Level(number=number, name=name, min_points=min_points, color=color))
+    db.session.commit()
+    print("Níveis criados.")
 
 BADGES = [
     ('novo_discipulo', 'Novo Discípulo', 'Seu primeiro curso começado', '👶', 'comum'),
@@ -36,6 +76,8 @@ def seed():
     with app.app_context():
         db.create_all()
         seed_badges()
+        seed_config()
+        seed_levels()
 
         if User.query.first():
             print("Database already seeded — skipping.")

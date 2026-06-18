@@ -67,14 +67,14 @@
     <div class="login-visual-content">
       <img class="login-visual-logo" src="images/logo-ibc-white.png" alt="Escola da IBC">
       <h1 class="login-headline">Sua jornada<br>de fé<br>começa aqui.</h1>
-      <p class="login-verse">"Lâmpada para os meus pés é a tua palavra e luz para o meu caminho."</p>
+      <p class="login-verse login-verse-text">"Lâmpada para os meus pés é a tua palavra e luz para o meu caminho."</p>
       <p class="login-verse-ref">Salmos 119:105</p>
     </div>
   </div>
   <div class="login-form-side">
   <div class="login-card" id="login-card">
     <div class="login-logo">
-      <h1 style="font-family:var(--font-display);font-size:1.4rem;color:var(--primary);margin:0">IBC Ensino</h1>
+      <h1 class="login-title" style="font-family:var(--font-display);font-size:1.4rem;color:var(--primary);margin:0">IBC Ensino</h1>
       <p style="font-size:.75rem;color:#888;letter-spacing:.05em;text-transform:uppercase;margin-top:.2rem">Plataforma de Estudos</p>
     </div>
     <div class="field">
@@ -132,7 +132,7 @@
   <div class="login-footer">
     <p class="support-text">
       Dúvidas? Entre em contato:<br>
-      <a href="https://wa.me/5567999999999" target="_blank" rel="noopener" class="whatsapp-link">💬 WhatsApp: (67) 99999-9999</a>
+      <a href="https://wa.me/5567999999999" target="_blank" rel="noopener" class="whatsapp-link login-whatsapp">💬 WhatsApp: (67) 99999-9999</a>
     </p>
   </div>
   </div>
@@ -274,6 +274,10 @@
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-megaphone"></use></svg></span>
           <div class="ci-text"><div class="ci-name">Comunicação</div></div>
         </div>
+        <div class="course-item" id="nav-admin-settings" onclick="showAdminPanel('settings')" style="display:none">
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-settings"></use></svg></span>
+          <div class="ci-text"><div class="ci-name">Configurações</div></div>
+        </div>
       </div>
     </div>
     <div class="content">
@@ -344,6 +348,23 @@ async function api(method, path, body){
   const res = await fetch('/api'+path, opts);
   return res;
 }
+
+async function loadLoginConfig(){
+  try{
+    const res = await fetch('/api/config/public', {credentials:'same-origin'});
+    if(!res.ok) return;
+    const cfg = await res.json();
+    document.querySelectorAll('.login-verse-text').forEach(el => el.textContent = `"${cfg.verse_text}"`);
+    document.querySelectorAll('.login-verse-ref').forEach(el => el.textContent = cfg.verse_reference);
+    document.querySelectorAll('.login-title').forEach(el => el.textContent = cfg.platform_name);
+    document.querySelectorAll('.login-whatsapp').forEach(el => {
+      const digits = (cfg.whatsapp || '').replace(/\D/g, '');
+      el.href = `https://wa.me/55${digits}`;
+      el.textContent = `💬 WhatsApp: ${cfg.whatsapp}`;
+    });
+  }catch(e){}
+}
+document.addEventListener('DOMContentLoaded', loadLoginConfig);
 
 // ── App init ──
 let resetToken = null;
@@ -419,7 +440,7 @@ function setupUI(){
   document.getElementById('admin-nav-section').style.display = (isAdmin()||isTutor()) ? 'block' : 'none';
   const isAdminUser = isAdmin();
   const isTutorUser = isTutor();
-  ['nav-admin-dashboard','nav-admin-categories','nav-admin-courses','nav-admin-trails','nav-admin-tutors','nav-admin-announcements'].forEach(id=>{
+  ['nav-admin-dashboard','nav-admin-categories','nav-admin-courses','nav-admin-trails','nav-admin-tutors','nav-admin-announcements','nav-admin-settings'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.style.display = isAdminUser ? 'flex' : 'none';
   });
@@ -1791,6 +1812,7 @@ function showAdminPanel(panel){
   else if(panel==='categories') renderAdminCategories();
   else if(panel==='trails') renderAdminTrails();
   else if(panel==='announcements') renderAdminAnnouncements();
+  else if(panel==='settings') renderAdminSettings();
   else renderAdminCourses();
 }
 
@@ -2132,7 +2154,10 @@ async function renderAdminCourses() {
     list.innerHTML = '<div class="empty-state"><p>Nenhum curso criado.</p></div>';
     return;
   }
-  list.innerHTML = data.courses.map(c => `
+  list.innerHTML = data.courses.map(c => {
+    const status = c.status || 'published';
+    const statusLabel = status === 'published' ? 'Publicado' : (status === 'draft' ? 'Rascunho' : 'Arquivado');
+    return `
     <div class="admin-course-card" onclick="openCourseEditor(${c.id})">
       <div class="admin-course-card-icon" style="background:${c.color||'var(--primary)'}">
         ${icon('books','28','icon--white')}
@@ -2146,11 +2171,70 @@ async function renderAdminCourses() {
         <div class="admin-course-card-flags">
           ${c.has_video ? '<span class="flag-badge">'+icon('play-circle','12')+' Vídeo</span>' : ''}
           ${c.has_pdf ? '<span class="flag-badge">'+icon('file','12')+' PDF</span>' : ''}
+          <span class="course-status status-${status}">${statusLabel}</span>
+        </div>
+        <div class="course-admin-actions" onclick="event.stopPropagation()">
+          <div class="course-action-buttons">
+            ${status === 'published'
+              ? `<button class="btn btn-outline btn-sm" onclick="toggleCourseStatus(${c.id},'draft')">Despublicar</button>`
+              : `<button class="btn btn-outline btn-sm" onclick="toggleCourseStatus(${c.id},'published')">Publicar</button>`}
+            <button class="btn btn-outline btn-sm" onclick="duplicateCourse(${c.id})">${icon('document-text','14')} Duplicar</button>
+            <button class="btn btn-outline btn-sm" onclick="previewCourseAsAluno(${c.id})">${icon('eye','14')} Preview</button>
+            ${status === 'archived'
+              ? `<button class="btn btn-outline btn-sm" onclick="toggleCourseStatus(${c.id},'published')">Restaurar</button>`
+              : `<button class="btn btn-outline btn-sm" onclick="toggleCourseStatus(${c.id},'archived')">Arquivar</button>`}
+          </div>
         </div>
       </div>
       <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openCourseEditor(${c.id})">Editar</button>
     </div>
-  `).join('');
+  `;
+  }).join('');
+}
+
+async function toggleCourseStatus(courseId, newStatus){
+  const labels = {published:'publicar', draft:'despublicar', archived:'arquivar'};
+  if(!confirm(`Deseja ${labels[newStatus]||'alterar'} este curso?`)) return;
+  const res = await api('POST', `/admin/courses/${courseId}/toggle-status`, {status: newStatus});
+  if(res.ok){
+    showToast('Status do curso atualizado.', 'success');
+    renderAdminCourses();
+  } else {
+    showToast('Erro ao atualizar status do curso.', 'error');
+  }
+}
+
+async function duplicateCourse(courseId){
+  if(!confirm('Duplicar este curso? Uma cópia em rascunho será criada com todas as aulas.')) return;
+  const res = await api('POST', `/admin/courses/${courseId}/duplicate`);
+  if(res.ok){
+    const data = await res.json();
+    showToast(`Curso duplicado: ${data.name}`, 'success');
+    await loadCourses();
+    renderAdminCourses();
+  } else {
+    showToast('Erro ao duplicar curso.', 'error');
+  }
+}
+
+function previewCourseAsAluno(courseId){
+  window._adminPreviewMode = true;
+  selectCourse(courseId);
+  setTimeout(()=>{
+    if(document.getElementById('preview-banner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'preview-banner';
+    banner.style = 'position:fixed;top:0;left:0;right:0;background:#f39c12;color:#fff;text-align:center;padding:.6rem;z-index:3000;font-weight:600';
+    banner.innerHTML = 'Modo de Pré-visualização (como Aluno) <button class="btn btn-sm" style="margin-left:1rem;background:#fff;color:#f39c12" onclick="exitPreview()">Sair do Preview</button>';
+    document.body.appendChild(banner);
+  }, 300);
+}
+
+function exitPreview(){
+  window._adminPreviewMode = false;
+  const banner = document.getElementById('preview-banner');
+  if(banner) banner.remove();
+  renderAdminCourses();
 }
 
 function showNewCourseForm() {
@@ -3204,6 +3288,168 @@ async function archiveAnnouncement(id){
     _loadAdminAnnouncements();
   } else {
     showToast('Erro ao arquivar aviso.', 'error');
+  }
+}
+
+// ── Admin: Settings ──
+async function renderAdminSettings(){
+  const main = document.getElementById('main-content');
+  main.innerHTML = '<p>Carregando...</p>';
+  const [cfgRes, lvlRes] = await Promise.all([
+    api('GET','/admin/config'),
+    api('GET','/admin/levels'),
+  ]);
+  if(!cfgRes.ok || !lvlRes.ok){ showToast('Erro ao carregar configurações.', 'error'); return; }
+  const cfg = await cfgRes.json();
+  const levels = await lvlRes.json();
+
+  main.innerHTML = `
+    <div class="admin-page-header">
+      <h1 class="text-h2">${icon('settings','24')} Configurações</h1>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-header">${icon('church','18')} Identidade</div>
+      <div class="settings-section-body">
+        <div class="form-row">
+          <div class="form-group"><label>Nome da plataforma</label><input type="text" id="cfg-name" class="form-control" value="${(cfg.platform_name||'').replace(/"/g,'&quot;')}"></div>
+          <div class="form-group"><label>Sigla</label><input type="text" id="cfg-short" class="form-control" value="${(cfg.platform_short||'').replace(/"/g,'&quot;')}"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-header">${icon('chat','18')} Contato &amp; Suporte</div>
+      <div class="settings-section-body">
+        <div class="form-row">
+          <div class="form-group"><label>WhatsApp</label><input type="text" id="cfg-whatsapp" class="form-control" value="${(cfg.whatsapp||'').replace(/"/g,'&quot;')}"></div>
+          <div class="form-group"><label>E-mail de suporte</label><input type="email" id="cfg-email" class="form-control" value="${(cfg.support_email||'').replace(/"/g,'&quot;')}"></div>
+          <div class="form-group"><label>Horário de atendimento</label><input type="text" id="cfg-hours" class="form-control" value="${(cfg.support_hours||'').replace(/"/g,'&quot;')}"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-header">${icon('cross-light','18')} Versículo da Tela de Login</div>
+      <div class="settings-section-body">
+        <div class="form-group"><label>Texto do versículo</label><textarea id="cfg-verse-text" class="form-control" rows="2" oninput="_updateVersePreview()">${(cfg.verse_text||'').replace(/</g,'&lt;')}</textarea></div>
+        <div class="form-group"><label>Referência</label><input type="text" id="cfg-verse-ref" class="form-control" value="${(cfg.verse_reference||'').replace(/"/g,'&quot;')}" oninput="_updateVersePreview()"></div>
+        <div class="settings-preview">
+          <div class="preview-label">Pré-visualização</div>
+          <div class="verse-preview" id="verse-preview-block">"${(cfg.verse_text||'')}" <cite id="verse-preview-ref">${(cfg.verse_reference||'')}</cite></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-header">${icon('rocket','18')} Gamificação (Pontuação)</div>
+      <div class="settings-section-body">
+        <div class="points-grid">
+          <div class="point-item"><label>Ler material</label><input type="number" id="cfg-pts-read" class="form-control" value="${cfg.points_read_material}"></div>
+          <div class="point-item"><label>Concluir vídeo</label><input type="number" id="cfg-pts-video" class="form-control" value="${cfg.points_complete_video}"></div>
+          <div class="point-item"><label>Exercício correto</label><input type="number" id="cfg-pts-exercise" class="form-control" value="${cfg.points_correct_exercise}"></div>
+          <div class="point-item"><label>Concluir curso</label><input type="number" id="cfg-pts-course" class="form-control" value="${cfg.points_complete_course}"></div>
+          <div class="point-item"><label>Concluir trilha</label><input type="number" id="cfg-pts-trail" class="form-control" value="${cfg.points_complete_trail}"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-header">${icon('target','18')} Níveis de Progressão</div>
+      <div class="settings-section-body">
+        <table class="levels-table">
+          <thead><tr><th>Número</th><th>Nome</th><th>Pontos mínimos</th><th>Cor</th><th></th></tr></thead>
+          <tbody id="levelsTableBody">
+            ${levels.map(lv => `
+              <tr>
+                <td><input type="number" class="lvl-number" value="${lv.number}"></td>
+                <td><input type="text" class="lvl-name" value="${(lv.name||'').replace(/"/g,'&quot;')}"></td>
+                <td><input type="number" class="lvl-points" value="${lv.min_points}"></td>
+                <td><input type="color" class="lvl-color" value="${lv.color||'#008ea8'}"></td>
+                <td><button class="btn-icon" onclick="removeLevelRow(this)">${icon('x-circle','16')}</button></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+        <button class="btn btn-outline" style="margin-top:var(--space-md)" onclick="addLevelRow()">${icon('plus','16')} Adicionar Nível</button>
+      </div>
+    </div>
+
+    <div class="settings-footer">
+      <span class="settings-saved" id="settingsSavedMsg" style="display:none">Configurações salvas!</span>
+      <button class="btn btn-primary" id="saveAllSettingsBtn" onclick="saveAllSettings()">${icon('checkmark','16')} Salvar Todas as Configurações</button>
+    </div>
+  `;
+}
+
+function _updateVersePreview(){
+  const text = document.getElementById('cfg-verse-text').value;
+  const ref = document.getElementById('cfg-verse-ref').value;
+  document.getElementById('verse-preview-block').innerHTML = `"${text}" <cite id="verse-preview-ref">${ref}</cite>`;
+}
+
+function addLevelRow(){
+  const tbody = document.getElementById('levelsTableBody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="number" class="lvl-number" value="0"></td>
+    <td><input type="text" class="lvl-name" value=""></td>
+    <td><input type="number" class="lvl-points" value="0"></td>
+    <td><input type="color" class="lvl-color" value="#008ea8"></td>
+    <td><button class="btn-icon" onclick="removeLevelRow(this)">${icon('x-circle','16')}</button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function removeLevelRow(btn){
+  const tbody = document.getElementById('levelsTableBody');
+  if(tbody.rows.length <= 1){
+    showToast('É necessário manter pelo menos um nível.', 'error');
+    return;
+  }
+  btn.closest('tr').remove();
+}
+
+async function saveAllSettings(){
+  const btn = document.getElementById('saveAllSettingsBtn');
+  const savedMsg = document.getElementById('settingsSavedMsg');
+  btn.disabled = true;
+  try{
+    const configBody = {
+      platform_name: document.getElementById('cfg-name').value,
+      platform_short: document.getElementById('cfg-short').value,
+      whatsapp: document.getElementById('cfg-whatsapp').value,
+      support_email: document.getElementById('cfg-email').value,
+      support_hours: document.getElementById('cfg-hours').value,
+      verse_text: document.getElementById('cfg-verse-text').value,
+      verse_reference: document.getElementById('cfg-verse-ref').value,
+      points_read_material: parseInt(document.getElementById('cfg-pts-read').value) || 0,
+      points_complete_video: parseInt(document.getElementById('cfg-pts-video').value) || 0,
+      points_correct_exercise: parseInt(document.getElementById('cfg-pts-exercise').value) || 0,
+      points_complete_course: parseInt(document.getElementById('cfg-pts-course').value) || 0,
+      points_complete_trail: parseInt(document.getElementById('cfg-pts-trail').value) || 0,
+    };
+    const cfgRes = await api('PUT', '/admin/config', configBody);
+
+    const rows = Array.from(document.querySelectorAll('#levelsTableBody tr'));
+    const levelsBody = {
+      levels: rows.map(row => ({
+        number: parseInt(row.querySelector('.lvl-number').value) || 0,
+        name: row.querySelector('.lvl-name').value,
+        min_points: parseInt(row.querySelector('.lvl-points').value) || 0,
+        color: row.querySelector('.lvl-color').value,
+      })).sort((a,b) => a.number - b.number),
+    };
+    const lvlRes = await api('PUT', '/admin/levels', levelsBody);
+
+    if(cfgRes.ok && lvlRes.ok){
+      showToast('Configurações salvas com sucesso!', 'success');
+      if(savedMsg){ savedMsg.style.display = 'inline'; setTimeout(()=>{ savedMsg.style.display = 'none'; }, 3000); }
+    } else {
+      const err = !cfgRes.ok ? await cfgRes.json() : await lvlRes.json();
+      showToast(err.error || 'Erro ao salvar configurações.', 'error');
+    }
+  } finally {
+    btn.disabled = false;
   }
 }
 

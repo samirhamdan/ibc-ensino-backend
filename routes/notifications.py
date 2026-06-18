@@ -4,7 +4,7 @@ User-facing notification and announcement routes
 from datetime import datetime
 from flask import Blueprint, request, jsonify, session
 from extensions import db
-from models import Notification, Announcement, AnnouncementDismissal, User
+from models import Notification, Announcement, AnnouncementDismissal, User, PlatformConfig, Level
 
 notifications_bp = Blueprint('notifications', __name__)
 
@@ -96,3 +96,43 @@ def dismiss_announcement(announcement_id):
         db.session.add(AnnouncementDismissal(user_id=user.id, announcement_id=announcement_id))
         db.session.commit()
     return jsonify({'ok': True}), 200
+
+
+def _get_or_create_config():
+    config = PlatformConfig.query.first()
+    if not config:
+        config = PlatformConfig()
+        db.session.add(config)
+        db.session.commit()
+    return config
+
+
+@notifications_bp.route('/config/public', methods=['GET'])
+def get_public_config():
+    config = _get_or_create_config()
+    return jsonify({
+        'platform_name': config.platform_name,
+        'platform_short': config.platform_short,
+        'whatsapp': config.whatsapp,
+        'support_email': config.support_email,
+        'verse_text': config.verse_text,
+        'verse_reference': config.verse_reference,
+    }), 200
+
+
+@notifications_bp.route('/config/gamification', methods=['GET'])
+def get_gamification_config():
+    user = _current_user()
+    if not user:
+        return jsonify({'error': 'Não autenticado'}), 401
+
+    config = _get_or_create_config()
+    levels = Level.query.order_by(Level.number).all()
+    return jsonify({
+        'points_read_material': config.points_read_material,
+        'points_complete_video': config.points_complete_video,
+        'points_correct_exercise': config.points_correct_exercise,
+        'points_complete_course': config.points_complete_course,
+        'points_complete_trail': config.points_complete_trail,
+        'levels': [lv.to_dict() for lv in levels],
+    }), 200

@@ -6,7 +6,8 @@ from flask import Blueprint, request, jsonify, session
 from extensions import db
 from models import (
     User, Course, Question, TutorCourse, UserTrail, UserPoints,
-    Certificate, Progress, Trail, Notification, Announcement, AnnouncementDismissal
+    Certificate, Progress, Trail, Notification, Announcement, AnnouncementDismissal,
+    PlatformConfig, Level, Module, Material, Quiz
 )
 from sqlalchemy import func
 
@@ -554,3 +555,158 @@ def delete_announcement(announcement_id):
     ann.is_active = False
     db.session.commit()
     return jsonify({'ok': True}), 200
+
+
+# ── Platform Configuration ────────────────────────────────────────────────────
+
+def _get_or_create_config():
+    config = PlatformConfig.query.first()
+    if not config:
+        config = PlatformConfig()
+        db.session.add(config)
+        db.session.commit()
+    return config
+
+
+@admin_bp.route('/config', methods=['GET'])
+def get_admin_config():
+    _, err = _admin_required()
+    if err:
+        return err
+
+    config = _get_or_create_config()
+    data = config.to_dict()
+    data['levels'] = [lv.to_dict() for lv in Level.query.order_by(Level.number).all()]
+    return jsonify(data), 200
+
+
+@admin_bp.route('/config', methods=['PUT'])
+def update_admin_config():
+    admin_user, err = _admin_required()
+    if err:
+        return err
+
+    config = _get_or_create_config()
+    data = request.get_json(silent=True) or {}
+    fields = (
+        'platform_name', 'platform_short', 'whatsapp', 'support_email', 'support_hours',
+        'verse_text', 'verse_reference', 'points_read_material', 'points_complete_video',
+        'points_correct_exercise', 'points_complete_course', 'points_complete_trail',
+    )
+    for field in fields:
+        if field in data:
+            setattr(config, field, data[field])
+    config.updated_by = admin_user.id
+    db.session.commit()
+    return jsonify({'success': True, 'config': config.to_dict()}), 200
+
+
+@admin_bp.route('/levels', methods=['GET'])
+def list_levels():
+    _, err = _admin_required()
+    if err:
+        return err
+
+    levels = Level.query.order_by(Level.number).all()
+    return jsonify([lv.to_dict() for lv in levels]), 200
+
+
+@admin_bp.route('/levels', methods=['PUT'])
+def replace_levels():
+    _, err = _admin_required()
+    if err:
+        return err
+
+    data = request.get_json(silent=True) or {}
+    levels_data = data.get('levels', [])
+    if not levels_data:
+        return jsonify({'error': 'É necessário pelo menos um nível'}), 400
+
+    numbers = [lv.get('number') for lv in levels_data]
+    if len(numbers) != len(set(numbers)):
+        return jsonify({'error': 'Números de nível devem ser únicos'}), 400
+
+    sorted_levels = sorted(levels_data, key=lambda lv: lv.get('number', 0))
+    prev_points = None
+    for lv in sorted_levels:
+        points = lv.get('min_points', 0)
+        if prev_points is not None and points <= prev_points:
+            return jsonify({'error': 'Pontos mínimos devem aumentar a cada nível'}), 400
+        prev_points = points
+
+    Level.query.delete()
+    for lv in levels_data:
+        db.session.add(Level(
+            number=lv.get('number'),
+            name=lv.get('name', ''),
+            min_points=lv.get('min_points', 0),
+            color=lv.get('color', '#008ea8'),
+        ))
+    db.session.commit()
+    return jsonify({'success': True, 'levels': [lv.to_dict() for lv in Level.query.order_by(Level.number).all()]}), 200
+
+
+# ── Course status management ──────────────────────────────────────────────────
+
+@admin_bp.route('/courses/<int:course_id>/toggle-status', methods=['POST'])
+def toggle_course_status(course_id):
+    _, err = _admin_required()
+    if err:
+        return err
+
+    course = Course.query.get_or_404(course_id)
+    data = request.get_json(silent=True) or {}
+    status = data.get('status')
+    if status not in ('published', 'draft', 'archived'):
+        return jsonify({'error': 'status inválido'}), 400
+
+    course.status = status
+    db.session.commit()
+    return jsonify({'success': True, 'status': course.status}), 200
+
+
+@admin_bp.route('/courses/<int:course_id>/duplicate', methods=['POST'])
+def duplicate_course(course_id):
+    _, err = _admin_required()
+    if err:
+        return err
+
+    course = Course.query.get_or_404(course_id)
+    new_course = Course(
+        name=f'Cópia de {course.name}',
+        icon=course.icon,
+        acesso=course.acesso,
+        resumo=course.resumo,
+        duracao=course.duracao,
+        category_id=course.category_id,
+        tutor_id=course.tutor_id,
+        color=course.color,
+        tag=course.tag,
+        description=course.description,
+        status='draft',
+    )
+    db.session.add(new_course)
+    db.session.flush()
+
+    for m in Module.query.filter_by(course_id=course.id).order_by(Module.position).all():
+        new_module = Module(
+            course_id=new_course.id, nome=m.nome, dur=m.dur, position=m.position,
+            video_url=m.video_url, video_provider=m.video_provider,
+        )
+        db.session.add(new_module)
+        db.session.flush()
+
+        for mat in Material.query.filter_by(module_id=m.id).all():
+            db.session.add(Material(
+                course_id=new_course.id, module_id=new_module.id,
+                name=mat.name, url=mat.url, tipo=mat.tipo, size=mat.size,
+            ))
+
+        for q in Quiz.query.filter_by(module_id=m.id).order_by(Quiz.position).all():
+            db.session.add(Quiz(
+                course_id=new_course.id, module_id=new_module.id,
+                q=q.q, opts=q.opts, ans=q.ans, exp=q.exp, position=q.position,
+            ))
+
+    db.session.commit()
+    return jsonify({'success': True, 'course_id': new_course.id, 'name': new_course.name}), 200

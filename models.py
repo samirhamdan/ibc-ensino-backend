@@ -71,6 +71,7 @@ class Course(db.Model):
     color = db.Column(db.String(20), default='#008ea8')
     tag = db.Column(db.String(100), default='')
     description = db.Column(db.Text, default='')
+    status = db.Column(db.String(20), default='published')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     tutor = db.relationship('User', foreign_keys=[tutor_id])
@@ -93,6 +94,7 @@ class Course(db.Model):
             'category': self.category_rel.name if self.category_rel else None,
             'category_id': self.category_id,
             'tutor_id': self.tutor_id,
+            'status': self.status or 'published',
         }
         if include_details:
             data['modules'] = [m.to_dict() for m in self.modules]
@@ -529,4 +531,60 @@ class AnnouncementDismissal(db.Model):
     announcement_id = db.Column(db.Integer, db.ForeignKey('announcements.id'), nullable=False)
     dismissed_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    __table_args__ = (db.UniqueConstraint('user_id', 'announcement_id', name='uq_user_announcement_dismissal'),)
+
+class PlatformConfig(db.Model):
+    __tablename__ = 'platform_config'
+
+    id = db.Column(db.Integer, primary_key=True)
+    platform_name = db.Column(db.String(100), default='IBC Ensino')
+    platform_short = db.Column(db.String(20), default='IBC')
+    whatsapp = db.Column(db.String(30), default='(67) 99999-9999')
+    support_email = db.Column(db.String(120), default='contato@ibc.com')
+    support_hours = db.Column(db.String(60), default='Seg-Sex, 8h-17h')
+    verse_text = db.Column(db.Text, default='Lâmpada para os meus pés é a tua palavra e luz para o meu caminho.')
+    verse_reference = db.Column(db.String(60), default='Salmos 119:105')
+    points_read_material = db.Column(db.Integer, default=10)
+    points_complete_video = db.Column(db.Integer, default=10)
+    points_correct_exercise = db.Column(db.Integer, default=20)
+    points_complete_course = db.Column(db.Integer, default=50)
+    points_complete_trail = db.Column(db.Integer, default=200)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'platform_name': self.platform_name,
+            'platform_short': self.platform_short,
+            'whatsapp': self.whatsapp,
+            'support_email': self.support_email,
+            'support_hours': self.support_hours,
+            'verse_text': self.verse_text,
+            'verse_reference': self.verse_reference,
+            'points_read_material': self.points_read_material,
+            'points_complete_video': self.points_complete_video,
+            'points_correct_exercise': self.points_correct_exercise,
+            'points_complete_course': self.points_complete_course,
+            'points_complete_trail': self.points_complete_trail,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'updated_by': self.updated_by,
+        }
+
+
+class Level(db.Model):
+    __tablename__ = 'levels'
+
+    id = db.Column(db.Integer, primary_key=True)
+    number = db.Column(db.Integer, unique=True, nullable=False)
+    name = db.Column(db.String(50), nullable=False)
+    min_points = db.Column(db.Integer, nullable=False)
+    color = db.Column(db.String(7), default='#008ea8')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'number': self.number,
+            'name': self.name,
+            'min_points': self.min_points,
+            'color': self.color,
+        }

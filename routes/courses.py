@@ -41,7 +41,8 @@ def _can_edit_course(user, course):
 def list_courses():
     user = _current_user()
     query = Course.query
-    # All authenticated users see all courses
+    if not user or user.role not in ('admin', 'tutor'):
+        query = query.filter_by(status='published')
 
     category = request.args.get('category')
     if category:
@@ -287,7 +288,8 @@ def admin_list_courses():
             'avg_progress': avg_progress,
             'has_video': has_video,
             'has_pdf': has_pdf,
-            'trail_name': trail_name
+            'trail_name': trail_name,
+            'status': c.status or 'published',
         })
     return jsonify({'courses': result})
 
