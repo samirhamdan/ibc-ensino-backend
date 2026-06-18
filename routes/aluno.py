@@ -2,10 +2,12 @@
 Aluno-facing endpoints (Sprint 6.1): stats/profile, achievements ("Conquistas"),
 certificates list and "continue learning" info.
 """
-from flask import Blueprint, jsonify, session
+from datetime import datetime
+from flask import Blueprint, jsonify, session, request
 from extensions import db
 from models import (User, Course, Module, LessonProgress, UserPoints,
-                     Achievement, UserAchievement, Certificate)
+                     Achievement, UserAchievement, Certificate, Question,
+                     StudySession)
 from routes.gamification import (
     LEVEL_NAMES, _get_or_create_points,
     get_completed_lessons_count, get_completed_courses_count,
@@ -129,3 +131,71 @@ def continue_learning():
             candidate = info
 
     return jsonify(candidate), 200
+
+
+# ── Minhas Perguntas (Sprint 6.2) ────────────────────────────────────────────
+
+@aluno_bp.route('/questions', methods=['GET'])
+def my_questions_with_status():
+    """All of the current student's questions, with status/course info for the
+    'Minhas Perguntas' screen."""
+    user, err = _require_aluno()
+    if err:
+        return err
+
+    questions = Question.query.filter_by(user_id=user.id).order_by(Question.created_at.desc()).all()
+    result = []
+    for q in questions:
+        d = q.to_dict()
+        d['course_name'] = q.course.name if q.course else ''
+        d['course_icon'] = q.course.icon if q.course else ''
+        result.append(d)
+    return jsonify(result), 200
+
+
+@aluno_bp.route('/questions/<int:question_id>/resolve', methods=['POST'])
+def resolve_question(question_id):
+    """Student marks an answered question as resolved."""
+    user, err = _require_aluno()
+    if err:
+        return err
+
+    question = Question.query.filter_by(id=question_id, user_id=user.id).first()
+    if not question:
+        return jsonify({'error': 'Pergunta não encontrada'}), 404
+
+    if (question.status or 'open') != 'answered':
+        return jsonify({'error': 'Apenas perguntas respondidas podem ser marcadas como resolvidas'}), 400
+
+    question.status = 'resolved'
+    question.resolved_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify(question.to_dict()), 200
+
+
+# ── Timer de Estudo (Sprint 6.2) ─────────────────────────────────────────────
+
+@aluno_bp.route('/study-time', methods=['POST'])
+def save_study_time():
+    """Records a study session (time spent on a lesson)."""
+    user, err = _require_aluno()
+    if err:
+        return err
+
+    data = request.get_json(silent=True) or {}
+    lesson_id = data.get('lesson_id')
+    seconds = data.get('seconds') or 0
+    try:
+        seconds = int(seconds)
+    except (TypeError, ValueError):
+        seconds = 0
+
+    session_row = StudySession(
+        user_id=user.id,
+        lesson_id=lesson_id,
+        duration_seconds=seconds,
+        ended_at=datetime.utcnow(),
+    )
+    db.session.add(session_row)
+    db.session.commit()
+    return jsonify({'success': True}), 200

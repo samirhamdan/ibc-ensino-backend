@@ -52,7 +52,7 @@ def create_app(config_name='development'):
     # Context
     with app.app_context():
         # Importar modelos
-        from models import User, Course, Material, Module, Quiz, Progress, Question, Category, Trail, TrailCourse, UserTrail, OnboardingAnswer, Certificate, Announcement, Notification, AnnouncementDismissal, PlatformConfig, Level, Achievement, UserAchievement
+        from models import User, Course, Material, Module, Quiz, Progress, Question, Category, Trail, TrailCourse, UserTrail, OnboardingAnswer, Certificate, Announcement, Notification, AnnouncementDismissal, PlatformConfig, Level, Achievement, UserAchievement, StudySession, ActivityFeed
         
         # Criar tabelas
         db.create_all()

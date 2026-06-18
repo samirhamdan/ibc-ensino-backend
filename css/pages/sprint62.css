@@ -1,0 +1,279 @@
+/* ─── Sprint 6.2: Experiência do Aluno + Comunicação Avançada ───────────── */
+
+/* ── Topbar icon buttons (Modo Foco / Timer) ─────────────────────────────── */
+.topbar-icon-btn {
+  position: relative;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255,255,255,.85);
+  padding: .35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background .15s, color .15s;
+}
+
+.topbar-icon-btn:hover {
+  color: #fff;
+  background: rgba(255,255,255,.12);
+}
+
+.topbar-icon-btn.active {
+  color: #fff;
+  background: rgba(255,255,255,.2);
+}
+
+.timer-display {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono, monospace);
+  font-size: .82rem;
+  color: #fff;
+  background: rgba(255,255,255,.12);
+  border-radius: 6px;
+  padding: .25rem .6rem;
+  letter-spacing: .03em;
+}
+
+/* ── Modo Foco ────────────────────────────────────────────────────────── */
+body.focus-mode .sidebar {
+  display: none !important;
+}
+
+body.focus-mode .main-body {
+  display: block;
+}
+
+body.focus-mode .topbar-logo-box,
+body.focus-mode .topbar-subtitle {
+  opacity: .55;
+}
+
+#focusToggle.active {
+  color: #fff;
+  background: rgba(255,255,255,.25);
+}
+
+/* ── Lesson Completed Panel (Próxima Aula Automática) ────────────────────── */
+.lesson-completed-panel {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 20, 25, .55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: fadeIn .2s ease;
+}
+
+.lesson-completed-card {
+  background: #fff;
+  border-radius: var(--radius-lg, 14px);
+  padding: 2rem 1.8rem;
+  max-width: 420px;
+  width: 100%;
+  margin: 1rem;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0,0,0,.25);
+}
+
+.lesson-completed-check {
+  display: flex;
+  justify-content: center;
+  margin-bottom: .6rem;
+}
+
+.lesson-completed-title {
+  font-family: var(--font-display);
+  color: var(--dark);
+  font-size: 1.3rem;
+  margin-bottom: .4rem;
+}
+
+.lesson-completed-msg {
+  color: var(--gray);
+  font-size: .9rem;
+  margin-bottom: 1.1rem;
+}
+
+.lesson-completed-next {
+  background: var(--bg-light, #f7f4ee);
+  border: 1px solid var(--border, #e8e0d4);
+  border-radius: var(--radius, 10px);
+  padding: .8rem 1rem;
+  margin-bottom: 1.2rem;
+  text-align: left;
+}
+
+.lcn-label {
+  display: block;
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--gray);
+  margin-bottom: .15rem;
+}
+
+.lcn-title {
+  display: block;
+  font-weight: 700;
+  color: var(--dark);
+  font-size: .95rem;
+}
+
+.lesson-completed-actions {
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+}
+
+/* ── Minhas Perguntas ─────────────────────────────────────────────────── */
+.questions-filters {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-lg, 1.2rem);
+}
+
+.filter-btn {
+  background: #fff;
+  border: 1px solid var(--border, #e8e0d4);
+  color: var(--gray-dark, #555);
+  font-size: .82rem;
+  padding: .4rem .9rem;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.filter-btn:hover {
+  border-color: var(--primary, #008ea8);
+  color: var(--primary, #008ea8);
+}
+
+.filter-btn.active {
+  background: var(--primary, #008ea8);
+  border-color: var(--primary, #008ea8);
+  color: #fff;
+}
+
+.question-item {
+  background: #fff;
+  border: 1px solid var(--border, #e8e0d4);
+  border-left: 4px solid var(--border, #e8e0d4);
+  border-radius: var(--radius, 10px);
+  padding: 1rem 1.2rem;
+  margin-bottom: .8rem;
+}
+
+.question-item.status-open { border-left-color: #d4a017; }
+.question-item.status-answered { border-left-color: var(--primary, #008ea8); }
+.question-item.status-resolved { border-left-color: var(--success, #2e9e5b); }
+
+.question-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin-bottom: .5rem;
+}
+
+.question-course {
+  font-size: .82rem;
+  color: var(--gray);
+  font-weight: 600;
+}
+
+.question-status-badge {
+  font-size: .7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  padding: .2rem .6rem;
+  border-radius: 20px;
+}
+
+.badge-open { background: #fdf3da; color: #92660a; }
+.badge-answered { background: #e0f3f7; color: #006a80; }
+.badge-resolved { background: #e3f5e9; color: #1f7a44; }
+
+.question-text {
+  color: var(--dark);
+  font-size: .92rem;
+  margin-bottom: .5rem;
+}
+
+.question-answer {
+  background: var(--bg-light, #f7f4ee);
+  border-radius: var(--radius-sm, 8px);
+  padding: .6rem .8rem;
+  font-size: .87rem;
+  color: var(--gray-dark, #444);
+  margin-bottom: .6rem;
+}
+
+.question-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .5rem;
+  font-size: .78rem;
+  color: var(--gray);
+}
+
+/* ── Mural de Conclusões / Comunidade em Ação ────────────────────────────── */
+.activity-feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+  margin-top: var(--space-md, .8rem);
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+}
+
+.activity-avatar {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--primary, #008ea8);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: .85rem;
+}
+
+.activity-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.activity-text {
+  font-size: .85rem;
+  color: var(--dark);
+}
+
+.activity-time {
+  font-size: .72rem;
+  color: var(--gray);
+}
+
+/* ── Mobile ───────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .timer-display { display: none !important; }
+  .lesson-completed-card { padding: 1.5rem 1.2rem; }
+  .questions-filters { gap: .4rem; }
+  .filter-btn { font-size: .76rem; padding: .35rem .7rem; }
+  .question-meta { flex-direction: column; align-items: flex-start; }
+}

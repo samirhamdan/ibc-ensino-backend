@@ -251,6 +251,8 @@ class Question(db.Model):
     resposta = db.Column(db.Text, default='')
     respondido_por = db.Column(db.String(150), default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='open')  # open | answered | resolved
+    resolved_at = db.Column(db.DateTime, nullable=True)
 
     assigned_tutor = db.relationship('User', foreign_keys=[assigned_tutor_id])
 
@@ -265,6 +267,8 @@ class Question(db.Model):
             'assigned_tutor_id': self.assigned_tutor_id,
             'assigned_tutor_name': self.assigned_tutor.name if self.assigned_tutor else None,
             'created_at': self.created_at.isoformat(),
+            'status': self.status or 'open',
+            'resolved_at': self.resolved_at.isoformat() if self.resolved_at else None,
         }
 
 
@@ -638,4 +642,54 @@ class UserAchievement(db.Model):
             'user_id': self.user_id,
             'achievement_id': self.achievement_id,
             'earned_at': self.earned_at.isoformat() if self.earned_at else None,
+        }
+
+
+class StudySession(db.Model):
+    """Sprint 6.2: tracks time spent studying a given lesson (Modulo) via the
+    frontend study timer."""
+    __tablename__ = 'study_sessions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    lesson_id = db.Column(db.Integer, db.ForeignKey('modules.id'), nullable=True)
+    duration_seconds = db.Column(db.Integer, default=0)
+    started_at = db.Column(db.DateTime, default=datetime.utcnow)
+    ended_at = db.Column(db.DateTime, nullable=True)
+
+    user = db.relationship('User', foreign_keys=[user_id])
+    lesson = db.relationship('Module', foreign_keys=[lesson_id])
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'lesson_id': self.lesson_id,
+            'duration_seconds': self.duration_seconds,
+            'started_at': self.started_at.isoformat() if self.started_at else None,
+            'ended_at': self.ended_at.isoformat() if self.ended_at else None,
+        }
+
+
+class ActivityFeed(db.Model):
+    """Sprint 6.2: 'Mural de Conclusões' — records when a student completes
+    a course, to power the 'Comunidade em Ação' feed on the dashboard."""
+    __tablename__ = 'activity_feed'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
+    action = db.Column(db.String(50), default='completed')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', foreign_keys=[user_id])
+    course = db.relationship('Course', foreign_keys=[course_id])
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'course_id': self.course_id,
+            'action': self.action,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
         }

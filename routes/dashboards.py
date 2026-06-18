@@ -2,12 +2,37 @@
 Profile-specific dashboard routes: admin, tutor, aluno, aluno-externo
 """
 from datetime import datetime, timedelta
-from flask import Blueprint, jsonify, session
+from flask import Blueprint, jsonify, session, request
 from extensions import db
 from models import (User, Course, Module, Question, LessonProgress,
-                    Badge, UserBadge, UserPoints)
+                    Badge, UserBadge, UserPoints, ActivityFeed)
 
 dashboards_bp = Blueprint('dashboards', __name__)
+
+
+def time_ago_pt(dt):
+    """Human-readable Portuguese relative time, e.g. 'há 3 horas'."""
+    if not dt:
+        return ''
+    now = datetime.utcnow()
+    delta = now - dt
+    seconds = delta.total_seconds()
+    if seconds < 60:
+        return 'agora mesmo'
+    minutes = int(seconds // 60)
+    if minutes < 60:
+        return f'há {minutes} minuto{"s" if minutes != 1 else ""}'
+    hours = int(seconds // 3600)
+    if hours < 24:
+        return f'há {hours} hora{"s" if hours != 1 else ""}'
+    days = int(seconds // 86400)
+    if days < 30:
+        return f'há {days} dia{"s" if days != 1 else ""}'
+    months = int(days // 30)
+    if months < 12:
+        return f'há {months} mês' if months == 1 else f'há {months} meses'
+    years = int(days // 365)
+    return f'há {years} ano{"s" if years != 1 else ""}'
 
 LEVEL_NAMES = {
     1: 'Iniciante', 2: 'Aprendiz', 3: 'Estudioso', 4: 'Conhecedor',
@@ -274,3 +299,40 @@ def aluno_externo_dashboard():
         },
         'testimonials': TESTIMONIALS,
     }), 200
+
+
+# ── Activity Feed ("Mural de Conclusões" — Sprint 6.2) ──────────────────────
+
+@dashboards_bp.route('/activity-feed', methods=['GET'])
+def activity_feed():
+    user = _current_user()
+    if not user:
+        return jsonify({'error': 'Não autenticado'}), 401
+
+    try:
+        limit = int(request.args.get('limit', 10))
+    except (TypeError, ValueError):
+        limit = 10
+    limit = max(1, min(limit, 50))
+
+    items = (ActivityFeed.query
+             .order_by(ActivityFeed.created_at.desc())
+             .limit(limit)
+             .all())
+
+    result = []
+    for item in items:
+        u = item.user
+        c = item.course
+        name = u.name if u else ''
+        result.append({
+            'id': item.id,
+            'user_name': name,
+            'user_initial': name[:1].upper() if name else '?',
+            'course_name': c.name if c else '',
+            'action': item.action,
+            'created_at': item.created_at.isoformat() if item.created_at else None,
+            'time_ago': time_ago_pt(item.created_at),
+        })
+
+    return jsonify(result), 200

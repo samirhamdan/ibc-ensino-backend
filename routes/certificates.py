@@ -7,7 +7,7 @@ from io import BytesIO
 from datetime import datetime
 from flask import Blueprint, jsonify, session, send_file, request, current_app
 from extensions import db
-from models import Certificate, User, Course, Trail, UserTrail
+from models import Certificate, User, Course, Trail, UserTrail, ActivityFeed
 
 certificates_bp = Blueprint('certificates', __name__)
 
@@ -59,6 +59,12 @@ def issue_certificate():
         cert = Certificate(user_id=user.id, trail_id=entity_id, cert_type='trail', cert_code=code)
     db.session.add(cert)
     db.session.commit()
+
+    # Sprint 6.2: "Mural de Conclusões" — register course completions for the
+    # community activity feed (trail completions are not posted here).
+    if cert_type == 'course':
+        db.session.add(ActivityFeed(user_id=user.id, course_id=entity_id, action='completed'))
+        db.session.commit()
 
     from routes.gamification import check_and_grant_achievements
     new_achievements = check_and_grant_achievements(user.id)

@@ -49,6 +49,7 @@
 <link rel="stylesheet" href="css/pages/login-premium.css">
 <link rel="stylesheet" href="css/pages/admin-ux.css">
 <link rel="stylesheet" href="css/pages/meu-perfil.css">
+<link rel="stylesheet" href="css/pages/sprint62.css">
 
 <!-- Scripts -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -190,6 +191,13 @@
     </div>
     <div class="topbar-user">
       <button id="continueBtn" class="btn-gold" style="display:none;padding:.35rem .9rem;font-size:.78rem;border-radius:6px" onclick="continueLastLesson()"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-play"></use></svg> Continuar</button>
+      <span id="timerDisplay" class="timer-display" style="display:none" title="Tempo de estudo nesta aula">00:00</span>
+      <button class="topbar-icon-btn" id="studyTimerToggle" onclick="toggleStudyTimer()" title="Cronômetro de estudo">
+        <svg class="icon" width="22" height="22" viewBox="0 0 24 24"><use href="#icon-clock"></use></svg>
+      </button>
+      <button class="topbar-icon-btn" id="focusToggle" onclick="toggleFocusMode()" title="Modo foco">
+        <svg class="icon" width="22" height="22" viewBox="0 0 24 24"><use href="#icon-eye"></use></svg>
+      </button>
       <div style="position:relative">
         <button class="topbar-bell" id="topbar-bell-btn" onclick="toggleNotificationsDropdown()" title="Notificações">
           <svg class="icon" width="20" height="20" viewBox="0 0 24 24"><use href="#icon-bell"></use></svg>
@@ -227,6 +235,10 @@
         <div class="course-item" id="nav-meu-perfil" onclick="navigateToMeuPerfil()" style="display:none">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-user"></use></svg></span>
           <div class="ci-text"><div class="ci-name">Meu Perfil</div></div>
+        </div>
+        <div class="course-item" id="nav-minhas-perguntas" onclick="navigateToMinhasPerguntas()" style="display:none">
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-message"></use></svg></span>
+          <div class="ci-text"><div class="ci-name">Minhas Perguntas</div></div>
         </div>
         <div class="course-item" id="nav-catalog" onclick="showCatalog()">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-catalog"></use></svg></span>
@@ -461,6 +473,8 @@ function setupUI(){
   if(certNav) certNav.style.display = isAluno() ? 'flex' : 'none';
   const perfilNav=document.getElementById('nav-meu-perfil');
   if(perfilNav) perfilNav.style.display = isAluno() ? 'flex' : 'none';
+  const perguntasNav=document.getElementById('nav-minhas-perguntas');
+  if(perguntasNav) perguntasNav.style.display = isAluno() ? 'flex' : 'none';
   const myTrailsSection=document.getElementById('my-trails-section');
   if(myTrailsSection) myTrailsSection.style.display = isAluno() ? 'block' : 'none';
   const myCoursesSection=document.getElementById('my-courses-section');
@@ -472,6 +486,7 @@ function setupUI(){
   loadNotifications();
   setInterval(loadNotifications, 60000);
   renderAnnouncementsBanner();
+  _applySavedFocusMode();
 }
 
 // ── SVG Icon Helper ──────────────────────────────────────
@@ -493,6 +508,71 @@ function icon(name, size='20', extra=''){
 function togglePassword(id){
   const inp = document.getElementById(id || 'login-pass');
   if(inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+// ── Modo Foco (Sprint 6.2) ──────────────────────────────────────────────
+function toggleFocusMode(force){
+  const enable = typeof force === 'boolean' ? force : !document.body.classList.contains('focus-mode');
+  document.body.classList.toggle('focus-mode', enable);
+  const btn = document.getElementById('focusToggle');
+  if(btn) btn.classList.toggle('active', enable);
+  localStorage.setItem('ibc_focus_mode', enable ? '1' : '0');
+  if(typeof showToast === 'function'){
+    showToast(enable ? 'Modo foco ativado. Pressione Esc para sair.' : 'Modo foco desativado.', 'default');
+  }
+}
+function _applySavedFocusMode(){
+  if(localStorage.getItem('ibc_focus_mode') === '1') toggleFocusMode(true);
+}
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape' && document.body.classList.contains('focus-mode')) toggleFocusMode(false);
+});
+
+// ── Timer de Estudo (Sprint 6.2) ─────────────────────────────────────────
+let studyTimerInterval = null;
+let studyTimerSeconds = 0;
+let studyTimerRunning = false;
+
+function formatTime(totalSeconds){
+  const m = Math.floor(totalSeconds/60).toString().padStart(2,'0');
+  const s = Math.floor(totalSeconds%60).toString().padStart(2,'0');
+  return `${m}:${s}`;
+}
+
+function toggleStudyTimer(){
+  const btn = document.getElementById('studyTimerToggle');
+  const display = document.getElementById('timerDisplay');
+  if(!studyTimerRunning){
+    studyTimerRunning = true;
+    if(display) display.style.display = 'inline-flex';
+    if(btn) btn.classList.add('active');
+    studyTimerInterval = setInterval(()=>{
+      studyTimerSeconds++;
+      if(display) display.textContent = formatTime(studyTimerSeconds);
+    }, 1000);
+    showToast('Cronômetro de estudo iniciado.', 'default');
+  } else {
+    studyTimerRunning = false;
+    clearInterval(studyTimerInterval);
+    studyTimerInterval = null;
+    if(btn) btn.classList.remove('active');
+    saveStudyTime();
+    studyTimerSeconds = 0;
+    if(display){ display.textContent = '00:00'; display.style.display = 'none'; }
+    showToast('Cronômetro de estudo pausado e tempo salvo.', 'default');
+  }
+}
+
+async function saveStudyTime(){
+  if(studyTimerSeconds <= 0) return;
+  const lessonId = (typeof currentAula !== 'undefined' && currentAula) ? currentAula.id : null;
+  try{
+    await api('POST','/aluno/study-time', {
+      lesson_id: lessonId,
+      seconds: studyTimerSeconds,
+      timestamp: new Date().toISOString(),
+    });
+  }catch(e){}
 }
 
 function showRegisterForm(){
@@ -1230,9 +1310,56 @@ async function submitAulaQuiz(){
       setTimeout(()=>showAchievementPopups(aulaQuizFeedback.new_achievements), 900);
     }
     renderAulaPage();
+    if(aulaQuizFeedback.passed && !wasPassedBefore && aulaQuizFeedback.next_lesson){
+      setTimeout(()=>showLessonCompletedPanel(aulaQuizFeedback.next_lesson), 1300);
+    }
   } else {
     alert('Erro ao enviar respostas.');
   }
+}
+
+// ── Próxima aula automática (Sprint 6.2) ──────────────────────────────────
+let lessonCompletedRedirectTimeout = null;
+
+function showLessonCompletedPanel(nextLesson){
+  const existing = document.getElementById('lesson-completed-panel');
+  if(existing) existing.remove();
+  if(lessonCompletedRedirectTimeout) clearTimeout(lessonCompletedRedirectTimeout);
+
+  const panel = document.createElement('div');
+  panel.id = 'lesson-completed-panel';
+  panel.className = 'lesson-completed-panel';
+  panel.innerHTML = `
+    <div class="lesson-completed-card">
+      <div class="lesson-completed-check">${icon('checkmark-circle','40','icon--success')}</div>
+      <h2 class="lesson-completed-title">Aula concluída!</h2>
+      <p class="lesson-completed-msg">Parabéns, você avançou para a próxima etapa.</p>
+      <div class="lesson-completed-next">
+        <span class="lcn-label">Próxima aula</span>
+        <span class="lcn-title">${nextLesson.title}</span>
+      </div>
+      <div class="lesson-completed-actions">
+        <button class="btn btn-primary" onclick="openLesson(${nextLesson.course_id},${nextLesson.id})">Continuar para próxima aula →</button>
+        <button class="btn btn-outline" onclick="closeLessonCompletedPanel(); selectCourse(${nextLesson.course_id})">Voltar ao curso</button>
+      </div>
+    </div>`;
+  document.body.appendChild(panel);
+
+  lessonCompletedRedirectTimeout = setTimeout(()=>{
+    openLesson(nextLesson.course_id, nextLesson.id);
+  }, 3000);
+}
+
+function closeLessonCompletedPanel(){
+  if(lessonCompletedRedirectTimeout){ clearTimeout(lessonCompletedRedirectTimeout); lessonCompletedRedirectTimeout = null; }
+  const panel = document.getElementById('lesson-completed-panel');
+  if(panel) panel.remove();
+}
+
+function openLesson(courseId, lessonId){
+  closeLessonCompletedPanel();
+  const aulaNum = currentAulas.findIndex(a => a.id === lessonId) + 1;
+  loadAula(courseId, aulaNum > 0 ? aulaNum : 1);
 }
 
 async function renderConclusion(){
@@ -3865,6 +3992,7 @@ async function _renderAlunoDashboardInner(){
   const heroStats={level:s.level,level_name:s.level_name,points_in_level:s.points_in_level,total_points:s.total_points||0,courses_completed:d.trofeus_count||0,badges_count:d.trofeus_count||0};
   body.innerHTML=`
     ${renderHero(currentUser, heroStats)}
+    <div id="activityFeedSection"></div>
     <div id="trailSection"></div>
     ${ip?`<div class="card" style="border-left:4px solid var(--primary);margin-bottom:var(--space-xl)"><div class="card-body"><h3 class="card-title">🎯 Continue de Onde Parou</h3><div style="margin:var(--space-md) 0"><div style="font-size:var(--text-sm);font-weight:var(--fw-semibold);color:var(--dark);margin-bottom:var(--space-sm)">${ip.icon} ${ip.name} — Aula ${ip.aula_atual}/${ip.total_aulas}</div><div class="progress progress-sm" style="margin-bottom:var(--space-xs)"><div class="progress-bar" style="width:${ip.percentage}%"></div></div><div style="font-size:var(--text-xs);color:var(--gray);text-align:right">${ip.percentage}% concluído</div></div><div class="status-grid"><div class="status-item"><span class="status-label">Material</span><span class="status-value">${ip.material_read?'✅ Lido':'📖 Pendente'}</span></div><div class="status-item"><span class="status-label">Quiz</span><span class="status-value">${ip.quiz_done?'✅ Concluído':'❌ Pendente'}</span></div></div><button class="btn btn-primary btn-full" style="margin-top:var(--space-md)" onclick="selectCourse(${ip.id})">🚀 CONTINUAR AULA</button></div></div>`:''}
     <div class="card" style="margin-bottom:var(--space-xl)">
@@ -3885,6 +4013,37 @@ async function _renderAlunoDashboardInner(){
   const trailSection = document.getElementById('trailSection');
   if(trailSection) await loadTrailsSection(trailSection);
   loadGoalsSection();
+  renderActivityFeed();
+}
+
+// ── Mural de Conclusões / "Comunidade em Ação" (Sprint 6.2) ───────────────
+async function renderActivityFeed(){
+  const el = document.getElementById('activityFeedSection');
+  if(!el) return;
+  try{
+    const res = await api('GET', '/activity-feed?limit=10');
+    if(!res.ok) { el.innerHTML = ''; return; }
+    const items = await res.json();
+    if(!items.length){ el.innerHTML = ''; return; }
+    el.innerHTML = `
+      <div class="card activity-feed-section" style="margin-bottom:var(--space-xl)">
+        <div class="card-body">
+          <h3 class="card-title">${icon('users','16')} Comunidade em Ação</h3>
+          <div class="activity-feed-list">
+            ${items.map(a => `
+              <div class="activity-item">
+                <span class="activity-avatar">${a.user_initial}</span>
+                <div class="activity-content">
+                  <span class="activity-text"><strong>${a.user_name}</strong> concluiu o curso <strong>${a.course_name}</strong></span>
+                  <span class="activity-time">${a.time_ago}</span>
+                </div>
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>`;
+  }catch(e){
+    el.innerHTML = '';
+  }
 }
 
 // ── Goals with how-to instructions (Sprint 2.1) ──
@@ -4825,6 +4984,103 @@ async function renderMeuPerfil(){
     `;
   }catch(e){
     el.innerHTML = '<p style="color:var(--danger);padding:1.5rem">Erro ao carregar seu perfil.</p>';
+  }
+}
+
+// ── Minhas Perguntas (Sprint 6.2) ─────────────────────────────────────────
+let meusPerguntasData = [];
+let meusPerguntasFiltro = 'todas';
+
+async function navigateToMinhasPerguntas(){
+  document.querySelectorAll('.course-item').forEach(x=>x.classList.remove('active'));
+  const nav = document.getElementById('nav-minhas-perguntas');
+  if(nav) nav.classList.add('active');
+  await renderMeusPerguntas();
+}
+
+async function renderMeusPerguntas(){
+  const el = document.getElementById('main-content');
+  el.innerHTML = '<div style="padding:2rem;color:var(--gray)">Carregando perguntas...</div>';
+  try{
+    const res = await api('GET', '/aluno/questions');
+    if(!res.ok){
+      el.innerHTML = '<p style="color:var(--danger);padding:1.5rem">Erro ao carregar suas perguntas.</p>';
+      return;
+    }
+    meusPerguntasData = await res.json();
+    meusPerguntasFiltro = 'todas';
+    el.innerHTML = `
+      <div class="course-header">
+        <span class="course-tag">Aluno</span>
+        <h1 class="course-title">${icon('message','24')} Minhas Perguntas</h1>
+      </div>
+      <div class="questions-filters">
+        <button class="filter-btn active" data-filtro="todas" onclick="filterQuestions('todas')">Todas</button>
+        <button class="filter-btn" data-filtro="open" onclick="filterQuestions('open')">Pendentes</button>
+        <button class="filter-btn" data-filtro="answered" onclick="filterQuestions('answered')">Respondidas</button>
+        <button class="filter-btn" data-filtro="resolved" onclick="filterQuestions('resolved')">Resolvidas</button>
+      </div>
+      <div id="questions-list-container"></div>
+    `;
+    _renderQuestionsList();
+  }catch(e){
+    el.innerHTML = '<p style="color:var(--danger);padding:1.5rem">Erro ao carregar suas perguntas.</p>';
+  }
+}
+
+function filterQuestions(status){
+  meusPerguntasFiltro = status;
+  document.querySelectorAll('.questions-filters .filter-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.filtro === status);
+  });
+  _renderQuestionsList();
+}
+
+function _renderQuestionsList(){
+  const container = document.getElementById('questions-list-container');
+  if(!container) return;
+  const list = meusPerguntasFiltro === 'todas'
+    ? meusPerguntasData
+    : meusPerguntasData.filter(q => (q.status||'open') === meusPerguntasFiltro);
+
+  if(!list.length){
+    container.innerHTML = `<div class="card" style="text-align:center;padding:2rem"><p style="color:var(--gray)">Nenhuma pergunta encontrada.</p></div>`;
+    return;
+  }
+
+  const statusLabel = {open:'Pendente', answered:'Respondida', resolved:'Resolvida'};
+  container.innerHTML = list.map(q => {
+    const status = q.status || 'open';
+    return `
+      <div class="question-item status-${status}">
+        <div class="question-item-header">
+          <span class="question-course">${q.course_icon||''} ${q.course_name||''}</span>
+          <span class="question-status-badge badge-${status}">${statusLabel[status]||status}</span>
+        </div>
+        <div class="question-text">${q.texto}</div>
+        ${q.resposta ? `<div class="question-answer"><strong>${q.respondido_por||'Tutor'} respondeu:</strong> ${q.resposta}</div>` : ''}
+        <div class="question-meta">
+          <span>${new Date(q.created_at).toLocaleDateString('pt-BR')}</span>
+          ${status === 'answered' ? `<button class="btn btn-outline btn-sm" onclick="markQuestionResolved(${q.id})">${icon('check','14')} Marcar como resolvida</button>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function markQuestionResolved(questionId){
+  try{
+    const res = await api('POST', `/aluno/questions/${questionId}/resolve`);
+    if(!res.ok){
+      showToast('Não foi possível marcar a pergunta como resolvida.', 'error');
+      return;
+    }
+    const updated = await res.json();
+    const idx = meusPerguntasData.findIndex(q => q.id === questionId);
+    if(idx !== -1) meusPerguntasData[idx] = {...meusPerguntasData[idx], ...updated};
+    _renderQuestionsList();
+    showToast('Pergunta marcada como resolvida!', 'success');
+  }catch(e){
+    showToast('Erro ao marcar pergunta como resolvida.', 'error');
   }
 }
 

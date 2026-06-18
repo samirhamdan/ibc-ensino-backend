@@ -4,7 +4,7 @@ Lesson (aula) routes: linear lesson flow — material + inline quiz per module
 import re
 from flask import Blueprint, request, jsonify, session
 from extensions import db
-from models import Course, Module, LessonProgress, User, UserPoints, Badge, UserBadge, Certificate
+from models import Course, Module, LessonProgress, User, UserPoints, Badge, UserBadge, Certificate, ActivityFeed
 from routes.gamification import award_points, check_and_grant_achievements
 
 lessons_bp = Blueprint('lessons', __name__)
@@ -193,11 +193,23 @@ def submit_aula_quiz(course_id, aula_num):
                 code = generate_cert_code()
                 cert = Certificate(user_id=user.id, course_id=course_id, cert_type='course', cert_code=code)
                 db.session.add(cert)
+                db.session.add(ActivityFeed(user_id=user.id, course_id=course_id, action='completed'))
                 db.session.commit()
                 certificate_issued = True
                 cert_code = code
 
     new_achievements = check_and_grant_achievements(user.id) if passed else []
+
+    # Sprint 6.2: surface the next lesson so the frontend can offer a
+    # "Continuar para próxima aula" panel after this one is completed.
+    next_lesson = None
+    if passed and not is_last:
+        next_module = modules[aula_num]  # aula_num is 1-based, so this is index `aula_num`
+        next_lesson = {
+            'id': next_module.id,
+            'title': next_module.nome,
+            'course_id': course_id,
+        }
 
     return jsonify({
         'score': score,
@@ -211,6 +223,46 @@ def submit_aula_quiz(course_id, aula_num):
         'certificate_issued': certificate_issued,
         'cert_code': cert_code,
         'new_achievements': new_achievements,
+        'next_lesson': next_lesson,
+    }), 200
+
+
+@lessons_bp.route('/<int:course_id>/next-lesson', methods=['GET'])
+def next_lesson(course_id):
+    """Returns the next unwatched/unpassed lesson for the current student."""
+    user = _current_user()
+    if not user:
+        return jsonify({'error': 'Não autenticado'}), 401
+
+    Course.query.get_or_404(course_id)
+    modules = _ordered_modules(course_id)
+    total = len(modules)
+
+    if not total:
+        return jsonify({'has_next': False, 'lesson': None, 'lesson_count': {'current': 0, 'total': 0}}), 200
+
+    progress_map = {p.module_id: p for p in
+                     LessonProgress.query.filter_by(user_id=user.id, course_id=course_id).all()}
+
+    next_idx = None
+    for i, m in enumerate(modules):
+        prog = progress_map.get(m.id)
+        if not (prog and prog.passed):
+            next_idx = i
+            break
+
+    if next_idx is None:
+        return jsonify({'has_next': False, 'lesson': None, 'lesson_count': {'current': total, 'total': total}}), 200
+
+    next_module = modules[next_idx]
+    return jsonify({
+        'has_next': True,
+        'lesson': {
+            'id': next_module.id,
+            'title': next_module.nome,
+            'order': next_module.position,
+        },
+        'lesson_count': {'current': next_idx + 1, 'total': total},
     }), 200
 
 

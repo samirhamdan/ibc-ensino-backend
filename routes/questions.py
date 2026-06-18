@@ -3,7 +3,7 @@ Questions/Q&A routes: students ask questions, tutors answer
 """
 from flask import Blueprint, request, jsonify, session
 from extensions import db
-from models import Question, Course, User, Progress
+from models import Question, Course, User, Progress, Notification
 
 questions_bp = Blueprint('questions', __name__)
 
@@ -69,7 +69,20 @@ def answer_question(question_id):
 
     question.resposta = resposta
     question.respondido_por = user.name
+    question.status = 'answered'
     db.session.commit()
+
+    notification = Notification(
+        user_id=question.user_id,
+        title='Sua pergunta foi respondida',
+        message=f'{user.name} respondeu sua pergunta em "{question.course.name if question.course else "um curso"}".',
+        type='message',
+        link='minhas-perguntas',
+        created_by=user.id,
+    )
+    db.session.add(notification)
+    db.session.commit()
+
     return jsonify(question.to_dict()), 200
 
 
