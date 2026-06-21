@@ -8,15 +8,8 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.py" },
     { "source": "/health", "destination": "/api/index.py" },
-    { "source": "/uploads/(.*)", "destination": "/api/index.py" }
-  ],
-  "routes": [
-    { "src": "/css/(.*)", "dest": "/css/$1" },
-    { "src": "/images/(.*)", "dest": "/images/$1" },
-    { "src": "/favicon.svg", "dest": "/favicon.svg" },
-    { "src": "/Logo-IBC-Horizontal.png", "dest": "/Logo-IBC-Horizontal.png" },
-    { "src": "/index.html", "dest": "/index.html" },
-    { "src": "/(.*)", "dest": "/index.html" }
+    { "source": "/uploads/(.*)", "destination": "/api/index.py" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
     {
