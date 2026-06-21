@@ -3,6 +3,9 @@ __pycache__/
 *.pyo
 instance/
 .env
+.env.local
+.env.production
 *.db
 uploads/
 .claude/
+.vercel/

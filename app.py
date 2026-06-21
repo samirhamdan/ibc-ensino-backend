@@ -22,31 +22,60 @@ def allowed_file(filename):
 def create_app(config_name='development'):
     """Factory para criar instância Flask"""
     app = Flask(__name__)
-    
+
+    # Detecta produção via parâmetro explícito, FLASK_ENV ou execução na Vercel
+    is_production = (
+        config_name == 'production'
+        or os.getenv('FLASK_ENV') == 'production'
+        or os.getenv('VERCEL') == '1'
+    )
+
     # Config
     basedir = os.path.abspath(os.path.dirname(__file__))
     instance_dir = os.path.join(basedir, 'instance')
-    uploads_dir = os.path.join(basedir, 'uploads')
+    if is_production:
+        # Vercel só permite escrita em /tmp (efêmero entre invocações)
+        uploads_dir = '/tmp/uploads'
+    else:
+        uploads_dir = os.path.join(basedir, 'uploads')
     os.makedirs(instance_dir, exist_ok=True)
     os.makedirs(uploads_dir, exist_ok=True)
     app.config['UPLOAD_FOLDER'] = uploads_dir
     app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_MB * 1024 * 1024
+
+    # DATABASE_URL: Postgres (Neon) em produção, SQLite local em dev
     default_db = f"sqlite:///{os.path.join(instance_dir, 'ibc_ensino.db')}"
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', default_db)
+    database_url = os.getenv('DATABASE_URL')
+    if database_url:
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        if database_url.startswith('postgresql://'):
+            database_url = database_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
+        app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    else:
+        app.config['SQLALCHEMY_DATABASE_URI'] = default_db
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+    }
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-prod')
     app.config['SESSION_PERMANENT'] = True
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
-    app.config['SESSION_COOKIE_SECURE'] = os.getenv('FLASK_ENV') == 'production'
+    app.config['SESSION_COOKIE_SECURE'] = is_production
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-    
+
     # Database
     db.init_app(app)
-    
+
     # CORS (permitir requisições do frontend)
-    CORS(app, supports_credentials=True, 
-         origins=['http://localhost:3000', 'http://localhost:5000', 'https://*.replit.dev'],
+    cors_origins = ['http://localhost:3000', 'http://localhost:5000', 'https://*.replit.dev', 'https://*.vercel.app']
+    app_url = os.getenv('APP_URL')
+    if app_url:
+        cors_origins.append(app_url)
+    CORS(app, supports_credentials=True,
+         origins=cors_origins,
          allow_headers=['Content-Type', 'Authorization'])
     
     # Context
@@ -94,6 +123,8 @@ def create_app(config_name='development'):
             return get_user()
         
         # Upload PDF
+        # Nota: em produção (Vercel) os arquivos são salvos em /tmp, que é efêmero
+        # entre invocações serverless — usar links externos para materiais em produção.
         @app.route('/api/upload', methods=['POST'])
         def upload_file():
             uid = session.get('user_id')
