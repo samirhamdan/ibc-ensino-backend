@@ -2391,23 +2391,47 @@ function exitPreview(){
 function showNewCourseForm() {
   document.getElementById('main-content').innerHTML = `
     <div class="admin-page-header">
-      <h2 class="text-h3">${icon('books','20')} Novo Curso</h2>
+      <h2 class="text-h3">${icon('plus','20')} Novo Curso</h2>
       <button class="btn btn-outline" onclick="renderAdminCourses()">${icon('chevron-left','16')} Voltar</button>
     </div>
-    <div class="course-editor-header">
-      <div class="form-group"><label>Nome do Curso</label><input type="text" id="nc-name" class="form-control" placeholder="Ex: Estudo de Romanos"></div>
-      <div style="display:flex;gap:var(--space-md)">
-        <div class="form-group" style="flex:1"><label>Categoria</label><select id="nc-tag" class="form-control"><option value="">Selecionar...</option>${categories.map(c=>'<option>'+c+'</option>').join('')}</select></div>
-        <div class="form-group" style="flex:1"><label>Visibilidade</label><select id="nc-acesso" class="form-control"><option value="interno">Alunos Internos</option><option value="publico">Público</option></select></div>
+    <div class="editor-card">
+      <div class="editor-card-header">
+        <span class="editor-section-title">${icon('books','18')} Informações do Curso</span>
       </div>
-      <div class="form-group"><label>Descrição</label><textarea id="nc-resumo" class="form-control" rows="2" placeholder="Breve descrição..."></textarea></div>
-      <div style="display:flex;gap:var(--space-md)">
-        <div class="form-group" style="flex:1"><label>Ícone (emoji ou nome)</label><input type="text" id="nc-icon" class="form-control" placeholder="Ex: 📚 ou book"></div>
-        <div class="form-group" style="flex:1"><label>Duração (semanas)</label><input type="number" id="nc-duracao" class="form-control" placeholder="Ex: 4" min="1" max="52"></div>
-      </div>
-      <div style="display:flex;gap:var(--space-md);margin-top:var(--space-md)">
-        <button class="btn btn-outline" onclick="renderAdminCourses()">Cancelar</button>
-        <button class="btn btn-primary" onclick="addCourse()">Criar Curso</button>
+      <div class="editor-card-body">
+        <div class="form-group">
+          <label class="form-label form-label-required">Nome do Curso</label>
+          <input type="text" id="nc-name" class="form-control input-title-lg" placeholder="Ex: Estudo de Romanos">
+          <span class="form-hint">Este é o título que os alunos verão no catálogo.</span>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label form-label-required">Categoria</label>
+            <select id="nc-tag" class="form-control"><option value="">Selecionar...</option>${categories.map(c=>'<option>'+c+'</option>').join('')}</select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Visibilidade</label>
+            <select id="nc-acesso" class="form-control"><option value="interno">Alunos Internos</option><option value="publico">Público</option></select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descrição</label>
+          <textarea id="nc-resumo" class="form-control" rows="2" placeholder="Breve descrição..."></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Ícone (emoji ou nome)</label>
+            <input type="text" id="nc-icon" class="form-control" placeholder="Ex: 📚 ou book">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Duração (semanas)</label>
+            <input type="number" id="nc-duracao" class="form-control" placeholder="Ex: 4" min="1" max="52">
+          </div>
+        </div>
+        <div class="editor-actions">
+          <button class="btn btn-outline" onclick="renderAdminCourses()">Cancelar</button>
+          <button class="btn btn-primary" id="btnCreateCourse" onclick="addCourse()">${icon('plus','16')} Criar Curso</button>
+        </div>
       </div>
     </div>`;
 }
@@ -2425,35 +2449,55 @@ async function openCourseEditor(courseId) {
       <h2 class="text-h3">${icon('books','20')} Editar Curso</h2>
       <button class="btn btn-outline" onclick="renderAdminCourses()">${icon('chevron-left','16')} Voltar</button>
     </div>
-    <div class="course-editor-header">
-      <input type="text" id="courseEditName" class="input-title" value="${(c.name||'').replace(/"/g,'&quot;')}">
-      <div style="display:flex;gap:var(--space-md)">
-        <div class="form-group" style="flex:1">
-          <label>Categoria / Tag</label>
-          <input type="text" id="courseEditCategory" class="form-control" value="${(c.tag||'').replace(/"/g,'&quot;')}">
+
+    <div class="editor-card">
+      <div class="editor-card-header">
+        <span class="editor-section-title">${icon('edit','18')} Informações do Curso</span>
+      </div>
+      <div class="editor-card-body">
+        <div class="form-group">
+          <label class="form-label form-label-required">Nome do Curso</label>
+          <input type="text" id="courseEditName" class="form-control input-title-lg" value="${(c.name||'').replace(/"/g,'&quot;')}">
+          <span class="form-hint">Este é o título que os alunos verão no catálogo.</span>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">${icon('tag','14')} Categoria / Tag</label>
+            <input type="text" id="courseEditCategory" class="form-control" value="${(c.tag||'').replace(/"/g,'&quot;')}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cor</label>
+            <input type="color" id="courseEditColor" class="form-control form-color" value="${c.color||'#008ea8'}">
+          </div>
         </div>
         <div class="form-group">
-          <label>Cor</label>
-          <input type="color" id="courseEditColor" class="form-control" value="${c.color||'#008ea8'}">
+          <label class="form-label">Descrição</label>
+          <textarea id="courseEditDescription" class="form-control" rows="2">${(c.resumo||c.description||'').replace(/</g,'&lt;')}</textarea>
+        </div>
+        <div class="editor-actions">
+          <button class="btn btn-outline" onclick="renderAdminCourses()">Cancelar</button>
+          <button class="btn btn-primary" id="btnSaveCourseHeader" onclick="saveCourseHeader()">${icon('checkmark-circle','16')} Salvar Informações</button>
         </div>
       </div>
-      <div class="form-group">
-        <label>Descrição</label>
-        <textarea id="courseEditDescription" class="form-control" rows="2">${(c.resumo||c.description||'').replace(/</g,'&lt;')}</textarea>
-      </div>
-      <div style="display:flex;gap:var(--space-md);margin-top:var(--space-md)">
-        <button class="btn btn-outline" onclick="renderAdminCourses()">Cancelar</button>
-        <button class="btn btn-primary" onclick="saveCourseHeader()">Salvar Informações</button>
-      </div>
     </div>
 
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-md)">
-      <h3 class="text-h4">Aulas (${lessons.length}) <small style="color:var(--gray);font-weight:400;font-size:var(--text-sm)">(arraste para reordenar)</small></h3>
-      <button class="btn btn-sm btn-outline" onclick="addNewLesson(${courseId})">${icon('plus','16')} Nova Aula</button>
-    </div>
-
-    <div class="lesson-accordion" id="lessonAccordion">
-      ${lessons.map((l, i) => renderLessonAccordionItem(l, i)).join('')}
+    <div class="editor-card">
+      <div class="editor-card-header">
+        <span class="editor-section-title">${icon('document-text','18')} Aulas do Curso (${lessons.length})</span>
+        <button class="btn btn-sm btn-primary" onclick="addNewLesson(${courseId})">${icon('plus','16')} Nova Aula</button>
+      </div>
+      <div class="editor-card-body">
+        ${lessons.length ? `<p class="empty-hint">${icon('drag-handle','14')} Arraste pela alça para reordenar as aulas.</p>` : ''}
+        <div class="lesson-accordion" id="lessonAccordion">
+          ${lessons.map((l, i) => renderLessonAccordionItem(l, i)).join('')}
+        </div>
+        ${!lessons.length ? `
+        <div class="empty-state-card">
+          ${icon('document-text','32')}
+          <p>Nenhuma aula cadastrada ainda.</p>
+          <span class="empty-hint">Clique em "Nova Aula" para começar.</span>
+        </div>` : ''}
+      </div>
     </div>`;
 
   if (typeof Sortable !== 'undefined') {
@@ -2492,56 +2536,75 @@ function renderLessonAccordionItem(l, i) {
         <span class="accordion-chevron">${icon('chevron-down','18')}</span>
       </div>
       <div class="lesson-accordion-body" id="lessonBody_${l.id}" style="display:none">
-        <div class="form-group">
-          <label>Título da Aula</label>
-          <input type="text" id="lt_${l.id}" class="form-control" value="${(l.title||'').replace(/"/g,'&quot;')}">
-        </div>
-        <div class="form-group">
-          <label>Duração</label>
-          <input type="text" id="ld_${l.id}" class="form-control" value="${l.duration_min||''}" placeholder="Ex: 30 min">
-        </div>
-        <div class="form-group">
-          <label>${icon('play-circle','14')} URL do Vídeo (YouTube/Vimeo)</label>
-          <input type="text" id="lv_${l.id}" class="form-control" value="${(l.video_url||'').replace(/"/g,'&quot;')}" placeholder="https://youtube.com/watch?v=...">
-        </div>
-        <div class="form-group">
-          <label>${icon('file','14')} Materiais</label>
-          <div class="material-list-edit" id="matList_${l.id}">
-            ${(l.materials||[]).map(m => `
-              <div class="material-edit-item" id="matItem_${m.id}">
-                <span>${icon(m.tipo==='pdf'?'file':'document-text','14')} ${m.name}</span>
-                <button class="btn-icon-only" onclick="adminRemoveMaterial(${m.id},${l.id})" title="Remover">${icon('x-circle','16')}</button>
-              </div>`).join('')}
+
+        <div class="lesson-section">
+          <p class="lesson-section-label">${icon('edit','14')} Informações Básicas</p>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label form-label-required">Título da Aula</label>
+              <input type="text" id="lt_${l.id}" class="form-control" value="${(l.title||'').replace(/"/g,'&quot;')}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Duração</label>
+              <input type="text" id="ld_${l.id}" class="form-control" value="${l.duration_min||''}" placeholder="Ex: 30 min">
+            </div>
           </div>
-          <div class="material-source-toggle">
-            <label><input type="radio" name="${matSrc}" value="link" checked onchange="toggleMatInput(${l.id},'link')"> Link</label>
-            <label><input type="radio" name="${matSrc}" value="upload" onchange="toggleMatInput(${l.id},'upload')"> Upload PDF</label>
-          </div>
-          <div id="matInputLink_${l.id}" style="display:flex;gap:8px">
-            <input type="text" id="matName_${l.id}" class="form-control" placeholder="Nome do material" style="flex:1">
-            <input type="text" id="matUrl_${l.id}" class="form-control" placeholder="URL" style="flex:2">
-          </div>
-          <div id="matInputUpload_${l.id}" style="display:none;gap:8px">
-            <input type="text" id="matNameUp_${l.id}" class="form-control" placeholder="Nome do material" style="flex:1">
-            <input type="file" id="matFile_${l.id}" accept=".pdf" class="form-control" style="flex:2">
-          </div>
-          <button class="btn btn-sm btn-outline" style="margin-top:8px" onclick="adminAddMaterial(${l.id})">${icon('plus','14')} Adicionar</button>
         </div>
-        <div class="form-group">
-          <label>${icon('document-text','14')} Exercício (múltipla escolha)</label>
-          <textarea id="eq_${l.id}" class="form-control" rows="2" placeholder="Pergunta do exercício">${(l.exercise&&l.exercise.question||'').replace(/</g,'&lt;')}</textarea>
-          <div class="exercise-options" style="margin-top:8px">
+
+        <div class="lesson-section">
+          <p class="lesson-section-label">${icon('play-circle','14')} Conteúdo Multimídia</p>
+          <div class="form-group">
+            <label class="form-label">URL do Vídeo (YouTube/Vimeo)</label>
+            <input type="text" id="lv_${l.id}" class="form-control" value="${(l.video_url||'').replace(/"/g,'&quot;')}" placeholder="https://youtube.com/watch?v=...">
+          </div>
+          <div class="form-group">
+            <label class="form-label">${icon('file','14')} Materiais</label>
+            <div class="material-list-edit" id="matList_${l.id}">
+              ${(l.materials||[]).map(m => `
+                <div class="material-edit-item" id="matItem_${m.id}">
+                  <span class="material-info">${icon(m.tipo==='pdf'?'file':'document-text','14')} ${m.name}</span>
+                  <button class="btn-icon-only" onclick="adminRemoveMaterial(${m.id},${l.id})" title="Remover">${icon('x-circle','16')}</button>
+                </div>`).join('')}
+            </div>
+            <div class="material-source-toggle">
+              <label class="toggle-option"><input type="radio" name="${matSrc}" value="link" checked onchange="toggleMatInput(${l.id},'link')"> ${icon('tag','14')} Link</label>
+              <label class="toggle-option"><input type="radio" name="${matSrc}" value="upload" onchange="toggleMatInput(${l.id},'upload')"> ${icon('file','14')} Upload PDF</label>
+            </div>
+            <div id="matInputLink_${l.id}" class="material-input-row" style="display:flex">
+              <input type="text" id="matName_${l.id}" class="form-control" placeholder="Nome do material" style="flex:1">
+              <input type="text" id="matUrl_${l.id}" class="form-control" placeholder="URL" style="flex:2">
+            </div>
+            <div id="matInputUpload_${l.id}" class="material-input-row form-file" style="display:none">
+              <input type="text" id="matNameUp_${l.id}" class="form-control" placeholder="Nome do material" style="flex:1">
+              <input type="file" id="matFile_${l.id}" accept=".pdf" class="form-control" style="flex:2">
+            </div>
+            <button class="btn btn-sm btn-outline" style="margin-top:8px" onclick="adminAddMaterial(${l.id})">${icon('plus','14')} Adicionar Material</button>
+          </div>
+        </div>
+
+        <div class="lesson-section">
+          <p class="lesson-section-label">${icon('document-text','14')} Exercício (Múltipla Escolha)</p>
+          <div class="form-group">
+            <label class="form-label">Pergunta</label>
+            <textarea id="eq_${l.id}" class="form-control" rows="2" placeholder="Pergunta do exercício">${(l.exercise&&l.exercise.question||'').replace(/</g,'&lt;')}</textarea>
+          </div>
+          <div class="exercise-options-grid">
             ${[0,1,2,3].map(j => `
-              <div class="exercise-option">
-                <input type="radio" name="correctOpt_${l.id}" value="${j}" ${correctIdx===j?'checked':''}>
-                <input type="text" id="eo_${l.id}_${j}" class="form-control" placeholder="Opção ${j+1}" value="${(opts[j]||'').replace(/"/g,'&quot;')}">
+              <div class="exercise-option-card${correctIdx===j?' correct':''}" id="eoCard_${l.id}_${j}">
+                <div class="exercise-option-header">
+                  <span class="option-letter">${'ABCD'[j]}</span>
+                  <input type="radio" name="correctOpt_${l.id}" value="${j}" ${correctIdx===j?'checked':''} onchange="highlightCorrectOption(${l.id})">
+                  <span class="correct-badge" style="${correctIdx===j?'':'display:none'}">${icon('checkmark-circle','12')} Correta</span>
+                </div>
+                <input type="text" id="eo_${l.id}_${j}" class="form-control" placeholder="Opção ${'ABCD'[j]}" value="${(opts[j]||'').replace(/"/g,'&quot;')}">
               </div>`).join('')}
           </div>
-          <small style="color:var(--gray)">Selecione o rádio ao lado da resposta correta</small>
+          <span class="form-hint">Selecione o rádio do card correspondente à resposta correta.</span>
         </div>
-        <div class="lesson-actions">
-          <button class="btn btn-outline btn-sm" style="color:var(--danger,#e74c3c);border-color:var(--danger,#e74c3c)" onclick="adminDeleteLesson(${l.id})">${icon('x-circle','14')} Excluir</button>
-          <button class="btn btn-primary btn-sm" onclick="adminSaveLesson(${l.id})">Salvar Aula</button>
+
+        <div class="lesson-actions-bar">
+          <button class="btn btn-outline btn-danger-outline" onclick="adminDeleteLesson(${l.id})">${icon('x-circle','14')} Excluir Aula</button>
+          <button class="btn btn-primary" id="btnSaveLesson_${l.id}" onclick="adminSaveLesson(${l.id})">${icon('checkmark-circle','16')} Salvar Aula</button>
         </div>
       </div>
     </div>`;
@@ -2565,9 +2628,71 @@ function toggleMatInput(lessonId, type) {
   document.getElementById('matInputUpload_' + lessonId).style.display = type === 'upload' ? 'flex' : 'none';
 }
 
+// ── Feedback visual: botões com estado (Sprint 6.3) ──
+function setBtnLoading(btnId, loading) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  if (loading) {
+    if (!btn.dataset.originalHtml) btn.dataset.originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.classList.add('btn-loading');
+    btn.innerHTML = '<span class="btn-spinner"></span> Salvando...';
+  } else {
+    btn.disabled = false;
+    btn.classList.remove('btn-loading');
+    if (btn.dataset.originalHtml) {
+      btn.innerHTML = btn.dataset.originalHtml;
+      delete btn.dataset.originalHtml;
+    }
+  }
+}
+
+function setBtnSuccess(btnId) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  if (!btn.dataset.originalHtml) btn.dataset.originalHtml = btn.innerHTML;
+  btn.disabled = false;
+  btn.classList.remove('btn-loading');
+  btn.classList.add('btn-success-state');
+  btn.innerHTML = icon('checkmark-circle','14') + ' Salvo!';
+  setTimeout(() => {
+    btn.classList.remove('btn-success-state');
+    if (btn.dataset.originalHtml) {
+      btn.innerHTML = btn.dataset.originalHtml;
+      delete btn.dataset.originalHtml;
+    }
+  }, 1800);
+}
+
+// ── Highlight da resposta correta (Sprint 6.3) ──
+function highlightCorrectOption(lessonId) {
+  const checked = document.querySelector('input[name="correctOpt_' + lessonId + '"]:checked');
+  const checkedIdx = checked ? checked.value : null;
+  [0,1,2,3].forEach(j => {
+    const card = document.getElementById('eoCard_' + lessonId + '_' + j);
+    if (!card) return;
+    const badge = card.querySelector('.correct-badge');
+    if (String(j) === String(checkedIdx)) {
+      card.classList.add('correct');
+      if (badge) badge.style.display = '';
+    } else {
+      card.classList.remove('correct');
+      if (badge) badge.style.display = 'none';
+    }
+  });
+}
+
 async function adminSaveLesson(lessonId) {
-  const title = document.getElementById('lt_' + lessonId) && document.getElementById('lt_' + lessonId).value.trim();
-  if (!title) { showToast('Título é obrigatório', 'error'); return; }
+  const titleEl = document.getElementById('lt_' + lessonId);
+  const title = titleEl && titleEl.value.trim();
+  if (!title) {
+    showToast('Título é obrigatório', 'error');
+    if (titleEl) { titleEl.classList.add('form-control-error'); titleEl.focus(); }
+    return;
+  }
+  if (titleEl) titleEl.classList.remove('form-control-error');
+  const btnId = 'btnSaveLesson_' + lessonId;
+  setBtnLoading(btnId, true);
   const videoUrl = document.getElementById('lv_' + lessonId) && document.getElementById('lv_' + lessonId).value.trim();
   const durationMin = document.getElementById('ld_' + lessonId) && document.getElementById('ld_' + lessonId).value;
   const r1 = await api('PUT', `/courses/admin/lessons/${lessonId}`, {
@@ -2575,6 +2700,7 @@ async function adminSaveLesson(lessonId) {
   });
   if (!r1.ok) {
     const err = await r1.json().catch(() => ({}));
+    setBtnLoading(btnId, false);
     showToast(err.error || 'Erro ao salvar aula', 'error'); return;
   }
   const question = document.getElementById('eq_' + lessonId) && document.getElementById('eq_' + lessonId).value.trim();
@@ -2588,6 +2714,7 @@ async function adminSaveLesson(lessonId) {
     await api('PUT', `/courses/admin/lessons/${lessonId}/exercise`, {question, options, correct_index: correctIndex});
   }
   showToast('Aula salva!', 'success');
+  setBtnSuccess(btnId);
   const titleLabel = document.querySelector('.lesson-accordion-item[data-lesson-id="' + lessonId + '"] .lesson-title-label');
   if (titleLabel) titleLabel.textContent = title;
 }
@@ -2609,7 +2736,7 @@ async function adminAddMaterial(lessonId) {
       const div = document.createElement('div');
       div.className = 'material-edit-item';
       div.id = 'matItem_' + mat.id;
-      div.innerHTML = '<span>'+icon('document-text','14')+' '+mat.name+'</span><button class="btn-icon-only" onclick="adminRemoveMaterial('+mat.id+','+lessonId+')">'+icon('x-circle','16')+'</button>';
+      div.innerHTML = '<span class="material-info">'+icon('document-text','14')+' '+mat.name+'</span><button class="btn-icon-only" onclick="adminRemoveMaterial('+mat.id+','+lessonId+')">'+icon('x-circle','16')+'</button>';
       list.appendChild(div);
     }
     if (nameEl) nameEl.value = '';
@@ -2634,7 +2761,7 @@ async function adminAddMaterial(lessonId) {
       const div = document.createElement('div');
       div.className = 'material-edit-item';
       div.id = 'matItem_' + mat.id;
-      div.innerHTML = '<span>'+icon('file','14')+' '+mat.name+'</span><button class="btn-icon-only" onclick="adminRemoveMaterial('+mat.id+','+lessonId+')">'+icon('x-circle','16')+'</button>';
+      div.innerHTML = '<span class="material-info">'+icon('file','14')+' '+mat.name+'</span><button class="btn-icon-only" onclick="adminRemoveMaterial('+mat.id+','+lessonId+')">'+icon('x-circle','16')+'</button>';
       list.appendChild(div);
     }
     showToast('PDF adicionado!', 'success');
@@ -2675,7 +2802,14 @@ async function addNewLesson(courseId) {
 async function saveCourseHeader() {
   const nameEl = document.getElementById('courseEditName');
   const name = nameEl ? nameEl.value.trim() : '';
-  if (!name) { showToast('Nome é obrigatório', 'error'); return; }
+  if (!name) {
+    showToast('Nome é obrigatório', 'error');
+    if (nameEl) { nameEl.classList.add('form-control-error'); nameEl.focus(); }
+    return;
+  }
+  if (nameEl) nameEl.classList.remove('form-control-error');
+  const btnId = 'btnSaveCourseHeader';
+  setBtnLoading(btnId, true);
   const catEl = document.getElementById('courseEditCategory');
   const colorEl = document.getElementById('courseEditColor');
   const descEl = document.getElementById('courseEditDescription');
@@ -2685,26 +2819,37 @@ async function saveCourseHeader() {
     resumo: descEl ? descEl.value : '',
     color: colorEl ? colorEl.value : '#008ea8'
   });
-  if (!res.ok) { showToast('Erro ao salvar', 'error'); return; }
+  if (!res.ok) { setBtnLoading(btnId, false); showToast('Erro ao salvar', 'error'); return; }
   showToast('Curso atualizado!', 'success');
+  setBtnSuccess(btnId);
 }
 
 async function addCourse(){
-  const name=document.getElementById('nc-name').value.trim();
+  const nameEl=document.getElementById('nc-name');
+  const name=nameEl.value.trim();
   const category=document.getElementById('nc-tag').value.trim();
   const iconVal=(document.getElementById('nc-icon').value.trim())||'📚';
   const acesso=document.getElementById('nc-acesso').value;
   const resumo=document.getElementById('nc-resumo').value.trim();
   const duracao=parseInt(document.getElementById('nc-duracao').value)||4;
-  if(!name){showToast('❌ Informe o nome do curso.','error');return;}
+  if(!name){
+    showToast('❌ Informe o nome do curso.','error');
+    nameEl.classList.add('form-control-error'); nameEl.focus();
+    return;
+  }
+  nameEl.classList.remove('form-control-error');
   if(!category){showToast('❌ Selecione uma categoria.','error');return;}
+  const btnId='btnCreateCourse';
+  setBtnLoading(btnId, true);
   const res=await api('POST','/courses',{name,category,icon:iconVal,acesso,resumo,duracao});
   if(res.ok){
     showToast('✅ Curso criado com sucesso!');
+    setBtnSuccess(btnId);
     await loadCourses();
     renderCourseList();
     renderAdminCourses();
   } else {
+    setBtnLoading(btnId, false);
     const d=await res.json();
     showToast('❌ '+(d.error||'Erro ao criar curso.'),'error');
   }
