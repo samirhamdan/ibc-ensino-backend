@@ -1,16 +1,15 @@
 import sys
-import os
 from app import create_app, db
-from app.models import Usuario
-
-if len(sys.argv) < 2:
-    print("❌ Use: python make_admin.py seu-email@ibc.com")
-    sys.exit(1)
-
-email = sys.argv[1]
 
 app = create_app('production')
 with app.app_context():
+    from models import Usuario
+    
+    if len(sys.argv) < 2:
+        email = input("Email do usuário: ")
+    else:
+        email = sys.argv[1]
+    
     user = Usuario.query.filter_by(email=email).first()
     if user:
         user.perfil = 'admin'
