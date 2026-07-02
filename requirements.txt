@@ -2,7 +2,7 @@ Flask==3.0.3
 Flask-SQLAlchemy==3.1.1
 Flask-CORS==4.0.0
 Flask-Session==0.5.0
-SQLAlchemy==2.0.50
+SQLAlchemy==2.2.13
 bcrypt==4.1.2
 python-dotenv==1.0.0
 reportlab==4.2.2
