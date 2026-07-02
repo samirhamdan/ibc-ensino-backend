@@ -9,12 +9,6 @@ Uso:
     DATABASE_URL=postgresql://... python seed_production.py
 """
 import os
-import sys
-
-if not os.getenv('DATABASE_URL'):
-    print("ERRO: variável de ambiente DATABASE_URL não definida. "
-          "Defina-a apontando para o banco de produção (Postgres/Neon) antes de rodar este script.")
-    sys.exit(1)
 
 from app import create_app, db
 from models import User, Category
