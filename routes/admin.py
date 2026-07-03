@@ -7,7 +7,7 @@ from extensions import db
 from models import (
     User, Course, Question, TutorCourse, UserTrail, UserPoints,
     Certificate, Progress, Trail, Notification, Announcement, AnnouncementDismissal,
-    PlatformConfig, Level, Module, Material, Quiz
+    PlatformConfig, Level, Module, Material, Quiz, LessonProgress
 )
 from sqlalchemy import func
 
@@ -284,6 +284,7 @@ def reset_user_progress(user_id):
     u = User.query.get_or_404(user_id)
 
     Progress.query.filter_by(user_id=u.id).delete()
+    LessonProgress.query.filter_by(user_id=u.id).delete()
     UserTrail.query.filter_by(user_id=u.id).delete()
 
     pts = UserPoints.query.filter_by(user_id=u.id).first()
