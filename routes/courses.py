@@ -59,6 +59,13 @@ def get_course(course_id):
     user = _current_user()
     course = Course.query.get_or_404(course_id)
 
+    is_staff = bool(user and user.role in ('admin', 'tutor'))
+    if not is_staff:
+        if course.status != 'published':
+            return jsonify({'error': 'Curso não encontrado'}), 404
+        if course.acesso == 'interno' and not user:
+            return jsonify({'error': 'Não autenticado'}), 401
+
     return jsonify(course.to_dict(include_details=True)), 200
 
 
