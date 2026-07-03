@@ -43,10 +43,31 @@ def issue_certificate():
 
     if cert_type not in ('course', 'trail') or not entity_id:
         return jsonify({'error': 'Parâmetros inválidos'}), 400
+    try:
+        entity_id = int(entity_id)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Parâmetros inválidos'}), 400
+
+    # Valida conclusão real (Module + LessonProgress) antes de emitir —
+    # antes qualquer autenticado emitia certificado de qualquer course_id/
+    # trail_id, concluído ou não. Reusa o mesmo critério já usado para
+    # marcar cursos como concluídos dentro de uma trilha (routes/trails.py).
+    from routes.trails import _completed_course_ids
+    done_course_ids = _completed_course_ids(user.id)
 
     if cert_type == 'course':
+        if not Course.query.get(entity_id):
+            return jsonify({'error': 'Curso não encontrado'}), 404
+        if entity_id not in done_course_ids:
+            return jsonify({'error': 'Curso ainda não foi concluído'}), 403
         existing = Certificate.query.filter_by(user_id=user.id, course_id=entity_id, cert_type='course').first()
     else:
+        trail = Trail.query.get(entity_id)
+        if not trail:
+            return jsonify({'error': 'Trilha não encontrada'}), 404
+        trail_course_ids = [tc.course_id for tc in trail.trail_courses]
+        if not trail_course_ids or not all(cid in done_course_ids for cid in trail_course_ids):
+            return jsonify({'error': 'Trilha ainda não foi concluída'}), 403
         existing = Certificate.query.filter_by(user_id=user.id, trail_id=entity_id, cert_type='trail').first()
 
     if existing:
