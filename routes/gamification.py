@@ -3,6 +3,7 @@ Gamification routes: points, levels and badges
 """
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, session
+from sqlalchemy.exc import IntegrityError
 from extensions import db
 from models import (User, Badge, UserBadge, UserPoints, LessonProgress,
                     Question, Course, Module, Achievement, UserAchievement,
@@ -45,9 +46,15 @@ def calculate_level(total_points):
 def _get_or_create_points(user_id):
     up = UserPoints.query.filter_by(user_id=user_id).first()
     if not up:
-        up = UserPoints(user_id=user_id, total_points=0, current_level=1, points_in_level=0)
-        db.session.add(up)
-        db.session.flush()
+        try:
+            with db.session.begin_nested():
+                up = UserPoints(user_id=user_id, total_points=0, current_level=1, points_in_level=0)
+                db.session.add(up)
+                db.session.flush()
+        except IntegrityError:
+            # Corrida: outra requisição concorrente já criou o registro
+            # (UserPoints.user_id é unique). Recarrega o que foi criado.
+            up = UserPoints.query.filter_by(user_id=user_id).first()
     return up
 
 
@@ -59,9 +66,15 @@ def unlock_badge(user_id, badge_code):
     existing = UserBadge.query.filter_by(user_id=user_id, badge_id=badge.id).first()
     if existing:
         return None
-    ub = UserBadge(user_id=user_id, badge_id=badge.id)
-    db.session.add(ub)
-    db.session.flush()
+    try:
+        with db.session.begin_nested():
+            ub = UserBadge(user_id=user_id, badge_id=badge.id)
+            db.session.add(ub)
+            db.session.flush()
+    except IntegrityError:
+        # Corrida: outra requisição concorrente já desbloqueou este badge
+        # (uq_user_badge). Trata como "não desbloqueado agora".
+        return None
     return badge.to_dict()
 
 
@@ -160,7 +173,10 @@ def award_points(user_id, action, metadata=None):
 
     level_up = up.current_level > old_level
     badges_unlocked = check_all_badges(user_id)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
 
     return {
         'points_awarded': points,
@@ -314,17 +330,26 @@ def check_and_grant_achievements(user_id):
             continue
         current = _achievement_progress_value(user_id, ach.criteria_type)
         if current >= ach.criteria_value:
-            ua = UserAchievement(user_id=user_id, achievement_id=ach.id)
-            db.session.add(ua)
-            if ach.points_reward:
-                up = _get_or_create_points(user_id)
-                up.total_points = (up.total_points or 0) + ach.points_reward
-                up.current_level, up.points_in_level = calculate_level(up.total_points)
-            db.session.flush()
+            try:
+                with db.session.begin_nested():
+                    ua = UserAchievement(user_id=user_id, achievement_id=ach.id)
+                    db.session.add(ua)
+                    if ach.points_reward:
+                        up = _get_or_create_points(user_id)
+                        up.total_points = (up.total_points or 0) + ach.points_reward
+                        up.current_level, up.points_in_level = calculate_level(up.total_points)
+                    db.session.flush()
+            except IntegrityError:
+                # Corrida: outra requisição concorrente já concedeu esta
+                # conquista (uq_user_achievement). Não conta como nova.
+                continue
             newly_granted.append(ach.to_dict())
 
     if newly_granted:
-        db.session.commit()
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
     return newly_granted
 
 
@@ -335,7 +360,10 @@ def check_badge_progress():
         return jsonify({'error': 'Não autenticado'}), 401
 
     unlocked = check_all_badges(user.id)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
     msg = ''
     if unlocked:
         names = ', '.join(b['name'] for b in unlocked)
