@@ -78,10 +78,18 @@ def create_app(config_name='development'):
     db.init_app(app)
 
     # CORS (permitir requisições do frontend)
-    cors_origins = ['http://localhost:3000', 'http://localhost:5000', 'https://*.replit.dev', 'https://*.vercel.app']
+    # Nota: nada de curingas tipo 'https://*.vercel.app' aqui — o Flask-CORS trata
+    # a string como regex, onde esse padrão não casa com subdomínios reais mas
+    # aceita qualquer domínio registrável parecido (ex.: https://xvercelyapp.com),
+    # o que com supports_credentials=True é uma falha de segurança. Usar sempre
+    # origens exatas.
+    cors_origins = ['http://localhost:3000', 'http://localhost:5000']
     app_url = os.getenv('APP_URL')
     if app_url:
         cors_origins.append(app_url)
+    railway_domain = os.getenv('RAILWAY_PUBLIC_DOMAIN')
+    if railway_domain:
+        cors_origins.append(f'https://{railway_domain}')
     CORS(app, supports_credentials=True,
          origins=cors_origins,
          allow_headers=['Content-Type', 'Authorization'])
