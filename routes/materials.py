@@ -139,5 +139,13 @@ def upload_material():
 
 @materials_bp.route('/files/materials/<path:filename>', methods=['GET'])
 def serve_material_file(filename):
+    user = _current_user()
+    if not user:
+        return jsonify({'error': 'Não autenticado'}), 401
+
+    material = Material.query.filter_by(url=f'/uploads/materials/{filename}').first()
+    if not material or not _can_access_material(user, material):
+        return jsonify({'error': 'Acesso negado'}), 403
+
     upload_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'materials')
     return send_from_directory(upload_dir, filename)

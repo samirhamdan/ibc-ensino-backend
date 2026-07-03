@@ -171,6 +171,20 @@ def create_app(config_name='development'):
             safe = posixpath.normpath(filename)
             if safe.startswith('..'):
                 return jsonify({'error': 'Acesso negado'}), 403
+
+            uid = session.get('user_id')
+            user = User.query.get(uid) if uid else None
+            if not user:
+                return jsonify({'error': 'Não autenticado'}), 401
+
+            # Se o arquivo é um material de curso registrado, aplica a mesma
+            # regra de acesso usada em routes/materials.py (get_material).
+            material = Material.query.filter_by(url=f'/uploads/{safe}').first()
+            if material:
+                from routes.materials import _can_access_material
+                if not _can_access_material(user, material):
+                    return jsonify({'error': 'Acesso negado'}), 403
+
             return send_from_directory(uploads_dir, safe)
 
         # Serve SVG icon sprite
