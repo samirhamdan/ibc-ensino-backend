@@ -3,7 +3,7 @@ Trails + Onboarding endpoints
 """
 from flask import Blueprint, jsonify, session, request
 from extensions import db
-from models import Trail, TrailCourse, UserTrail, OnboardingAnswer, User, UserPoints, Badge, UserBadge, Progress
+from models import Trail, TrailCourse, UserTrail, OnboardingAnswer, User, UserPoints, Badge, UserBadge, Module, LessonProgress
 
 trails_bp = Blueprint('trails', __name__)
 onboarding_bp = Blueprint('onboarding', __name__)
@@ -89,17 +89,36 @@ def focus_trail(trail_id):
     return jsonify({'ok': True, 'focused_trail_id': trail_id})
 
 
-def _annotate_trail_progress(trail, user_id, progress_map=None):
+def _completed_course_ids(user_id):
+    """Ids de curso 100% concluídos pelo usuário (todos os módulos com
+    LessonProgress.passed=True). Substitui o antigo cálculo baseado no modelo
+    legado `Progress` — routes/progress.py não é mais usado pelo frontend, então
+    `Progress` fica sempre vazio e a conclusão de trilha nunca disparava
+    (bug crítico do ROADMAP.md, seção 1.2)."""
+    modules_by_course = {}
+    for m in Module.query.all():
+        modules_by_course.setdefault(m.course_id, []).append(m.id)
+
+    passed_module_ids = {
+        lp.module_id for lp in LessonProgress.query.filter_by(user_id=user_id, passed=True).all()
+    }
+
+    done_ids = set()
+    for cid, module_ids in modules_by_course.items():
+        if module_ids and all(mid in passed_module_ids for mid in module_ids):
+            done_ids.add(cid)
+    return done_ids
+
+
+def _annotate_trail_progress(trail, user_id, done_course_ids=None):
     """Return trail dict with per-course done/current/locked states."""
-    if progress_map is None:
-        progress_map = {p.course_id: p for p in Progress.query.filter_by(user_id=user_id).all()}
+    if done_course_ids is None:
+        done_course_ids = _completed_course_ids(user_id)
 
     trail_dict = trail.to_dict(include_courses=True)
     first_undone = None
     for tc in trail_dict['courses']:
-        prog = progress_map.get(tc['course_id'])
-        done = bool(prog and prog.material_done and prog.quiz_total > 0
-                    and prog.quiz_score >= prog.quiz_total * 0.6)
+        done = tc['course_id'] in done_course_ids
         tc['done'] = done
         if not done and first_undone is None:
             first_undone = tc['course_id']
@@ -128,13 +147,13 @@ def my_trails():
         return jsonify({'error': 'Não autenticado'}), 401
 
     enrollments = UserTrail.query.filter_by(user_id=user.id).all()
-    progress_map = {p.course_id: p for p in Progress.query.filter_by(user_id=user.id).all()}
+    done_course_ids = _completed_course_ids(user.id)
 
     in_progress, completed = [], []
     for ut in enrollments:
         if not ut.trail:
             continue
-        td = _annotate_trail_progress(ut.trail, user.id, progress_map)
+        td = _annotate_trail_progress(ut.trail, user.id, done_course_ids)
         td['enrolled_at'] = ut.enrolled_at.isoformat()
         if ut.completed_at or td['completed']:
             td['completed_at'] = ut.completed_at.isoformat() if ut.completed_at else None
@@ -165,15 +184,12 @@ def active_trail():
     trail_dict = trail.to_dict(include_courses=True)
 
     # annotate each course with state: done | current | locked
-    progress_map = {
-        p.course_id: p for p in Progress.query.filter_by(user_id=user.id).all()
-    }
+    done_course_ids = _completed_course_ids(user.id)
 
     first_undone = None
     for tc in trail_dict['courses']:
         cid = tc['course_id']
-        prog = progress_map.get(cid)
-        done = bool(prog and prog.material_done and prog.quiz_total > 0 and prog.quiz_score >= prog.quiz_total * 0.6)
+        done = cid in done_course_ids
         tc['done'] = done
         if not done and first_undone is None:
             first_undone = cid

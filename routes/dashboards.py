@@ -243,7 +243,6 @@ def aluno_dashboard():
 
 # ── Aluno dashboard ────────────────────────────────────────────
 
-@dashboards_bp.route('/aluno/dashboard', methods=['GET'])
 @dashboards_bp.route('/aluno-externo/dashboard', methods=['GET'])
 def aluno_externo_dashboard():
     user = _current_user()

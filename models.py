@@ -3,6 +3,7 @@ SQLAlchemy models for IBC Ensino
 """
 from datetime import datetime, timedelta
 from extensions import db
+from sqlalchemy.ext.hybrid import hybrid_property
 import bcrypt
 import secrets
 
@@ -214,6 +215,30 @@ class Progress(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     __table_args__ = (db.UniqueConstraint('user_id', 'course_id', name='uq_user_course'),)
+
+    PASS_THRESHOLD = 60  # percent — mesmo limiar usado em LessonProgress (routes/lessons.py)
+
+    @hybrid_property
+    def passed(self):
+        """Computado (não é coluna): material lido + nota do quiz >= PASS_THRESHOLD
+        (ou sem quiz). Adicionado para corrigir bug crítico do ROADMAP.md —
+        'Progress.passed' era referenciado em routes/admin.py e routes/courses.py
+        mas nunca existiu como coluna."""
+        if not self.material_done:
+            return False
+        if not self.quiz_total:
+            return True
+        return (self.quiz_score / self.quiz_total * 100) >= Progress.PASS_THRESHOLD
+
+    @passed.expression
+    def passed(cls):
+        return db.and_(
+            cls.material_done.is_(True),
+            db.or_(
+                cls.quiz_total == 0,
+                (cls.quiz_score * 100.0 / db.func.nullif(cls.quiz_total, 0)) >= Progress.PASS_THRESHOLD,
+            ),
+        )
 
     def to_dict(self):
         return {

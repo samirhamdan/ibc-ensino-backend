@@ -59,7 +59,15 @@ def create_app(config_name='development'):
         'pool_pre_ping': True,
         'pool_recycle': 300,
     }
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-prod')
+    secret_key = os.getenv('SECRET_KEY')
+    if not secret_key:
+        if is_production:
+            raise RuntimeError(
+                'SECRET_KEY não definida. Configure a variável de ambiente SECRET_KEY '
+                'antes de rodar em produção (gere com: python -c "import secrets; print(secrets.token_hex(32))").'
+            )
+        secret_key = 'dev-secret-key-change-in-prod'
+    app.config['SECRET_KEY'] = secret_key
     app.config['SESSION_PERMANENT'] = True
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
     app.config['SESSION_COOKIE_SECURE'] = is_production

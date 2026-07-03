@@ -34,8 +34,14 @@ def signup():
     if len(password) < 6:
         return jsonify({'error': 'A senha deve ter ao menos 6 caracteres'}), 400
 
+    # Só um admin autenticado pode escolher o role (uso: tela de cadastro de
+    # usuários do admin). Qualquer outra requisição (anônima ou não-admin)
+    # sempre cria um 'aluno', independentemente do que for enviado.
+    requester = _current_user()
     valid_roles = {'aluno', 'tutor', 'admin'}
-    if role not in valid_roles:
+    if requester and requester.role == 'admin' and role in valid_roles:
+        pass
+    else:
         role = 'aluno'
 
     if User.query.filter_by(email=email).first():

@@ -18,8 +18,13 @@ DEFAULT_CATEGORIES = ['Teologia', 'Crescimento', 'Bíblia']
 
 
 def seed_admin():
-    admin_email = os.getenv('ADMIN_EMAIL', 'admin@ibc.com')
-    admin_password = os.getenv('ADMIN_PASSWORD', 'TrocarSenha123!')
+    admin_email = os.getenv('ADMIN_EMAIL')
+    admin_password = os.getenv('ADMIN_PASSWORD')
+
+    if not admin_email or not admin_password:
+        print("ADMIN_EMAIL/ADMIN_PASSWORD não definidos — criação de admin padrão pulada "
+              "(defina ambos no ambiente se precisar criar um admin inicial).")
+        return
 
     if User.query.filter_by(email=admin_email).first():
         print(f"Usuário admin '{admin_email}' já existe — pulando.")
