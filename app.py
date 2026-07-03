@@ -7,7 +7,7 @@ import uuid
 from flask import Flask, jsonify, session, request, send_from_directory
 from flask_cors import CORS
 from datetime import timedelta
-from extensions import db
+from extensions import db, limiter
 
 ALLOWED_EXTENSIONS = {'pdf'}
 MAX_FILE_MB = 20
@@ -76,6 +76,9 @@ def create_app(config_name='development'):
 
     # Database
     db.init_app(app)
+
+    # Rate limiting (login/forgot-password — ver decorators em routes/auth.py)
+    limiter.init_app(app)
 
     # CORS (permitir requisições do frontend)
     # Nota: nada de curingas tipo 'https://*.vercel.app' aqui — o Flask-CORS trata

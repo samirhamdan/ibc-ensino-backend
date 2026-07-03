@@ -7,7 +7,7 @@ from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import Blueprint, request, jsonify, session
-from extensions import db
+from extensions import db, limiter
 from models import User, PasswordResetToken
 
 auth_bp = Blueprint('auth', __name__)
@@ -57,6 +57,7 @@ def signup():
 
 
 @auth_bp.route('/login', methods=['POST'])
+@limiter.limit('10 per minute')
 def login():
     data = request.get_json(silent=True) or {}
     email = (data.get('email') or '').strip().lower()
@@ -270,6 +271,7 @@ def _send_reset_email(to_email, to_name, reset_url):
 
 
 @auth_bp.route('/forgot-password', methods=['POST'])
+@limiter.limit('5 per hour')
 def forgot_password():
     data = request.get_json(silent=True) or {}
     email = (data.get('email') or '').strip().lower()
