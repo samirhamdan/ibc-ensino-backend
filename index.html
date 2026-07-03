@@ -50,6 +50,7 @@
 <link rel="stylesheet" href="css/pages/admin-ux.css">
 <link rel="stylesheet" href="css/pages/meu-perfil.css">
 <link rel="stylesheet" href="css/pages/sprint62.css">
+<link rel="stylesheet" href="css/pages/mobile-nav.css">
 
 <!-- Scripts -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -184,6 +185,9 @@
 <div id="screen-main" class="screen" style="flex-direction:column">
   <div class="topbar">
     <div class="topbar-left">
+      <button class="sidebar-hamburger" id="sidebarHamburger" onclick="toggleSidebar()" aria-label="Abrir menu" title="Menu">
+        <svg class="icon" width="22" height="22" viewBox="0 0 24 24"><use href="#icon-menu"></use></svg>
+      </button>
       <div class="topbar-logo-box"><img src="images/logo-ibc.png" alt="Escola da IBC"></div>
       <div style="border-left:1px solid rgba(255,255,255,.25);padding-left:.7rem">
         <div class="topbar-subtitle">Plataforma EAD</div>
@@ -297,6 +301,7 @@
         </div>
       </div>
     </div>
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar(false)"></div>
     <div class="content">
       <div id="announcements-banner-area"></div>
       <div id="main-content"></div>
@@ -509,6 +514,30 @@ function togglePassword(id){
   const inp = document.getElementById(id || 'login-pass');
   if(inp) inp.type = inp.type === 'password' ? 'text' : 'password';
 }
+
+// ── Sidebar mobile (off-canvas) ──────────────────────────────────────────
+function toggleSidebar(force){
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if(!sidebar) return;
+  const enable = typeof force === 'boolean' ? force : !sidebar.classList.contains('sidebar-open');
+  sidebar.classList.toggle('sidebar-open', enable);
+  if(backdrop) backdrop.classList.toggle('sidebar-open', enable);
+  document.body.classList.toggle('sidebar-open-lock', enable);
+}
+// Fecha o menu automaticamente ao navegar (clique em qualquer item da sidebar)
+document.addEventListener('DOMContentLoaded', function(){
+  const sidebar = document.getElementById('sidebar');
+  if(sidebar){
+    sidebar.addEventListener('click', function(e){
+      if(e.target.closest('.course-item')) toggleSidebar(false);
+    });
+  }
+});
+// Se a tela crescer para desktop com o menu mobile aberto, reseta o estado
+window.addEventListener('resize', function(){
+  if(window.innerWidth > 768) toggleSidebar(false);
+});
 
 // ── Modo Foco (Sprint 6.2) ──────────────────────────────────────────────
 function toggleFocusMode(force){
