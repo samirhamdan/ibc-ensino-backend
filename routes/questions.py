@@ -62,6 +62,9 @@ def answer_question(question_id):
 
     question = Question.query.get_or_404(question_id)
 
+    if user.role == 'tutor' and (not question.course or question.course.tutor_id != user.id):
+        return jsonify({'error': 'Você só pode responder perguntas dos seus cursos'}), 403
+
     data = request.get_json(silent=True) or {}
     resposta = (data.get('resposta') or '').strip()
     if not resposta:
