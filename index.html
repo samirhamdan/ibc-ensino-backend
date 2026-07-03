@@ -1974,7 +1974,6 @@ async function responderPergunta(qid){
   if(res.ok){
     const updated=await res.json();
     currentQuestions=currentQuestions.map(q=>q.id===qid?updated:q);
-    api('POST','/gamification/add-points', {action:'question_answered', question_id: qid}).catch(()=>{});
     renderTabContent();
   } else { alert('Erro ao responder.'); }
 }

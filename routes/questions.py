@@ -70,10 +70,19 @@ def answer_question(question_id):
     if not resposta:
         return jsonify({'error': 'resposta é obrigatória'}), 400
 
+    is_first_answer = question.status != 'answered'
+
     question.resposta = resposta
     question.respondido_por = user.name
     question.status = 'answered'
     db.session.commit()
+
+    # Pontos para quem perguntou, concedidos aqui (servidor, evento real) e só
+    # na primeira resposta — não mais via /gamification/add-points, que
+    # aceitava question_id arbitrário vindo do cliente sem checagem alguma.
+    if is_first_answer:
+        from routes.gamification import award_points
+        award_points(question.user_id, 'question_answered')
 
     notification = Notification(
         user_id=question.user_id,

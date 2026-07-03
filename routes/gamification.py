@@ -250,6 +250,20 @@ def list_badges():
     return jsonify(result), 200
 
 
+# Ações que o cliente NÃO pode disparar diretamente neste endpoint:
+# - 'course_completed': não recebe course_id nem qualquer verificação, e não
+#   há nenhum chamador no frontend — só existe hoje como vetor de abuso
+#   (POST repetido credita pontos ilimitados). Concessão real de pontos por
+#   conclusão de curso deve acontecer no servidor, no momento da emissão do
+#   certificado (routes/certificates.py), não aqui.
+# - 'question_answered': creditava o AUTOR da pergunta (não o chamador) a
+#   partir de um question_id arbitrário — qualquer usuário autenticado podia
+#   chamar isso para si mesmo ou para terceiros, repetidamente. Movido para
+#   dentro de answer_question() (routes/questions.py), que só concede uma vez,
+#   no momento real em que a pergunta é respondida.
+_CLIENT_BLOCKED_ACTIONS = {'course_completed', 'question_answered'}
+
+
 @gamification_bp.route('/add-points', methods=['POST'])
 def add_points():
     user = _current_user()
@@ -258,16 +272,12 @@ def add_points():
 
     data = request.get_json(silent=True) or {}
     action = data.get('action')
+    if action in _CLIENT_BLOCKED_ACTIONS:
+        return jsonify({'error': 'Ação inválida'}), 400
     if action not in POINTS_PER_ACTION and action != 'quiz_passed':
         return jsonify({'error': 'Ação inválida'}), 400
 
-    target_user_id = user.id
-    if action == 'question_answered':
-        question = Question.query.get(data.get('question_id'))
-        if question:
-            target_user_id = question.user_id
-
-    result = award_points(target_user_id, action, data)
+    result = award_points(user.id, action, data)
     msg = f"+{result['points_awarded']} XP! (Total: {result['total_points']})"
     result['message'] = msg
     return jsonify(result), 201
