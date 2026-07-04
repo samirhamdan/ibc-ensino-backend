@@ -4024,7 +4024,7 @@ async function _renderAdminDashboardInner(){
   catch(e){ console.error('[DEBUG] renderHero ERRO:', e); throw e; }
   el.innerHTML=`
     ${heroHtml}
-    <div class="dash-heading">📊 Dashboard Executivo</div>
+    <div class="dash-heading">${icon('bar-chart','20')} Dashboard Executivo</div>
     <div id="admin-dash-body"><div class="alert alert-info"><span class="alert-icon">⏳</span><div class="alert-body">Carregando...</div></div></div>`;
   console.log('[DEBUG] innerHTML loading state OK, chamando /admin/dashboard');
   const res=await api('GET','/admin/dashboard');
@@ -4053,30 +4053,30 @@ async function _renderAdminDashboardInner(){
       </div>
       <div class="stat-card stagger-item">
         <div class="stat-value">${d.completion_rate||0}%</div>
-        <div class="stat-label">📊 Conclusão Média</div>
+        <div class="stat-label">${icon('target','14')} Conclusão Média</div>
       </div>
       <div class="stat-card stagger-item">
         <div class="stat-value">${d.new_users_7d||0}</div>
-        <div class="stat-label">📈 Novos (7 dias)</div>
+        <div class="stat-label">${icon('bar-chart','14')} Novos (7 dias)</div>
         ${d.new_users_7d>0?`<div class="stat-trend stat-trend-up">↑ Esta semana</div>`:''}
       </div>
     </div>
     <div class="grid grid-cols-2 gap-lg" style="margin-bottom:var(--space-xl)">
       <div class="card">
-        <div class="card-header"><h3 class="card-title">📈 Atividade (últimos 7 dias)</h3></div>
+        <div class="card-header"><h3 class="card-title">${icon('bar-chart','16')} Atividade (últimos 7 dias)</h3></div>
         <div class="card-body"><canvas id="admin-chart-line" height="140"></canvas></div>
       </div>
       <div class="card">
-        <div class="card-header"><h3 class="card-title">🍰 Distribuição de usuários</h3></div>
+        <div class="card-header"><h3 class="card-title">${icon('users','16')} Distribuição de usuários</h3></div>
         <div class="card-body"><canvas id="admin-chart-pie" height="140"></canvas></div>
       </div>
     </div>
     <div class="dash-section">
-      <div class="dash-section-title">🚨 Alertas</div>
-      ${alerts.length?alerts.map(a=>`<div class="alert ${a.severity==='high'?'alert-danger':a.severity==='warn'?'alert-warning':'alert-info'}"><span class="alert-icon">${a.severity==='high'?'❌':a.severity==='warn'?'⚠️':'✅'}</span><div class="alert-body">${a.message}</div></div>`).join(''):'<div class="alert alert-success"><span class="alert-icon">✅</span><div class="alert-body">Nenhum alerta no momento.</div></div>'}
+      <div class="dash-section-title">${icon('bell','16')} Alertas</div>
+      ${alerts.length?alerts.map(a=>`<div class="alert ${a.severity==='high'?'alert-danger':a.severity==='warn'?'alert-warning':'alert-info'}"><span class="alert-icon">${a.severity==='high'?icon('x-circle','16'):a.severity==='warn'?icon('lightbulb','16'):icon('checkmark-circle','16')}</span><div class="alert-body">${a.message}</div></div>`).join(''):`<div class="alert alert-success"><span class="alert-icon">${icon('checkmark-circle','16')}</span><div class="alert-body">Nenhum alerta no momento.</div></div>`}
     </div>
     <div class="card" style="margin-bottom:var(--space-xl)">
-      <div class="card-header"><h3 class="card-title">📋 Atividades Recentes</h3></div>
+      <div class="card-header"><h3 class="card-title">${icon('clock','16')} Atividades Recentes</h3></div>
       <div class="card-body">
         <div class="activity-list">
           ${recentActivities.length?recentActivities.map(a=>`<div class="activity-item"><div class="activity-dot"></div><div class="activity-text"><strong>${a.user}</strong> ${a.action}</div><div class="activity-time">${a.timestamp?new Date(a.timestamp).toLocaleString('pt-BR'):''}</div></div>`).join(''):'<p style="color:var(--gray);font-size:var(--text-sm)">Nenhuma atividade recente.</p>'}
@@ -4106,7 +4106,7 @@ async function _renderTutorPanelDashboardInner(){
   const el=document.getElementById('main-content');
   el.innerHTML=`
     ${renderHero(currentUser, {})}
-    <div class="dash-heading">👨‍🏫 Painel do Tutor</div>
+    <div class="dash-heading">${icon('user-check','20')} Painel do Tutor</div>
     <div class="dash-subtitle">Olá, ${currentUser.name.split(' ')[0]}! Aqui está seu resumo.</div>
     <div id="tutor-panel-body"><div class="alert alert-info"><span class="alert-icon">⏳</span><div class="alert-body">Carregando...</div></div></div>`;
   const res=await api('GET','/tutor/dashboard');
@@ -4117,17 +4117,17 @@ async function _renderTutorPanelDashboardInner(){
   body.innerHTML=`
     ${pend.length?`
     <div class="pending-questions-alert">
-      <div class="pending-questions-title">⚠️ ${pend.length} dúvida(s) sem resposta — responda agora!</div>
-      ${pend.map(q=>`<div class="question-item"><div class="question-item-header"><span><strong>${q.author}:</strong> "${q.text}"</span><span class="time-badge">${new Date(q.timestamp).toLocaleString('pt-BR')}</span></div><div class="question-course-tag">📚 ${q.course}</div><div><button class="btn btn-primary btn-sm" onclick="setTutorDashTab('duvidas');showTutorDashboard()">Responder Agora</button></div></div>`).join('')}
-    </div>`:`<div class="alert alert-success"><span class="alert-icon">✅</span><div class="alert-body">Nenhuma dúvida pendente — tudo em dia!</div></div>`}
+      <div class="pending-questions-title">${icon('message','16')} ${pend.length} dúvida(s) sem resposta — responda agora!</div>
+      ${pend.map(q=>`<div class="question-item"><div class="question-item-header"><span><strong>${q.author}:</strong> "${q.text}"</span><span class="time-badge">${new Date(q.timestamp).toLocaleString('pt-BR')}</span></div><div class="question-course-tag">${icon('book','12')} ${q.course}</div><div><button class="btn btn-primary btn-sm" onclick="setTutorDashTab('duvidas');showTutorDashboard()">Responder Agora</button></div></div>`).join('')}
+    </div>`:`<div class="alert alert-success"><span class="alert-icon">${icon('checkmark-circle','16')}</span><div class="alert-body">Nenhuma dúvida pendente — tudo em dia!</div></div>`}
     <div class="dash-section">
       <div class="dash-section-title">${icon('catalog','16')} Meus Cursos</div>
       <div class="grid grid-cols-2 gap-lg">
-        ${d.my_courses.map(c=>`<div class="card"><div class="card-body"><h3 class="card-title">${c.icon||'📚'} ${c.name}</h3><div class="stat-row"><span>👥 ${c.students} aluno(s)</span><span style="color:var(--primary);font-weight:var(--fw-bold)">${c.completion_rate}% conclusão</span></div><div class="progress progress-sm" style="margin:var(--space-sm) 0"><div class="progress-bar" style="width:${c.completion_rate}%"></div></div><div style="font-size:var(--text-xs);color:var(--gray);margin-bottom:var(--space-md)">${c.completed}/${c.students} concluíram</div>${c.alerts.length?`<div class="alert alert-sm alert-warning" style="margin-bottom:var(--space-md)"><span>⚠️ ${c.alerts[0]}</span></div>`:`<div class="alert alert-sm alert-success" style="margin-bottom:var(--space-md)"><span>✅ Curso rodando bem</span></div>`}<button class="btn btn-outline btn-sm btn-full" onclick="selectCourse(${c.id})">Ver Alunos</button></div></div>`).join('')}
+        ${d.my_courses.map(c=>`<div class="card"><div class="card-body"><h3 class="card-title">${c.icon||'📚'} ${c.name}</h3><div class="stat-row"><span>${icon('users','14')} ${c.students} aluno(s)</span><span style="color:var(--primary);font-weight:var(--fw-bold)">${c.completion_rate}% conclusão</span></div><div class="progress progress-sm" style="margin:var(--space-sm) 0"><div class="progress-bar" style="width:${c.completion_rate}%"></div></div><div style="font-size:var(--text-xs);color:var(--gray);margin-bottom:var(--space-md)">${c.completed}/${c.students} concluíram</div>${c.alerts.length?`<div class="alert alert-sm alert-warning" style="margin-bottom:var(--space-md)"><span>${icon('lightbulb','14')} ${c.alerts[0]}</span></div>`:`<div class="alert alert-sm alert-success" style="margin-bottom:var(--space-md)"><span>${icon('checkmark-circle','14')} Curso rodando bem</span></div>`}<button class="btn btn-outline btn-sm btn-full" onclick="selectCourse(${c.id})">Ver Alunos</button></div></div>`).join('')}
       </div>
     </div>
     <div class="card" style="margin-bottom:var(--space-xl)">
-      <div class="card-header"><h3 class="card-title">📊 Atividade (últimos 7 dias)</h3></div>
+      <div class="card-header"><h3 class="card-title">${icon('bar-chart','16')} Atividade (últimos 7 dias)</h3></div>
       <div class="card-body">
         <div class="kpi-grid">
           <div class="stat-card" style="box-shadow:none;border:1px solid var(--gray-light)">
@@ -4168,17 +4168,17 @@ async function _renderAlunoDashboardInner(){
     ${renderHero(currentUser, heroStats)}
     <div id="activityFeedSection"></div>
     <div id="trailSection"></div>
-    ${ip?`<div class="card" style="border-left:4px solid var(--primary);margin-bottom:var(--space-xl)"><div class="card-body"><h3 class="card-title">🎯 Continue de Onde Parou</h3><div style="margin:var(--space-md) 0"><div style="font-size:var(--text-sm);font-weight:var(--fw-semibold);color:var(--dark);margin-bottom:var(--space-sm)">${ip.icon} ${ip.name} — Aula ${ip.aula_atual}/${ip.total_aulas}</div><div class="progress progress-sm" style="margin-bottom:var(--space-xs)"><div class="progress-bar" style="width:${ip.percentage}%"></div></div><div style="font-size:var(--text-xs);color:var(--gray);text-align:right">${ip.percentage}% concluído</div></div><div class="status-grid"><div class="status-item"><span class="status-label">Material</span><span class="status-value">${ip.material_read?'✅ Lido':'📖 Pendente'}</span></div><div class="status-item"><span class="status-label">Quiz</span><span class="status-value">${ip.quiz_done?'✅ Concluído':'❌ Pendente'}</span></div></div><button class="btn btn-primary btn-full" style="margin-top:var(--space-md)" onclick="selectCourse(${ip.id})">🚀 CONTINUAR AULA</button></div></div>`:''}
+    ${ip?`<div class="card" style="border-left:4px solid var(--primary);margin-bottom:var(--space-xl)"><div class="card-body"><h3 class="card-title">${icon('target','16')} Continue de Onde Parou</h3><div style="margin:var(--space-md) 0"><div style="font-size:var(--text-sm);font-weight:var(--fw-semibold);color:var(--dark);margin-bottom:var(--space-sm)">${ip.icon} ${ip.name} — Aula ${ip.aula_atual}/${ip.total_aulas}</div><div class="progress progress-sm" style="margin-bottom:var(--space-xs)"><div class="progress-bar" style="width:${ip.percentage}%"></div></div><div style="font-size:var(--text-xs);color:var(--gray);text-align:right">${ip.percentage}% concluído</div></div><div class="status-grid"><div class="status-item"><span class="status-label">Material</span><span class="status-value">${ip.material_read?icon('checkmark-circle','14','icon--success')+' Lido':icon('clock','14')+' Pendente'}</span></div><div class="status-item"><span class="status-label">Quiz</span><span class="status-value">${ip.quiz_done?icon('checkmark-circle','14','icon--success')+' Concluído':icon('clock','14')+' Pendente'}</span></div></div><button class="btn btn-primary btn-full" style="margin-top:var(--space-md)" onclick="selectCourse(${ip.id})">${icon('arrow-right','16')} CONTINUAR AULA</button></div></div>`:''}
     <div class="card" style="margin-bottom:var(--space-xl)">
       <div class="card-body">
         <h3 class="card-title">${icon('lightbulb','16','icon--lightbulb')} Próximas Metas</h3>
         <div id="goalsSection"><span style="color:var(--gray);font-size:var(--text-sm)">Carregando...</span></div>
       </div>
     </div>
-    ${d.recent_trofeus.length?`<div class="card" style="margin-bottom:var(--space-xl)"><div class="card-body"><h3 class="card-title">🎖️ Últimas Conquistas</h3><div style="margin-top:var(--space-md)">${d.recent_trofeus.map(t=>`<div class="achievement-item"><span class="achievement-icon">${t.icon}</span><div><div class="achievement-name">${t.name}</div><div class="achievement-desc">${t.description||''}</div><div class="achievement-date">${new Date(t.date).toLocaleDateString('pt-BR')}</div></div></div>`).join('')}</div></div></div>`:''}
+    ${d.recent_trofeus.length?`<div class="card" style="margin-bottom:var(--space-xl)"><div class="card-body"><h3 class="card-title">${icon('achievements','16','icon--gold')} Últimas Conquistas</h3><div style="margin-top:var(--space-md)">${d.recent_trofeus.map(t=>`<div class="achievement-item"><span class="achievement-icon">${t.icon}</span><div><div class="achievement-name">${t.name}</div><div class="achievement-desc">${t.description||''}</div><div class="achievement-date">${new Date(t.date).toLocaleDateString('pt-BR')}</div></div></div>`).join('')}</div></div></div>`:''}
     <div class="dash-section">
       <div class="dash-section-title">${icon('catalog','16')} Outros Cursos</div>
-      <div class="grid grid-cols-2 gap-lg">${d.other_courses.map(c=>`<div class="card other-course-card" onclick="selectCourse(${c.id})" style="cursor:pointer"><div class="other-course-icon">${c.icon||'📚'}</div><h3 style="font-size:var(--text-sm);font-weight:var(--fw-bold);color:var(--dark)">${c.name}</h3>${c.status==='concluido'?`<span style="color:var(--success);font-size:var(--text-xs)">✅ Concluído</span><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();selectCourse(${c.id})">🏆 Certificado</button>`:c.status==='em_andamento'?`<span style="color:var(--primary);font-size:var(--text-xs)">${c.percentage}% concluído</span><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();selectCourse(${c.id})">Continuar</button>`:`<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();selectCourse(${c.id})">Começar</button>`}</div>`).join('')}</div>
+      <div class="grid grid-cols-2 gap-lg">${d.other_courses.map(c=>`<div class="card other-course-card" onclick="selectCourse(${c.id})" style="cursor:pointer"><div class="other-course-icon">${c.icon||'📚'}</div><h3 style="font-size:var(--text-sm);font-weight:var(--fw-bold);color:var(--dark)">${c.name}</h3>${c.status==='concluido'?`<span style="color:var(--success);font-size:var(--text-xs)">${icon('checkmark-circle','12','icon--success')} Concluído</span><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();selectCourse(${c.id})">${icon('certificates','14')} Certificado</button>`:c.status==='em_andamento'?`<span style="color:var(--primary);font-size:var(--text-xs)">${c.percentage}% concluído</span><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();selectCourse(${c.id})">Continuar</button>`:`<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();selectCourse(${c.id})">Começar</button>`}</div>`).join('')}</div>
     </div>`;
   // Animate hero ring
   animateHero(pct);
@@ -4233,7 +4233,7 @@ async function loadGoalsSection(){
       return {...b, cur: cur||0, tgt: tgt||1, ratio: (cur||0)/(tgt||1)};
     }).sort((a,b)=>b.ratio - a.ratio).slice(0,3);
     if(!locked.length){
-      el.innerHTML = '<span style="color:var(--gray);font-size:var(--text-sm)">Você desbloqueou todas as conquistas! 🎉</span>';
+      el.innerHTML = `<span style="color:var(--gray);font-size:var(--text-sm)">${icon('achievements','14','icon--gold')} Você desbloqueou todas as conquistas!</span>`;
       return;
     }
     el.innerHTML = locked.map(b=>`
@@ -4732,6 +4732,12 @@ function renderHero(userData, stats){
   return `<div class="dashboard-hero">
     <div class="hero-avatar-wrap">
       <svg class="level-ring" viewBox="0 0 80 80">
+        <defs>
+          <linearGradient id="heroRingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="var(--neon-cyan, #22e3ee)"/>
+            <stop offset="100%" stop-color="var(--violet-500, #8b5cf6)"/>
+          </linearGradient>
+        </defs>
         <circle class="level-ring-bg" cx="40" cy="40" r="32"/>
         <circle class="level-ring-fill" id="heroRingFill" cx="40" cy="40" r="32"
           style="stroke-dashoffset:${circumference}"/>
@@ -4739,17 +4745,18 @@ function renderHero(userData, stats){
       <div class="hero-avatar">${(userData.name||'?').charAt(0).toUpperCase()}</div>
     </div>
     <div class="hero-content">
-      <div class="hero-greeting">${greeting}, ${userData.name.split(' ')[0]}! 👋</div>
+      <div class="hero-greeting-eyebrow">${greeting}</div>
+      <div class="hero-greeting">${userData.name.split(' ')[0]}</div>
       <div class="hero-context">${roleCtx[userData.role]||''}</div>
-      <div class="hero-level-label">⭐ Nível ${level} — ${levelName}</div>
+      <div class="hero-level-label">${icon('points','14','icon--gold')} Nível ${level} — ${levelName}</div>
       <div class="hero-xp-bar"><div class="hero-xp-fill" id="heroXpFill" style="width:0%"></div></div>
       ${isAluno() ? (level >= 7
-        ? `<p class="level-hint">Você alcançou o nível máximo! 🎉</p>`
+        ? `<p class="level-hint">${icon('achievements','14','icon--gold')} Você alcançou o nível máximo!</p>`
         : `<p class="level-hint">Faltam <strong>${Math.max(0, levelTarget - ptsInLevel)} pontos</strong> para o Nível ${level+1} — ${GAMI_LEVEL_NAMES[level+1]||''}</p>
-           <p class="level-tip">💡 Você ganha pontos ao ler materiais e acertar exercícios</p>`) : ''}
+           <p class="level-tip">${icon('lightbulb','12')} Você ganha pontos ao ler materiais e acertar exercícios</p>`) : ''}
     </div>
     ${(totalPoints === 0 && badgesCount === 0 && isAluno())
-      ? `<p class="hero-cta-empty">🎯 Complete sua primeira aula para ganhar seus primeiros pontos!</p>`
+      ? `<p class="hero-cta-empty">${icon('target','16')} Complete sua primeira aula para ganhar seus primeiros pontos!</p>`
       : `<div class="hero-stats">
       <div class="hero-stat"><span class="hero-stat-value" data-target="${totalPoints}">${totalPoints}</span><span class="hero-stat-label">${icon('points','16','icon--gold')} Pontos</span></div>
       <div class="hero-stat"><span class="hero-stat-value" data-target="${coursesCount}">${coursesCount}</span><span class="hero-stat-label">${icon('catalog','16')} Cursos</span></div>
