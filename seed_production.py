@@ -12,7 +12,7 @@ import os
 
 from app import create_app, db
 from models import User, Category
-from seed import seed_config, seed_levels, seed_achievements
+from seed import seed_config, seed_levels, seed_achievements, seed_badges
 
 DEFAULT_CATEGORIES = ['Teologia', 'Crescimento', 'Bíblia']
 
@@ -53,6 +53,7 @@ def main():
 
         seed_config()
         seed_levels()
+        seed_badges()
         seed_achievements()
         seed_categories()
         seed_admin()
