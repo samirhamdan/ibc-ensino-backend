@@ -81,8 +81,15 @@ body.focus-mode .topbar-subtitle {
 
 .lesson-completed-check {
   display: flex;
+  align-items: center;
   justify-content: center;
-  margin-bottom: .6rem;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  margin: 0 auto .9rem;
+  background: linear-gradient(135deg, var(--success-500, #1fa96a), var(--success-700, #0f7a4a));
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(31,169,106,.15), 0 0 26px rgba(31,169,106,.4);
 }
 
 .lesson-completed-title {

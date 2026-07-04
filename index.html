@@ -894,10 +894,10 @@ async function renderCourseResume(){
       <span class="course-tag">${c.tag}</span>
       <h1 class="course-title">${c.icon} ${c.name}</h1>
       <div class="course-meta">
-        <span>👨‍🏫 ${c.tutor_id&&currentCourse.tutor_name?currentCourse.tutor_name:'Professor IBC'}</span>
-        ${c.duracao?`<span>⏱ ${c.duracao}</span>`:''}
-        <span>📋 ${total} aula(s)</span>
-        <span>✅ Nota mínima: 60%</span>
+        <span>${icon('user-check','14')} ${c.tutor_id&&currentCourse.tutor_name?currentCourse.tutor_name:'Professor IBC'}</span>
+        ${c.duracao?`<span>${icon('clock','14')} ${c.duracao}</span>`:''}
+        <span>${icon('play-circle','14')} ${total} aula(s)</span>
+        <span>${icon('target','14')} Nota mínima: 60%</span>
       </div>
     </div>
     <div class="progress-section">
@@ -913,10 +913,10 @@ async function renderCourseResume(){
     <div class="modulo-list" style="margin-bottom:1.2rem">
       ${currentAulas.map((a,i)=>`
         <div class="modulo-item" style="${a.unlocked?'cursor:pointer':'opacity:.6'}" ${a.unlocked?`onclick="loadAula(${c.id},${i+1})"`:''}>
-          <div class="modulo-num">${a.progress&&a.progress.passed?'✓':(i+1)}</div>
+          <div class="modulo-num">${a.progress&&a.progress.passed?icon('check','14'):(i+1)}</div>
           <div class="modulo-name">${a.nome}</div>
-          ${a.dur?`<div class="modulo-dur">⏱ ${a.dur}</div>`:''}
-          ${!a.unlocked?'<span style="font-size:.8rem">🔒</span>':''}
+          ${a.dur?`<div class="modulo-dur">${icon('clock','12')} ${a.dur}</div>`:''}
+          ${!a.unlocked?`<span style="font-size:.8rem">${icon('lock','14')}</span>`:''}
         </div>`).join('')}
     </div>
     <div style="text-align:center">
@@ -969,9 +969,9 @@ function renderAulaPage(){
     videoCardHtml = `
     <div class="lesson-section-card">
       <div class="lesson-section-header${videoWatched?' done':''}">
-        <span class="lesson-section-icon">${videoWatched?'✓':'▶'}</span>
+        <span class="lesson-section-icon">${videoWatched?icon('checkmark-circle','20'):icon('play-circle','20')}</span>
         <h2 class="lesson-section-title">VÍDEO DA AULA</h2>
-        ${videoWatched?'<span class="lesson-section-status">✓ Concluído</span>':''}
+        ${videoWatched?`<span class="lesson-section-status">${icon('check','12')} Concluído</span>`:''}
       </div>
       <div class="lesson-section-body">
         <div class="video-wrapper">
@@ -981,8 +981,8 @@ function renderAulaPage(){
         </div>
         ${videoWatched
           ? `<div class="material-done-badge">${icon('checkmark','16','icon--success')} Vídeo concluído · +10 pontos</div>`
-          : `<button class="btn btn-success btn-lg btn-full" id="btnVideoAssistido" onclick="marcarVideoAssistido()">✅ JÁ ASSISTI O VÍDEO</button>
-             <p class="material-reward-hint">Você ganha <strong>+10 pontos</strong> ⭐</p>`}
+          : `<button class="btn btn-success btn-lg btn-full" id="btnVideoAssistido" onclick="marcarVideoAssistido()">${icon('checkmark-circle','16')} JÁ ASSISTI O VÍDEO</button>
+             <p class="material-reward-hint">Você ganha <strong>+10 pontos</strong> ${icon('points','12','icon--gold')}</p>`}
       </div>
     </div>`;
   }
@@ -991,15 +991,15 @@ function renderAulaPage(){
   const matItems = (a.materiais||[]).map(m=>`
     <div class="material-item-row">
       <div class="material-item-info">
-        <span class="material-item-icon">${m.tipo==='pdf'?'📄':'🔗'}</span>
+        <span class="material-item-icon">${m.tipo==='pdf'?icon('file','16'):icon('share','16')}</span>
         <div>
           <div class="material-item-name">${m.name}</div>
           <div class="material-item-type">${m.tipo==='pdf'?'PDF':'Link'}</div>
         </div>
       </div>
       <div class="material-item-actions">
-        ${m.tipo==='pdf'?`<button class="btn btn-outline" onclick="openPdfViewer(${m.id},'${m.name.replace(/'/g,"\\'")}')">📖 Abrir Viewer</button>`:''}
-        <a class="btn btn-outline" href="${m.url}" target="_blank" rel="noopener">${m.tipo==='pdf'?'📥 Baixar':'🔗 Abrir'}</a>
+        ${m.tipo==='pdf'?`<button class="btn btn-outline" onclick="openPdfViewer(${m.id},'${m.name.replace(/'/g,"\\'")}')">${icon('book','14')} Abrir Viewer</button>`:''}
+        <a class="btn btn-outline" href="${m.url}" target="_blank" rel="noopener">${m.tipo==='pdf'?icon('download','14')+' Baixar':icon('share','14')+' Abrir'}</a>
       </div>
     </div>`).join('');
 
@@ -1007,21 +1007,21 @@ function renderAulaPage(){
     ? `${matItems}
        ${hasMat ? renderMaterialReadStatus(a.progress) : ''}
        ${matRead
-         ? `<div class="material-done-badge">✅ Material concluído · +10 pontos</div>`
-         : `<button class="btn btn-success btn-lg btn-full" id="btnMaterialLido" onclick="confirmMaterialRead(${moduleId})">✅ JÁ LI O MATERIAL</button>
-            <p class="material-reward-hint">Libera o exercício e você ganha <strong>+10 pontos</strong> ⭐</p>`}`
+         ? `<div class="material-done-badge">${icon('checkmark-circle','16','icon--success')} Material concluído · +10 pontos</div>`
+         : `<button class="btn btn-success btn-lg btn-full" id="btnMaterialLido" onclick="confirmMaterialRead(${moduleId})">${icon('checkmark-circle','16')} JÁ LI O MATERIAL</button>
+            <p class="material-reward-hint">Libera o exercício e você ganha <strong>+10 pontos</strong> ${icon('points','12','icon--gold')}</p>`}`
     : `<p class="section-placeholder">Nenhum material cadastrado para esta aula.</p>
        ${matRead
-         ? `<div class="material-done-badge">✅ Concluído</div>`
-         : `<button class="btn btn-success btn-lg btn-full" id="btnMaterialLido" onclick="confirmMaterialRead(${moduleId})">✅ JÁ LI O MATERIAL</button>
-            <p class="material-reward-hint">Libera o exercício e você ganha <strong>+10 pontos</strong> ⭐</p>`}`;
+         ? `<div class="material-done-badge">${icon('checkmark-circle','16','icon--success')} Concluído</div>`
+         : `<button class="btn btn-success btn-lg btn-full" id="btnMaterialLido" onclick="confirmMaterialRead(${moduleId})">${icon('checkmark-circle','16')} JÁ LI O MATERIAL</button>
+            <p class="material-reward-hint">Libera o exercício e você ganha <strong>+10 pontos</strong> ${icon('points','12','icon--gold')}</p>`}`;
 
   const materialCardHtml = `
     <div class="lesson-section-card">
       <div class="lesson-section-header${matRead?' done':''}">
-        <span class="lesson-section-icon">${matRead?'✓':'✍'}</span>
+        <span class="lesson-section-icon">${matRead?icon('checkmark-circle','20'):icon('edit','20')}</span>
         <h2 class="lesson-section-title">MATERIAL DA AULA</h2>
-        ${matRead?'<span class="lesson-section-status">✓ Concluído</span>':''}
+        ${matRead?`<span class="lesson-section-status">${icon('check','12')} Concluído</span>`:''}
       </div>
       <div class="lesson-section-body">${matBodyContent}</div>
     </div>`;
@@ -1038,7 +1038,7 @@ function renderAulaPage(){
       <div class="locked-exercise-hint">
         <span class="locked-exercise-hint-icon">${icon('lock','36','icon--disabled')}</span>
         <p>${lockMsg}</p>
-        <p class="locked-exercise-reward">Este exercício vale <strong>+20 pontos</strong> ⭐</p>
+        <p class="locked-exercise-reward">Este exercício vale <strong>+20 pontos</strong> ${icon('points','12','icon--gold')}</p>
       </div>`;
   } else if(outOfAttempts && !passed){
     exerciseBody = `
@@ -1057,14 +1057,14 @@ function renderAulaPage(){
           ${a.quiz[i]&&a.quiz[i].opts?a.quiz[i].opts.map((o,j)=>`<div class="option ${j===f.correct_answer?'correct-ans':(f.selected===j&&!f.is_correct?'wrong-ans':'')}">
             <input type="radio" disabled ${f.selected===j?'checked':''}><span>${o}</span></div>`).join(''):''}
         </div>
-        <div class="q-feedback ${f.is_correct?'ok':'err'}">${f.is_correct?'✓ Correto!':'✗ Incorreto — '+f.explanation}</div>
+        <div class="q-feedback ${f.is_correct?'ok':'err'}">${f.is_correct?icon('check','14')+' Correto!':icon('x','14')+' Incorreto — '+f.explanation}</div>
       </div>`).join('') : '';
     exerciseBody = `
       <div class="quiz-body">
         <div class="quiz-result">
           <div class="result-score">${fb.score}/${fb.total}</div>
           <div class="result-label">${fb.percentage}% de aproveitamento</div>
-          <div class="result-msg ${pass?'pass':'fail'}">${pass?'🎉 Você foi aprovado nesta aula!':'📚 Você precisa de pelo menos 60% para avançar.'}</div>
+          <div class="result-msg ${pass?'pass':'fail'}">${pass?icon('checkmark-circle','16')+' Você foi aprovado nesta aula!':icon('target','16')+' Você precisa de pelo menos 60% para avançar.'}</div>
           ${pass?'':` <p style="font-size:.8rem;color:var(--muted);margin-top:.5rem">Tentativas restantes: <strong>${attemptsLeft}</strong> de ${MAX_QUIZ_ATTEMPTS}</p>`}
         </div>
         ${reviewHtml?`<hr style="border:none;border-top:1px solid #e8e0d4;margin:1rem 0">${reviewHtml}`:''}
@@ -1091,10 +1091,10 @@ function renderAulaPage(){
   const exerciseCardHtml = `
     <div class="lesson-section-card">
       <div class="lesson-section-header${quizHeaderDone?' done':quizLocked?' ':''}">
-        <span class="lesson-section-icon">${quizHeaderDone?'✓':quizLocked?'🔒':'📝'}</span>
+        <span class="lesson-section-icon">${quizHeaderDone?icon('checkmark-circle','20'):quizLocked?icon('lock','20'):icon('edit','20')}</span>
         <h2 class="lesson-section-title">EXERCÍCIO</h2>
         ${quizHeaderDone
-          ? '<span class="lesson-section-status">✓ Aprovado</span>'
+          ? `<span class="lesson-section-status">${icon('check','12')} Aprovado</span>`
           : quizLocked
             ? '<span class="lesson-section-status" style="opacity:.75">Bloqueado</span>'
             : `<span class="lesson-section-status" style="opacity:.75">${a.quiz.length} questão(ões)</span>`}
@@ -1107,7 +1107,7 @@ function renderAulaPage(){
     ${Array.from({length: total}, (_, i)=>{
       const n = i+1;
       let dot;
-      if(n < num)           dot=`<div class="lesson-dot done" title="Aula ${n}">✓</div>`;
+      if(n < num)           dot=`<div class="lesson-dot done" title="Aula ${n}">${icon('check','12')}</div>`;
       else if(n === num)    dot=`<div class="lesson-dot current" title="Aula ${n}">${n}</div>`;
       else if(n===num+1 && passed) dot=`<div class="lesson-dot" title="Aula ${n}">${n}</div>`;
       else                  dot=`<div class="lesson-dot locked" title="Aula ${n}">${icon('lock','12','icon--disabled')}</div>`;
@@ -1122,7 +1122,7 @@ function renderAulaPage(){
 
   document.getElementById('main-content').innerHTML=`
     <nav class="breadcrumb">
-      <a onclick="detectarPerfilEAtualizarDashboard()">🏠 Meu Painel</a>
+      <a onclick="detectarPerfilEAtualizarDashboard()">${icon('home','14')} Meu Painel</a>
       <span>›</span>
       <a onclick="selectCourse(${a.course.id})">${a.course.icon} ${a.course.name}</a>
       <span>›</span>
@@ -1130,7 +1130,7 @@ function renderAulaPage(){
     </nav>
     <div class="course-header">
       <h1 class="course-title">Aula ${num}: ${a.nome}</h1>
-      <div class="course-meta">${a.dur?`<span>⏱ ${a.dur}</span>`:''}</div>
+      <div class="course-meta">${a.dur?`<span>${icon('clock','14')} ${a.dur}</span>`:''}</div>
     </div>
     ${stepperHtml}
     <div class="progress-section">
@@ -1146,7 +1146,7 @@ function renderAulaPage(){
     </div>
     <div class="lesson-navigation">
       <button class="btn btn-outline" ${num<=1?'disabled':''} onclick="loadAula(${a.course.id},${num-1})">← Voltar</button>
-      <button class="btn btn-outline" onclick="openAskQuestionModal(${a.course.id})"${icon('message','16')} Fazer Pergunta</button>
+      <button class="btn btn-outline" onclick="openAskQuestionModal(${a.course.id})">${icon('message','16')} Fazer Pergunta</button>
       ${nextBtn}
     </div>`;
 }
@@ -1170,8 +1170,8 @@ function renderMaterialReadStatus(progress){
   const filled=Math.round(pct/10);
   const bar='▓'.repeat(filled)+'░'.repeat(10-filled);
   return `<div style="background:var(--cream);border-radius:8px;padding:.6rem .8rem;font-size:.78rem;color:var(--muted);display:flex;flex-direction:column;gap:.2rem">
-    <span>⏱ Tempo lido: <strong style="color:var(--navy)">${fmtTime(timeSpent)}</strong></span>
-    <span>📄 Páginas vistas: <strong style="color:var(--navy)">${pagesViewed.length}</strong>${pagesViewed.length?' ('+pagesViewed.join(', ')+')':''}</span>
+    <span>${icon('clock','12')} Tempo lido: <strong style="color:var(--navy)">${fmtTime(timeSpent)}</strong></span>
+    <span>${icon('file','12')} Páginas vistas: <strong style="color:var(--navy)">${pagesViewed.length}</strong>${pagesViewed.length?' ('+pagesViewed.join(', ')+')':''}</span>
     <span style="font-family:monospace">${bar} ${pct}%</span>
   </div>`;
 }
@@ -1214,11 +1214,11 @@ async function openPdfViewer(materialId, materialName){
           <button class="btn-secondary" style="padding:.35rem .6rem" onclick="pdfZoom(0.25)">＋</button>
         </div>
         <div style="font-size:.78rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:1rem;justify-content:center">
-          <span>⏱ Tempo lendo: <strong id="pdf-timer" style="color:var(--navy)">0:00</strong></span>
-          <span>📄 Páginas vistas: <strong id="pdf-pages-viewed" style="color:var(--navy)">—</strong></span>
+          <span>${icon('clock','12')} Tempo lendo: <strong id="pdf-timer" style="color:var(--navy)">0:00</strong></span>
+          <span>${icon('file','12')} Páginas vistas: <strong id="pdf-pages-viewed" style="color:var(--navy)">—</strong></span>
         </div>
         <div style="display:flex;justify-content:center;gap:.6rem">
-          <a class="btn-secondary" href="${meta.file_url}" download target="_blank" rel="noopener">📥 Baixar PDF</a>
+          <a class="btn-secondary" href="${meta.file_url}" download target="_blank" rel="noopener">${icon('download','14')} Baixar PDF</a>
           <button class="btn-gold" onclick="closePdfViewer()">Fechar Viewer</button>
         </div>
       </div>

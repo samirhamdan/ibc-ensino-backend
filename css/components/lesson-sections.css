@@ -12,7 +12,6 @@
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--shadow-md);
-  border-left: 6px solid var(--primary);
   animation: fadeInUp 0.4s ease both;
 }
 
@@ -29,17 +28,19 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  background: linear-gradient(135deg, #006b85, #008ea8);
+  background: linear-gradient(135deg, var(--primary-700, #006b85), var(--primary-500, #008ea8));
   padding: var(--space-md) var(--space-lg);
   color: var(--white);
 }
 
 .lesson-section-header.done {
-  background: linear-gradient(135deg, #1a7f47, #27ae60);
+  background: linear-gradient(135deg, var(--success-700, #0f7a4a), var(--success-500, #1fa96a));
 }
 
 .lesson-section-icon {
-  font-size: 1.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 
