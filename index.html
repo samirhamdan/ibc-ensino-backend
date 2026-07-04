@@ -4449,16 +4449,16 @@ function _courseCardV2(c, userPct, showEdit){
   const nModules = (c.modules||[]).length;
   const badge = _courseBadgeTag(c, userPct);
   const trail = _courseTrailChip(c.id);
-  const coverBg = `linear-gradient(135deg, #006b85, #1ba3c2)`;
+  const coverClass = `cover-${(c.id % 4) + 1}`;
   const editBtns = showEdit ? `
     <div style="display:flex;gap:.4rem;margin-top:.6rem">
       <button class="btn btn-outline" style="flex:1;padding:.35rem;font-size:.72rem" onclick="event.stopPropagation();selectCourse(${c.id})">Editar</button>
       <button class="btn btn-danger-sm" style="font-size:.72rem;padding:.35rem .6rem" onclick="event.stopPropagation();removeCourse(${c.id})">Remover</button>
     </div>` : '';
-  const accessChip = showEdit ? `<span style="font-size:.6rem;padding:.1rem .4rem;border-radius:3px;background:${c.acesso==='publico'?'#e8f4f6':'#f3f0ff'};color:var(--navy)">${c.acesso==='publico'?'🌐 Público':'✝️ Interno'}</span>` : '';
+  const accessChip = showEdit ? `<span style="display:inline-flex;align-items:center;gap:.2rem;font-size:.6rem;padding:.1rem .4rem;border-radius:3px;background:${c.acesso==='publico'?'#e8f4f6':'#f3f0ff'};color:var(--navy)">${c.acesso==='publico'?icon('unlock','10')+' Público':icon('lock','10')+' Interno'}</span>` : '';
   return `
     <div class="course-card-v2 stagger-item" onclick="selectCourse(${c.id})">
-      <div class="course-cover" style="background:${coverBg}">
+      <div class="course-cover ${coverClass}">
         ${badge}
         <div class="course-cover-overlay"></div>
         <span class="course-cover-icon">${c.icon||'📚'}</span>
@@ -4468,11 +4468,12 @@ function _courseCardV2(c, userPct, showEdit){
         <span class="course-category">${c.tag||''} ${accessChip}</span>
         <h3 class="course-card-v2-title">${c.name}</h3>
         <div class="course-card-v2-meta">
-          <span>📚 ${nModules} aula(s)</span>
-          <span>⏱️ ${c.duracao||'–'}</span>
+          <span>${icon('play-circle','14')} ${nModules} aula(s)</span>
+          <span>${icon('clock','14')} ${c.duracao||'–'}</span>
         </div>
         ${trail}
         ${editBtns}
+        <div class="course-card-v2-cta">${userPct>0?'Continuar':'Começar'} ${icon('arrow-right','14')}</div>
       </div>
     </div>`;
 }

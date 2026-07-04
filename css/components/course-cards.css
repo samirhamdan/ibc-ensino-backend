@@ -203,16 +203,21 @@
   overflow: hidden;
   box-shadow: var(--shadow-md);
   cursor: pointer;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  transition: transform .35s var(--ease-spring, ease), box-shadow .3s ease;
 }
 
 .course-card-v2:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 14px 32px rgba(0, 142, 168, 0.22);
+  transform: translateY(-6px) scale(1.03);
+  box-shadow: var(--shadow-xl), 0 0 32px rgba(0, 142, 168, .2);
+  z-index: 2;
 }
 
 .course-card-v2:hover .course-cover-icon {
   transform: scale(1.12);
+}
+
+.course-card-v2:hover .course-cover {
+  filter: saturate(1.12) brightness(1.03);
 }
 
 .course-cover {
@@ -221,7 +226,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: filter .3s ease;
 }
+
+/* Variedade de capas (estilo "Netflix") — alterna por id do curso */
+.course-cover.cover-1 { background: linear-gradient(135deg, var(--neon-cyan, #22e3ee), var(--primary-700, #006b85) 70%); }
+.course-cover.cover-2 { background: linear-gradient(135deg, var(--violet-300, #b9a6fb), var(--violet-700, #6423c7) 75%); }
+.course-cover.cover-3 { background: linear-gradient(135deg, #ff9d6e, #c23e14 75%); }
+.course-cover.cover-4 { background: linear-gradient(135deg, #6ee7b7, var(--success-700, #0f7a4a) 75%); }
 
 .course-cover-icon {
   font-size: 3.4rem;
@@ -298,6 +310,24 @@
   border-radius: 99px;
 }
 
+.course-card-v2-cta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-bold);
+  color: var(--primary);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity .25s ease, transform .25s ease;
+}
+
+.course-card-v2:hover .course-card-v2-cta {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 @media (max-width: 640px) {
   .course-grid-v2 {
     grid-template-columns: repeat(2, 1fr);
@@ -305,4 +335,6 @@
   }
   .course-cover { height: 110px; }
   .course-cover-icon { font-size: 2.4rem; }
+  /* Sem :hover no toque — CTA sempre visível para não ficar inacessível */
+  .course-card-v2-cta { opacity: 1; transform: none; }
 }
