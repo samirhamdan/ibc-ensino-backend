@@ -1,15 +1,16 @@
 /* ─── Alerts ─────────────────────────────────────────────────── */
 .alert {
   padding: var(--space-lg);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   margin-bottom: var(--space-lg);
   font-size: var(--text-sm);
   font-weight: var(--fw-medium);
-  border-left: 4px solid;
+  border: 1.5px solid transparent;
   display: flex;
   align-items: flex-start;
   gap: var(--space-md);
   animation: slideDown .3s ease both;
+  box-shadow: var(--shadow-sm);
 }
 
 .alert-icon {
@@ -29,27 +30,27 @@
 
 /* ── Semantic variants ── */
 .alert-success {
-  background: #d4edda;
-  color: #155724;
-  border-color: #28a745;
+  background: var(--success-100);
+  color: var(--success-700);
+  border-color: rgba(31, 169, 106, .25);
 }
 
 .alert-warning {
-  background: #fff3cd;
-  color: #856404;
-  border-color: #ffc107;
+  background: var(--warning-100);
+  color: var(--warning-700);
+  border-color: rgba(232, 161, 61, .3);
 }
 
 .alert-danger {
-  background: #f8d7da;
-  color: #721c24;
-  border-color: #dc3545;
+  background: var(--danger-100);
+  color: var(--danger-700);
+  border-color: rgba(224, 83, 63, .25);
 }
 
 .alert-info {
-  background: #d1ecf1;
-  color: #0c5460;
-  border-color: #17a2b8;
+  background: var(--info-100);
+  color: var(--info-700);
+  border-color: rgba(61, 130, 196, .25);
 }
 
 /* Dismissible */

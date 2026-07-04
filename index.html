@@ -14,7 +14,7 @@
 <!-- Google Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
 <!-- App legacy styles (load first so design system can override) -->
 <link rel="stylesheet" href="css/app.css">
@@ -1195,7 +1195,7 @@ async function openPdfViewer(materialId, materialName){
   modal.innerHTML=`
     <div style="background:white;border-radius:var(--radius);width:100%;max-width:720px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden">
       <div style="background:var(--navy);color:white;padding:.8rem 1.1rem;display:flex;align-items:center;justify-content:space-between">
-        <strong style="font-family:'Playfair Display',serif">${icon('document-text','16')} ${materialName}</strong>
+        <strong style="font-family:var(--font-display)">${icon('document-text','16')} ${materialName}</strong>
         <button onclick="closePdfViewer()" style="background:none;border:none;color:white;font-size:1.2rem;cursor:pointer">✕</button>
       </div>
       <div style="flex:1;overflow:auto;background:#525659;display:flex;justify-content:center;padding:1rem">
@@ -1440,7 +1440,7 @@ function openAskQuestionModal(courseId){
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:1000';
   modal.innerHTML=`
     <div style="background:white;border-radius:var(--radius);padding:1.4rem;width:100%;max-width:420px;margin:1rem">
-      <h3 style="font-family:'Playfair Display',serif;color:var(--navy);margin-bottom:.8rem">${icon('message','18')} Fazer Pergunta</h3>
+      <h3 style="font-family:var(--font-display);color:var(--navy);margin-bottom:.8rem">${icon('message','18')} Fazer Pergunta</h3>
       <div class="form-group" style="margin-bottom:.7rem">
         <label>Sua dúvida</label>
         <textarea id="ask-question-text" placeholder="Digite sua pergunta para o tutor..." style="min-height:90px"></textarea>
@@ -3922,7 +3922,7 @@ async function renderGamiWidget(){
   const icons = s.badges_unlocked.slice(0,8).map(b=>`<span title="${b.name}" style="font-size:1.3rem">${b.icon}</span>`).join(' ');
   el.innerHTML = `
     <div style="background:white;border:1px solid #e8e0d4;border-radius:var(--radius);padding:1rem 1.2rem;margin-bottom:1rem">
-      <div style="font-family:'Playfair Display',serif;color:var(--navy);font-weight:700;margin-bottom:.5rem">🎮 Seu Progresso</div>
+      <div style="font-family:var(--font-display);color:var(--navy);font-weight:700;margin-bottom:.5rem">🎮 Seu Progresso</div>
       <div style="font-size:.85rem;color:var(--navy);font-weight:600">⭐ Nível ${s.current_level}: ${GAMI_LEVEL_NAMES[s.current_level]||''}</div>
       <div style="font-size:.78rem;color:var(--muted);margin:.2rem 0">${s.points_in_level} / ${target} pontos (Total: ${s.total_points})</div>
       <div style="font-family:monospace;font-size:.85rem;color:var(--gold)">${bar} ${pct}%</div>
@@ -3951,7 +3951,7 @@ function showLevelUpModal(level){
     <div style="background:white;border-radius:var(--radius);padding:1.6rem;text-align:center;max-width:340px">
       <div style="font-size:1.6rem;margin-bottom:.3rem">🎉 Parabéns! 🎉</div>
       <div style="font-size:.85rem;color:var(--muted);margin-bottom:.4rem">Você subiu para:</div>
-      <div style="font-family:'Playfair Display',serif;font-weight:700;color:var(--navy);font-size:1.1rem">Nível ${level}: ${GAMI_LEVEL_NAMES[level]||''}</div>
+      <div style="font-family:var(--font-display);font-weight:700;color:var(--navy);font-size:1.1rem">Nível ${level}: ${GAMI_LEVEL_NAMES[level]||''}</div>
       <div style="margin:.4rem 0 1rem;color:var(--gold)">${'⭐'.repeat(Math.min(level,7))}</div>
       <button class="btn-gold" style="padding:.4rem .9rem;font-size:.8rem" onclick="document.getElementById('levelup-modal').remove()">Fechar</button>
     </div>`;
@@ -3981,7 +3981,7 @@ async function showBadgesPage(){
     <div style="background:white;border:1px solid #e8e0d4;border-radius:8px;padding:.8rem 1rem;display:flex;gap:.8rem;align-items:flex-start;margin-bottom:.6rem;${b.unlocked?'':'opacity:.6'}">
       <div style="font-size:1.8rem">${b.unlocked?'✅':'❌'} ${b.icon}</div>
       <div>
-        <div style="font-weight:700;color:var(--navy);font-family:'Playfair Display',serif">${b.name}</div>
+        <div style="font-weight:700;color:var(--navy);font-family:var(--font-display)">${b.name}</div>
         <div style="font-size:.78rem;color:var(--muted)">${b.description||''}</div>
         <div style="font-size:.75rem;color:${b.unlocked?'var(--gold)':'var(--muted)'};margin-top:.2rem">${b.unlocked?'Conquistada: '+new Date(b.unlocked_at).toLocaleDateString('pt-BR'):'Progresso: '+b.progress}</div>
       </div>
@@ -4382,7 +4382,7 @@ function openAnswerModal(qid, texto, autor){
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:1000';
   modal.innerHTML=`
     <div style="background:white;border-radius:var(--radius);padding:1.4rem;width:100%;max-width:460px;margin:1rem">
-      <h3 style="font-family:'Playfair Display',serif;color:var(--navy);margin-bottom:.6rem">📩 Responder Pergunta</h3>
+      <h3 style="font-family:var(--font-display);color:var(--navy);margin-bottom:.6rem">📩 Responder Pergunta</h3>
       <div style="background:var(--cream);border-radius:8px;padding:.7rem;margin-bottom:.8rem">
         <div style="font-size:.75rem;font-weight:600;color:var(--navy);margin-bottom:.3rem">${autor} perguntou:</div>
         <div style="font-size:.85rem;color:var(--text)">${texto}</div>

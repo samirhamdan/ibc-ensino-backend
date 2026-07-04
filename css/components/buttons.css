@@ -57,14 +57,13 @@
 
 /* ── Variants ── */
 .btn-primary {
-  background: var(--primary);
+  background: var(--gradient-btn, var(--primary));
   color: var(--white);
   box-shadow: var(--shadow-md);
 }
 .btn-primary:hover:not(:disabled) {
-  background: var(--primary-dark);
   transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-lg), var(--glow-primary);
 }
 .btn-primary:active:not(:disabled) {
   transform: translateY(0);
