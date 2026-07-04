@@ -38,12 +38,12 @@ def seed_config():
 
 
 def seed_levels():
-    if Level.query.first():
-        return
     for number, name, min_points, color in LEVELS:
+        if Level.query.filter_by(number=number).first():
+            continue
         db.session.add(Level(number=number, name=name, min_points=min_points, color=color))
     db.session.commit()
-    print("Níveis criados.")
+    print("Níveis verificados/criados.")
 
 BADGES = [
     ('novo_discipulo', 'Novo Discípulo', 'Seu primeiro curso começado', '👶', 'comum'),
@@ -63,12 +63,12 @@ BADGES = [
 
 
 def seed_badges():
-    if Badge.query.first():
-        return
     for code, name, desc, icon, rarity in BADGES:
+        if Badge.query.filter_by(code=code).first():
+            continue
         db.session.add(Badge(code=code, name=name, description=desc, icon=icon, rarity=rarity))
     db.session.commit()
-    print("Badges criadas.")
+    print("Badges verificadas/criadas.")
 
 
 ACHIEVEMENTS = [
