@@ -62,6 +62,12 @@
   box-shadow: var(--shadow-md);
 }
 .btn-primary:hover:not(:disabled) {
+  /* Redeclara o gradiente aqui (não só em .btn-primary): a regra legada
+     .btn-primary:hover{background:var(--navy-light)} em app.css tem
+     especificidade maior (classe+pseudo-classe) que o .btn-primary base
+     deste arquivo, e venceria mesmo carregando antes — achatando o
+     gradiente para uma cor sólida sempre que o botão fosse hover. */
+  background: var(--gradient-btn, var(--primary));
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg), var(--glow-primary);
 }

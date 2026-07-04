@@ -16,7 +16,7 @@
   .login-card{background:white;border-radius:18px;padding:2.5rem 2rem;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
   .login-logo{text-align:center;margin-bottom:1.8rem}
   .login-logo .cross{font-size:2.2rem;color:var(--gold)}
-  .login-logo h1{font-family:'Playfair Display',serif;font-size:1.5rem;color:var(--navy);line-height:1.2;margin-top:.3rem}
+  .login-logo h1{font-family:var(--font-display);font-size:1.5rem;color:var(--navy);line-height:1.2;margin-top:.3rem}
   .login-logo p{font-size:.8rem;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-top:.2rem}
   .field{margin-bottom:1rem}
   .field label{display:block;font-size:.78rem;font-weight:600;color:var(--navy);margin-bottom:.35rem;letter-spacing:.03em}
@@ -32,7 +32,7 @@
   .topbar{background:var(--navy);color:white;padding:.8rem 1.2rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
   .topbar-left{display:flex;align-items:center;gap:.7rem}
   .topbar-cross{color:var(--gold);font-size:1.3rem}
-  .topbar-title{font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:600}
+  .topbar-title{font-family:var(--font-display);font-size:1.05rem;font-weight:600}
   .topbar-subtitle{font-size:.7rem;color:rgba(255,255,255,.55);letter-spacing:.05em;text-transform:uppercase}
   .topbar-user{display:flex;align-items:center;gap:.6rem}
   .avatar{width:32px;height:32px;border-radius:50%;background:var(--gold);color:var(--navy);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.78rem}
@@ -59,7 +59,7 @@
   /* COURSE */
   .course-header{margin-bottom:1.5rem}
   .course-tag{display:inline-block;background:var(--navy);color:var(--gold);font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:.25rem .7rem;border-radius:20px;margin-bottom:.6rem}
-  .course-title{font-family:'Playfair Display',serif;font-size:1.6rem;color:var(--navy);margin-bottom:.4rem}
+  .course-title{font-family:var(--font-display);font-size:1.6rem;color:var(--navy);margin-bottom:.4rem}
   .course-meta{font-size:.8rem;color:var(--muted);display:flex;gap:1rem;flex-wrap:wrap}
   .progress-section{background:white;border-radius:var(--radius);padding:1rem 1.2rem;margin-bottom:1.2rem;border:1px solid #e8e0d4}
   .progress-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem}
@@ -97,7 +97,7 @@
   /* QUIZ */
   .quiz-wrap{background:white;border-radius:var(--radius);border:1px solid #e8e0d4;overflow:hidden}
   .quiz-header{background:var(--navy);padding:1rem 1.2rem;color:white}
-  .quiz-title{font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--gold-light)}
+  .quiz-title{font-family:var(--font-display);font-size:1.05rem;color:var(--gold-light)}
   .quiz-desc{font-size:.78rem;color:rgba(255,255,255,.6);margin-top:.2rem}
   .quiz-body{padding:1.2rem}
   .question-card{margin-bottom:1.3rem;padding:1rem 1.1rem;border-radius:8px;background:var(--cream);border:1px solid #e8e0d4;transition:border .2s}
@@ -121,7 +121,7 @@
   .btn-gold{padding:.6rem 1.4rem;background:var(--gold);color:var(--navy);border:none;border-radius:var(--radius);font-family:inherit;font-size:.85rem;font-weight:700;cursor:pointer;transition:all .2s}
   .btn-gold:hover{background:var(--gold-light)}
   .quiz-result{text-align:center;padding:2rem 1rem}
-  .result-score{font-size:3rem;font-weight:700;color:var(--navy);font-family:'Playfair Display',serif}
+  .result-score{font-size:3rem;font-weight:700;color:var(--navy);font-family:var(--font-display)}
   .result-label{font-size:.9rem;color:var(--muted);margin-top:.3rem}
   .result-msg{margin-top:1rem;font-size:.95rem;font-weight:500;padding:.6rem 1rem;border-radius:8px;display:inline-block}
   .result-msg.pass{background:var(--success-bg);color:var(--success)}
@@ -153,7 +153,7 @@
   .dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.9rem;margin-bottom:1.5rem}
   .dash-card{background:white;border-radius:var(--radius);padding:1.1rem 1rem;border:1px solid #e8e0d4;display:flex;flex-direction:column;gap:.3rem}
   .dash-card-icon{font-size:1.4rem}
-  .dash-card-value{font-family:'Playfair Display',serif;font-size:2rem;font-weight:700;color:var(--navy);line-height:1}
+  .dash-card-value{font-family:var(--font-display);font-size:2rem;font-weight:700;color:var(--navy);line-height:1}
   .dash-card-label{font-size:.75rem;color:var(--muted);font-weight:500}
   .dash-card.highlight{background:var(--navy);border-color:var(--navy)}
   .dash-card.highlight .dash-card-value{color:white}

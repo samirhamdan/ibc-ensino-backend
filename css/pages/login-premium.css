@@ -40,9 +40,9 @@
   filter: none; /* logo branca dedicada — sem invert */
 }
 
-/* Card com sombra premium */
+/* Card com sombra premium + leve glow neon (mesma linguagem do resto do app) */
 #screen-login .login-card {
-  box-shadow: 0 20px 60px rgba(0, 142, 168, 0.12);
+  box-shadow: 0 20px 60px rgba(0, 142, 168, 0.12), var(--glow-primary, none);
 }
 
 /* Olho mostrar/ocultar senha */

@@ -135,17 +135,17 @@
   <div class="login-footer">
     <p class="support-text">
       Dúvidas? Entre em contato:<br>
-      <a href="https://wa.me/5567999999999" target="_blank" rel="noopener" class="whatsapp-link login-whatsapp">💬 WhatsApp: (67) 99999-9999</a>
+      <a href="https://wa.me/5567999999999" target="_blank" rel="noopener" class="whatsapp-link login-whatsapp"><svg class="icon icon-sm" viewBox="0 0 24 24"><use href="#icon-chat"></use></svg> <span>WhatsApp: (67) 99999-9999</span></a>
     </p>
   </div>
   </div>
 </div>
 
 <!-- FORGOT PASSWORD -->
-<div id="screen-forgot" class="screen" style="align-items:center;justify-content:center;background:var(--bg)">
-  <div class="login-box">
-    <div class="login-logo">🔑</div>
-    <div class="login-title">Recuperar Senha</div>
+<div id="screen-forgot" class="screen auth-screen">
+  <div class="login-card auth-card">
+    <div class="auth-icon-mark"><svg class="icon icon-lg" viewBox="0 0 24 24"><use href="#icon-key"></use></svg></div>
+    <div class="auth-title">Recuperar Senha</div>
     <div class="login-sub" id="forgot-sub">Digite seu email cadastrado e enviaremos as instruções.</div>
     <div class="field" id="forgot-email-field">
       <label>E-mail</label>
@@ -154,16 +154,16 @@
     <button class="btn-primary" id="forgot-btn" onclick="doForgotPassword()">Enviar instruções</button>
     <div class="login-error" id="forgot-error"></div>
     <div style="text-align:center;margin-top:.8rem">
-      <a href="#" onclick="show('login')" style="font-size:.82rem;color:var(--navy-light);text-decoration:none">← Voltar ao login</a>
+      <a href="#" onclick="show('login')" class="forgot-link">← Voltar ao login</a>
     </div>
   </div>
 </div>
 
 <!-- RESET PASSWORD -->
-<div id="screen-reset" class="screen" style="align-items:center;justify-content:center;background:var(--bg)">
-  <div class="login-box">
-    <div class="login-logo">🔒</div>
-    <div class="login-title">Nova Senha</div>
+<div id="screen-reset" class="screen auth-screen">
+  <div class="login-card auth-card">
+    <div class="auth-icon-mark"><svg class="icon icon-lg" viewBox="0 0 24 24"><use href="#icon-lock"></use></svg></div>
+    <div class="auth-title">Nova Senha</div>
     <div class="login-sub">Digite e confirme sua nova senha.</div>
     <div class="field">
       <label>Nova senha</label>
@@ -176,7 +176,7 @@
     <button class="btn-primary" onclick="doResetPassword()">Redefinir senha</button>
     <div class="login-error" id="reset-error"></div>
     <div style="text-align:center;margin-top:.8rem">
-      <a href="#" onclick="show('login')" style="font-size:.82rem;color:var(--navy-light);text-decoration:none">← Voltar ao login</a>
+      <a href="#" onclick="show('login')" class="forgot-link">← Voltar ao login</a>
     </div>
   </div>
 </div>
@@ -382,7 +382,8 @@ async function loadLoginConfig(){
     document.querySelectorAll('.login-whatsapp').forEach(el => {
       const digits = (cfg.whatsapp || '').replace(/\D/g, '');
       el.href = `https://wa.me/55${digits}`;
-      el.textContent = `💬 WhatsApp: ${cfg.whatsapp}`;
+      const span = el.querySelector('span');
+      if (span) span.textContent = `WhatsApp: ${cfg.whatsapp}`;
     });
   }catch(e){}
 }

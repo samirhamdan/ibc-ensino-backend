@@ -22,8 +22,11 @@
 .login-gradient {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, #006b85, #008ea8, #1ba3c2, #006b85);
-  background-size: 300% 300%;
+  background:
+    radial-gradient(60% 55% at 15% 10%, rgba(139, 92, 246, .55), transparent 65%),
+    radial-gradient(55% 50% at 85% 90%, rgba(34, 227, 238, .3), transparent 60%),
+    linear-gradient(135deg, #006b85, #008ea8, #1ba3c2, #006b85);
+  background-size: 100% 100%, 100% 100%, 300% 300%;
   animation: gradientShift 15s ease infinite;
 }
 
@@ -100,4 +103,55 @@
   #screen-login.active { grid-template-columns: 1fr; }
   .login-visual { min-height: 35vh; padding: var(--space-xl); }
   .login-headline { font-size: 1.5rem; }
+}
+
+/* ── Telas secundárias de autenticação (recuperar/redefinir senha) ──
+   Reaproveitam o mesmo mesh gradient + card glassmórfico do login,
+   sem o painel visual dividido (fluxo mais curto, uma única coluna). */
+.auth-screen {
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl);
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(60% 55% at 15% 10%, rgba(139, 92, 246, .5), transparent 65%),
+    radial-gradient(55% 50% at 85% 90%, rgba(34, 227, 238, .28), transparent 60%),
+    linear-gradient(135deg, #006b85, #008ea8, #1ba3c2, #006b85);
+}
+
+.auth-card {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+
+.auth-card .field { text-align: left; }
+
+.auth-icon-mark {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-lg);
+  background: var(--gradient-btn, var(--primary));
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--space-md);
+  box-shadow: var(--glow-primary, var(--shadow-md));
+}
+
+.auth-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.3rem;
+  color: var(--primary-dark, var(--navy));
+  margin-bottom: .4rem;
+}
+
+.auth-card .login-sub {
+  font-size: .85rem;
+  color: var(--gray, var(--muted));
+  margin-bottom: var(--space-lg, 1.5rem);
+  line-height: 1.5;
 }
