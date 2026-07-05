@@ -2955,7 +2955,7 @@ function _renderTutorsContent(tutors, courses, unassignedQs) {
       }).join('') + '</div>';
 
   const queueHtml = unassignedQs.length === 0
-    ? '<p style="color:var(--muted);font-size:.85rem;text-align:center;padding:1rem">Nenhuma pergunta sem tutor atribuído. 🎉</p>'
+    ? `<p style="color:var(--muted);font-size:.85rem;text-align:center;padding:1rem">${icon('checkmark-circle','14')} Nenhuma pergunta sem tutor atribuído.</p>`
     : '<div class="questions-queue">' + unassignedQs.map(q =>
         `<div class="question-queue-item" id="qqueue-${q.id}">
           <div class="question-queue-meta">
@@ -3208,7 +3208,7 @@ async function openUserProfile(userId) {
 
   const certItems = u.certificates.length === 0
     ? '<p style="font-size:.82rem;color:var(--muted)">Nenhum certificado emitido.</p>'
-    : u.certificates.map(c => `<div class="profile-cert-item">🏅 ${c.course_name}<span style="margin-left:auto;font-size:.72rem;color:var(--muted)">${(c.issued_at||'').slice(0,10)}</span></div>`).join('');
+    : u.certificates.map(c => `<div class="profile-cert-item">${icon('certificates','14')} ${c.course_name}<span style="margin-left:auto;font-size:.72rem;color:var(--muted)">${(c.issued_at||'').slice(0,10)}</span></div>`).join('');
 
   const statusBadge = u.is_active
     ? '<span class="user-status-badge active">Ativo</span>'
@@ -4527,7 +4527,7 @@ async function renderAdminCategories(){
   document.getElementById('main-content').innerHTML=`
     <div class="course-header">
       <span class="course-tag">Admin</span>
-      <h1 class="course-title">🏷️ Categorias</h1>
+      <h1 class="course-title">${icon('tag','20')} Categorias</h1>
     </div>
     <div class="admin-section">
       <div class="admin-section-header">Nova Categoria</div>
@@ -5049,7 +5049,7 @@ async function navigateToCertificados(){
     el.innerHTML = `
       <div class="course-header">
         <span class="course-tag">Aluno</span>
-        <h1 class="course-title">🎓 Meus Certificados</h1>
+        <h1 class="course-title">${icon('graduation-cap','20')} Meus Certificados</h1>
         <div class="course-meta"><span>${certs.length} certificado(s) conquistado(s)</span></div>
       </div>
       ${certs.length === 0
@@ -5359,7 +5359,7 @@ async function renderVerifyPage(certCode){
   el.innerHTML = `
     <div style="max-width:540px;margin:2rem auto;padding:0 1rem">
       <div class="course-header">
-        <h1 class="course-title">🔍 Verificar Certificado</h1>
+        <h1 class="course-title">${icon('search','20')} Verificar Certificado</h1>
       </div>
       <div class="card" style="margin-bottom:var(--space-lg)">
         <div style="display:flex;gap:.6rem;align-items:flex-end">
