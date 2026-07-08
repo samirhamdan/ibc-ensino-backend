@@ -7,7 +7,13 @@ import uuid
 from flask import Flask, jsonify, session, request, send_from_directory
 from flask_cors import CORS
 from datetime import timedelta
+from dotenv import load_dotenv
 from extensions import db, limiter
+
+# Carrega .env ANTES de qualquer leitura de os.getenv — python-dotenv estava
+# em requirements.txt mas load_dotenv() nunca era chamado: um .env local com
+# SECRET_KEY/DATABASE_URL/ADMIN_* era silenciosamente ignorado.
+load_dotenv()
 
 ALLOWED_EXTENSIONS = {'pdf'}
 MAX_FILE_MB = 20
