@@ -20,10 +20,12 @@ feature.
 - **Seed de dev:** `python seed.py` (usuários demo, cursos, badges, níveis).
 - **Seed de produção:** `python seed_production.py` (idempotente; roda como
   `preDeployCommand` no Railway; admin vem de `ADMIN_EMAIL`/`ADMIN_PASSWORD`).
-- **Testes:** ainda NÃO existem (`pytest` não configurado). Primeiro entregável
-  de teste é a suíte de caracterização da Fase 1 do playbook
-  (`docs/PLAYBOOK-MIGRACAO-0.9.md`) e depois a suíte de isolamento
-  (`tests/isolation/`, doc 02 §5.4) — required no CI a partir da Fase 2.
+- **Testes:** `python -m pytest` (suíte de caracterização da Fase 1 em
+  `tests/`; SQLite por padrão, `TEST_DATABASE_URL` aponta para Postgres no
+  CI). Comportamentos estranhos encontrados vão para `docs/DEBITOS.md`, nunca
+  são "corrigidos" dentro de teste de caracterização. Próximo entregável: a
+  suíte de isolamento (`tests/isolation/`, doc 02 §5.4) — required no CI a
+  partir da Fase 2.
 - **Migrações:** ainda NÃO há Alembic — o schema atual nasce de
   `db.create_all()` em `app.py`. Alembic entra na Release 0.9; a partir daí,
   toda migração é reversível (`downgrade` implementado e testado).
