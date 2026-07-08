@@ -78,7 +78,16 @@ def login():
 
     session['user_id'] = user.id
 
-    from routes.gamification import check_and_grant_achievements
+    # +5 XP de login diário, no máximo 1x por dia (guard: last_activity_date).
+    # Concedido aqui no servidor — a ação 'daily_login' não é mais aceita via
+    # /gamification/add-points, onde podia ser repetida à vontade.
+    from routes.gamification import check_and_grant_achievements, award_points, _get_or_create_points
+    up = _get_or_create_points(user.id)
+    if up.last_activity_date != datetime.utcnow().date():
+        award_points(user.id, 'daily_login')
+    else:
+        db.session.commit()
+
     new_achievements = check_and_grant_achievements(user.id)
 
     data_out = user.to_dict()

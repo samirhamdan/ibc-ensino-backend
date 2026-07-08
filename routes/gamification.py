@@ -250,37 +250,22 @@ def list_badges():
     return jsonify(result), 200
 
 
-# Ações que o cliente NÃO pode disparar diretamente neste endpoint:
-# - 'course_completed': não recebe course_id nem qualquer verificação, e não
-#   há nenhum chamador no frontend — só existe hoje como vetor de abuso
-#   (POST repetido credita pontos ilimitados). Concessão real de pontos por
-#   conclusão de curso deve acontecer no servidor, no momento da emissão do
-#   certificado (routes/certificates.py), não aqui.
-# - 'question_answered': creditava o AUTOR da pergunta (não o chamador) a
-#   partir de um question_id arbitrário — qualquer usuário autenticado podia
-#   chamar isso para si mesmo ou para terceiros, repetidamente. Movido para
-#   dentro de answer_question() (routes/questions.py), que só concede uma vez,
-#   no momento real em que a pergunta é respondida.
-_CLIENT_BLOCKED_ACTIONS = {'course_completed', 'question_answered'}
-
-
 @gamification_bp.route('/add-points', methods=['POST'])
 def add_points():
+    """DESATIVADO como vetor de pontos: aceitava qualquer ação repetidamente,
+    sem verificação de evento real (XP/nível/badge ilimitados via POST em loop).
+    Todos os pontos agora são concedidos no servidor, no evento verificado:
+    - material_read      → routes/materials.py (cruzar 50% de leitura, 1x/aula)
+    - quiz_attempted/... → routes/lessons.py   (1ª tentativa / 1ª aprovação)
+    - question_asked     → routes/questions.py (pergunta criada)
+    - question_answered  → routes/questions.py (1ª resposta do tutor)
+    - course_completed   → lessons/certificates (emissão do certificado)
+    - daily_login        → routes/auth.py      (login, 1x por dia)
+    A rota permanece para clientes antigos, que tratam !res.ok como no-op."""
     user = _current_user()
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
-
-    data = request.get_json(silent=True) or {}
-    action = data.get('action')
-    if action in _CLIENT_BLOCKED_ACTIONS:
-        return jsonify({'error': 'Ação inválida'}), 400
-    if action not in POINTS_PER_ACTION and action != 'quiz_passed':
-        return jsonify({'error': 'Ação inválida'}), 400
-
-    result = award_points(user.id, action, data)
-    msg = f"+{result['points_awarded']} XP! (Total: {result['total_points']})"
-    result['message'] = msg
-    return jsonify(result), 201
+    return jsonify({'error': 'Pontos são concedidos automaticamente pelas ações reais'}), 400
 
 
 # ── Achievements ("Conquistas") — Sprint 6.1 ────────────────────────────

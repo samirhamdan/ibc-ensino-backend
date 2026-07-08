@@ -69,10 +69,12 @@ def save_read_progress(material_id):
         return jsonify({'error': 'Material não vinculado a uma aula'}), 400
 
     data = request.get_json(silent=True) or {}
-    pages_viewed = data.get('pages_viewed') or []
-    time_spent = int(data.get('time_spent') or 0)
-    current_page = data.get('current_page')
-    total_pages = data.get('total_pages')
+    try:
+        pages_viewed = [int(p) for p in (data.get('pages_viewed') or [])]
+        time_spent = max(0, int(data.get('time_spent') or 0))
+        total_pages = int(data.get('total_pages') or 0)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Dados de progresso inválidos'}), 400
 
     prog = LessonProgress.query.filter_by(user_id=user.id, module_id=material.module_id).first()
     if not prog:
@@ -85,13 +87,25 @@ def save_read_progress(material_id):
     prog.material_time_spent = (prog.material_time_spent or 0) + time_spent
     prog.material_read_at = datetime.utcnow()
     crossed_50 = False
-    if total_pages:
+    if total_pages > 0:
         before = prog.material_percentage or 0.0
-        prog.material_percentage = round(len(existing) / total_pages * 100, 1)
+        # nunca regride: um total_pages maior enviado depois não pode derrubar o
+        # percentual (e permitir re-cruzar os 50% para farmar pontos de novo)
+        new_pct = round(len(existing) / total_pages * 100, 1)
+        prog.material_percentage = max(before, min(new_pct, 100.0))
         crossed_50 = before < 50 and prog.material_percentage >= 50
 
     db.session.commit()
-    return jsonify({'saved': True, 'crossed_50': crossed_50}), 200
+
+    # Pontos de leitura concedidos aqui (evento real, no máximo 1x por aula) —
+    # antes o frontend chamava /gamification/add-points, que aceitava a ação
+    # repetidamente sem verificação nenhuma.
+    points = None
+    if crossed_50:
+        from routes.gamification import award_points
+        points = award_points(user.id, 'material_read')
+
+    return jsonify({'saved': True, 'crossed_50': crossed_50, 'points': points}), 200
 
 
 @materials_bp.route('/upload', methods=['POST'])

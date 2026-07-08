@@ -1294,7 +1294,7 @@ async function closePdfViewer(){
     });
     if(r.ok){
       const rd = await r.json();
-      if(rd.crossed_50 && currentAula) gamiAddPoints('material_read', {course_id: currentAula.course.id});
+      gamiShowResult(rd.points);
     }
   } catch(e){}
   const modal=document.getElementById('pdf-viewer-modal');
@@ -1332,10 +1332,7 @@ async function submitAulaQuiz(){
     if(currentAula.progress){ currentAula.progress.passed = currentAula.progress.passed || aulaQuizFeedback.passed; }
     else currentAula.progress = {passed: aulaQuizFeedback.passed, score: aulaQuizFeedback.score, total: aulaQuizFeedback.total};
     if(aulaQuizFeedback.passed) resetAttempts(moduleId);
-    gamiAddPoints('quiz_attempted', {course_id: currentAula.course.id});
-    if(aulaQuizFeedback.passed && !wasPassedBefore){
-      gamiAddPoints('quiz_passed', {course_id: currentAula.course.id, attempts: getAttempts(moduleId)});
-    }
+    gamiShowResult(aulaQuizFeedback.points);
     if(aulaQuizFeedback.new_achievements && aulaQuizFeedback.new_achievements.length){
       setTimeout(()=>showAchievementPopups(aulaQuizFeedback.new_achievements), 900);
     }
@@ -1464,7 +1461,7 @@ async function sendQuestion(courseId){
     const qd = await res.json();
     msgEl.style.color='var(--success)';
     msgEl.textContent='✅ Pergunta enviada! O tutor responderá em breve.';
-    gamiAddPoints('question_asked', {course_id: courseId});
+    gamiShowResult(qd.points);
     if(qd.new_achievements && qd.new_achievements.length){
       setTimeout(()=>showAchievementPopups(qd.new_achievements), 600);
     }
@@ -3959,15 +3956,16 @@ function showLevelUpModal(level){
   document.body.appendChild(modal);
 }
 
-async function gamiAddPoints(action, extra){
+// Pontos agora são concedidos pelo servidor nos eventos reais (submit de quiz,
+// leitura de material, pergunta criada...). Esta função só EXIBE o resultado
+// (`points`) que essas respostas trazem — substitui a antiga gamiAddPoints,
+// que pedia pontos via /gamification/add-points (rota desativada).
+function gamiShowResult(r){
+  if(!r) return;
   try{
-    const res = await api('POST','/gamification/add-points', {action, ...(extra||{})});
-    if(!res.ok) return;
-    const r = await res.json();
     if(r.points_awarded) gamiToast(`+${r.points_awarded} pontos! (Total: ${r.total_points})`);
     if(r.badge_unlocked) setTimeout(()=>showBadgeModal(r.badge_unlocked), 600);
     if(r.level_up) setTimeout(()=>showLevelUpModal(r.new_level), r.badge_unlocked ? 1300 : 600);
-    return r;
   } catch(e){}
 }
 

@@ -87,10 +87,18 @@ def issue_certificate():
         db.session.add(ActivityFeed(user_id=user.id, course_id=entity_id, action='completed'))
         db.session.commit()
 
+    # 100 pts de curso concluído junto com a emissão (1x por curso — se o
+    # certificado já existia, retornamos antes de chegar aqui).
+    points = None
+    if cert_type == 'course':
+        from routes.gamification import award_points
+        points = award_points(user.id, 'course_completed')
+
     from routes.gamification import check_and_grant_achievements
     new_achievements = check_and_grant_achievements(user.id)
 
-    return jsonify({'certificate_issued': True, 'cert': cert.to_dict(), 'new_achievements': new_achievements}), 201
+    return jsonify({'certificate_issued': True, 'cert': cert.to_dict(),
+                    'new_achievements': new_achievements, 'points': points}), 201
 
 
 # ── List my certificates ───────────────────────────────────────────────────

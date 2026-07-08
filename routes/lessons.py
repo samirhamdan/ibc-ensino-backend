@@ -25,6 +25,21 @@ def _ordered_modules(course_id):
     return Module.query.filter_by(course_id=course_id).order_by(Module.position).all()
 
 
+def _merge_points(a, b):
+    """Combine two award_points() results into one payload for the frontend."""
+    if not a:
+        return b
+    if not b:
+        return a
+    return {
+        'points_awarded': (a.get('points_awarded') or 0) + (b.get('points_awarded') or 0),
+        'total_points': b.get('total_points'),
+        'level_up': a.get('level_up') or b.get('level_up'),
+        'new_level': b.get('new_level') or a.get('new_level'),
+        'badge_unlocked': a.get('badge_unlocked') or b.get('badge_unlocked'),
+    }
+
+
 def get_embed_url(video_url):
     """Return embeddable iframe URL from a YouTube or Vimeo URL, or None."""
     if not video_url:
@@ -136,6 +151,16 @@ def submit_aula_quiz(course_id, aula_num):
     if aula_num < 1 or aula_num > len(modules):
         return jsonify({'error': 'Aula não encontrada'}), 404
 
+    # Mesmo bloqueio sequencial de get_aula: sem isso, bastava POSTar direto
+    # nesta rota para completar aulas bloqueadas fora de ordem.
+    if user.role not in ('admin', 'tutor'):
+        progress_check = {p.module_id: p for p in
+                          LessonProgress.query.filter_by(user_id=user.id, course_id=course_id).all()}
+        for i in range(aula_num - 1):
+            prev = progress_check.get(modules[i].id)
+            if not (prev and prev.passed):
+                return jsonify({'error': 'Esta aula está bloqueada. Conclua a aula anterior primeiro.'}), 403
+
     module = modules[aula_num - 1]
     quiz = module.quiz
     if not quiz:
@@ -163,8 +188,16 @@ def submit_aula_quiz(course_id, aula_num):
     percentage = round(score / total * 100) if total else 0
     passed = percentage >= PASS_THRESHOLD
 
+    # Reprovou: não devolver o gabarito das questões erradas — senão basta
+    # errar de propósito, copiar as respostas e re-submeter com 100%.
+    if not passed:
+        for f in feedback:
+            if not f['is_correct']:
+                f['correct_answer'] = None
+                f['explanation'] = None
+
     prog = LessonProgress.query.filter_by(user_id=user.id, module_id=module.id).first()
-    is_first_attempt = prog is None
+    is_first_attempt = prog is None or not prog.total
     already_passed = bool(prog and prog.passed)
     if not prog:
         prog = LessonProgress(user_id=user.id, course_id=course_id, module_id=module.id)
@@ -175,6 +208,17 @@ def submit_aula_quiz(course_id, aula_num):
         prog.total = total
     prog.passed = prog.passed or passed
     db.session.commit()
+
+    # Pontos concedidos aqui (evento real, com dedupe) — antes o frontend
+    # chamava /gamification/add-points, que aceitava POSTs repetidos sem
+    # nenhuma verificação (XP ilimitado).
+    points = None
+    if is_first_attempt:
+        points = award_points(user.id, 'quiz_attempted')
+    if passed and not already_passed:
+        passed_result = award_points(user.id, 'quiz_passed',
+                                     {'attempts': 1 if is_first_attempt else 2})
+        points = _merge_points(points, passed_result)
 
     next_unlocked = passed
     is_last = aula_num == len(modules)
@@ -197,6 +241,9 @@ def submit_aula_quiz(course_id, aula_num):
                 db.session.commit()
                 certificate_issued = True
                 cert_code = code
+                # 100 pts de curso concluído: concedidos junto com o certificado
+                # (1x por curso, por construção — só entra aqui se não existia).
+                points = _merge_points(points, award_points(user.id, 'course_completed'))
 
     new_achievements = check_and_grant_achievements(user.id) if passed else []
 
@@ -224,6 +271,7 @@ def submit_aula_quiz(course_id, aula_num):
         'cert_code': cert_code,
         'new_achievements': new_achievements,
         'next_lesson': next_lesson,
+        'points': points,
     }), 200
 
 

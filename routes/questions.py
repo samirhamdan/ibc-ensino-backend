@@ -43,11 +43,15 @@ def ask_question(course_id):
     db.session.add(q)
     db.session.commit()
 
-    from routes.gamification import check_and_grant_achievements
+    # Pontos concedidos aqui (evento real: pergunta criada) — antes vinham de
+    # /gamification/add-points, chamável repetidamente sem criar pergunta.
+    from routes.gamification import award_points, check_and_grant_achievements
+    points = award_points(user.id, 'question_asked')
     new_achievements = check_and_grant_achievements(user.id)
 
     result = q.to_dict()
     result['new_achievements'] = new_achievements
+    result['points'] = points
     return jsonify(result), 201
 
 
