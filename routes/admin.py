@@ -174,8 +174,12 @@ def list_users():
         query = query.filter_by(role=role_filter)
 
     if trail_filter:
+        try:
+            trail_filter_id = int(trail_filter)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'Filtro de trilha inválido'}), 400
         enrolled_ids = [
-            ut.user_id for ut in UserTrail.query.filter_by(trail_id=int(trail_filter)).all()
+            ut.user_id for ut in UserTrail.query.filter_by(trail_id=trail_filter_id).all()
         ]
         query = query.filter(User.id.in_(enrolled_ids))
 
@@ -342,12 +346,15 @@ def bulk_action_users():
         if not trail_id:
             return jsonify({'error': 'trail_id obrigatório'}), 400
         Trail.query.get_or_404(trail_id)
-        for uid in user_ids:
+        # só ids que existem: um id fantasma na lista violava FK e derrubava
+        # a operação inteira com 500
+        valid_ids = {u.id for u in User.query.filter(User.id.in_(user_ids)).all()}
+        for uid in valid_ids:
             existing = UserTrail.query.filter_by(user_id=uid, trail_id=trail_id).first()
             if not existing:
                 db.session.add(UserTrail(user_id=uid, trail_id=trail_id))
         db.session.commit()
-        return jsonify({'ok': True, 'enrolled': len(user_ids)}), 200
+        return jsonify({'ok': True, 'enrolled': len(valid_ids)}), 200
 
     elif action == 'remove_trail':
         if not trail_id:

@@ -3,7 +3,7 @@ Questions/Q&A routes: students ask questions, tutors answer
 """
 from flask import Blueprint, request, jsonify, session
 from extensions import db
-from models import Question, Course, User, Progress, Notification
+from models import Question, Course, User, Progress, Notification, TutorCourse
 
 questions_bp = Blueprint('questions', __name__)
 
@@ -66,8 +66,17 @@ def answer_question(question_id):
 
     question = Question.query.get_or_404(question_id)
 
-    if user.role == 'tutor' and (not question.course or question.course.tutor_id != user.id):
-        return jsonify({'error': 'Você só pode responder perguntas dos seus cursos'}), 403
+    # Tutor pode responder se: é o tutor principal do curso, OU foi vinculado
+    # ao curso via TutorCourse (admin /tutors/<id>/assign-course), OU a pergunta
+    # foi atribuída a ele (admin /questions/<id>/assign). Antes só o tutor_id
+    # do curso passava — o fluxo de atribuição do admin ficava inoperante (403).
+    if user.role == 'tutor':
+        is_course_tutor = bool(question.course and question.course.tutor_id == user.id)
+        is_linked_tutor = bool(question.course and TutorCourse.query.filter_by(
+            tutor_id=user.id, course_id=question.course_id).first())
+        is_assigned = question.assigned_tutor_id == user.id
+        if not (is_course_tutor or is_linked_tutor or is_assigned):
+            return jsonify({'error': 'Você só pode responder perguntas dos seus cursos'}), 403
 
     data = request.get_json(silent=True) or {}
     resposta = (data.get('resposta') or '').strip()
@@ -132,8 +141,12 @@ def tutor_dashboard():
 
     query = Question.query
     if user.role == 'tutor':
-        course_ids = [c.id for c in Course.query.filter_by(tutor_id=user.id).all()]
-        query = query.filter(Question.course_id.in_(course_ids))
+        # mesmos critérios de answer_question: cursos onde é tutor principal,
+        # cursos vinculados via TutorCourse e perguntas atribuídas diretamente
+        course_ids = {c.id for c in Course.query.filter_by(tutor_id=user.id).all()}
+        course_ids.update(tc.course_id for tc in TutorCourse.query.filter_by(tutor_id=user.id).all())
+        query = query.filter(db.or_(Question.course_id.in_(course_ids),
+                                    Question.assigned_tutor_id == user.id))
 
     questions = query.order_by(Question.created_at.desc()).all()
     result = []

@@ -21,6 +21,17 @@ def _current_user():
     return None
 
 
+def _get_visible_course(course_id, user):
+    """404 para aluno se o curso não está publicado — as rotas de aula eram o
+    único caminho que ignorava Course.status (aluno via conteúdo, fazia quiz e
+    emitia certificado de curso draft/archived acessando a URL direto)."""
+    course = Course.query.get_or_404(course_id)
+    if course.status != 'published' and (not user or user.role not in ('admin', 'tutor')):
+        from flask import abort
+        abort(404)
+    return course
+
+
 def _ordered_modules(course_id):
     return Module.query.filter_by(course_id=course_id).order_by(Module.position).all()
 
@@ -89,7 +100,7 @@ def list_aulas(course_id):
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    Course.query.get_or_404(course_id)
+    _get_visible_course(course_id, user)
     modules = _ordered_modules(course_id)
 
     progresses = LessonProgress.query.filter_by(user_id=user.id, course_id=course_id).all()
@@ -112,7 +123,7 @@ def get_aula(course_id, aula_num):
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    Course.query.get_or_404(course_id)
+    _get_visible_course(course_id, user)
     modules = _ordered_modules(course_id)
     if aula_num < 1 or aula_num > len(modules):
         return jsonify({'error': 'Aula não encontrada'}), 404
@@ -146,7 +157,7 @@ def submit_aula_quiz(course_id, aula_num):
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    Course.query.get_or_404(course_id)
+    _get_visible_course(course_id, user)
     modules = _ordered_modules(course_id)
     if aula_num < 1 or aula_num > len(modules):
         return jsonify({'error': 'Aula não encontrada'}), 404
@@ -282,7 +293,7 @@ def next_lesson(course_id):
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    Course.query.get_or_404(course_id)
+    _get_visible_course(course_id, user)
     modules = _ordered_modules(course_id)
     total = len(modules)
 
@@ -320,7 +331,7 @@ def mark_video_watched(course_id, aula_num):
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    Course.query.get_or_404(course_id)
+    _get_visible_course(course_id, user)
     modules = _ordered_modules(course_id)
     if aula_num < 1 or aula_num > len(modules):
         return jsonify({'error': 'Aula não encontrada'}), 404

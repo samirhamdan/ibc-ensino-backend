@@ -288,7 +288,7 @@ def admin_list_courses():
             trail_name = t.name if t else None
         result.append({
             'id': c.id, 'name': c.name,
-            'category': c.tag or c.resumo[:30] if c.resumo else 'Geral',
+            'category': c.tag or (c.resumo[:30] if c.resumo else 'Geral'),
             'color': c.color or '#008ea8',
             'total_lessons': total_lessons,
             'enrolled_users': len(enrolled_ids),

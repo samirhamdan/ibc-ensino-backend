@@ -312,7 +312,11 @@ def admin_update_trail(trail_id):
     if 'description' in data: t.description = data['description']
     if 'icon' in data: t.icon = data['icon']
     if 'color' in data: t.color = data['color']
-    if 'xp_bonus' in data: t.xp_bonus = int(data['xp_bonus'])
+    if 'xp_bonus' in data:
+        try:
+            t.xp_bonus = int(data['xp_bonus'])
+        except (TypeError, ValueError):
+            return jsonify({'error': 'xp_bonus deve ser um número'}), 400
     if 'certificate_name' in data: t.certificate_name = data['certificate_name']
     db.session.commit()
     return jsonify({'success': True})
@@ -381,10 +385,15 @@ def create_trail():
     if not name:
         return jsonify({'error': 'name é obrigatório'}), 400
     
+    try:
+        xp_bonus = int(data.get('xp_bonus', 100))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'xp_bonus deve ser um número'}), 400
+
     t = Trail(
         name=name,
         description=data.get('description', ''),
-        xp_bonus=int(data.get('xp_bonus', 100)),
+        xp_bonus=xp_bonus,
         color=data.get('color', '#008ea8')
     )
     db.session.add(t)

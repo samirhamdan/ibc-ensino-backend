@@ -189,6 +189,12 @@ def save_study_time():
         seconds = int(seconds)
     except (TypeError, ValueError):
         seconds = 0
+    # limita a 12h por sessão e ignora negativos (valor vem do timer do cliente)
+    seconds = max(0, min(seconds, 12 * 3600))
+
+    # lesson_id fantasma violava FK no commit → 500
+    if lesson_id is not None and not Module.query.get(lesson_id):
+        lesson_id = None
 
     session_row = StudySession(
         user_id=user.id,

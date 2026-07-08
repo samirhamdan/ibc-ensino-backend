@@ -54,11 +54,10 @@ def save_progress(course_id):
     if 'material_done' in data:
         prog.material_done = bool(data['material_done'])
 
-    if 'quiz_score' in data:
-        prog.quiz_score = int(data['quiz_score'])
-
-    if 'quiz_total' in data:
-        prog.quiz_total = int(data['quiz_total'])
+    # quiz_score/quiz_total NÃO são mais aceitos do cliente: a nota é gravada
+    # exclusivamente pela correção do servidor (POST /progress/quiz/<id>/submit).
+    # Antes, um POST {"material_done":true,"quiz_score":10,"quiz_total":10}
+    # marcava o curso como concluído (Progress.passed) sem fazer nada.
 
     db.session.commit()
     return jsonify(prog.to_dict()), 200
