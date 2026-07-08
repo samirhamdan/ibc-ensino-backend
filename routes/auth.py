@@ -196,6 +196,15 @@ def delete_user(user_id):
     if user.id == user_id:
         return jsonify({'error': 'Não é possível remover a si mesmo'}), 400
     target = User.query.get_or_404(user_id)
+
+    # Referências que apontam para o usuário mas não são "posse" dele: precisam
+    # ser anuladas/removidas antes do delete, senão o Postgres viola FK → 500.
+    from models import Course, Question, Notification, TutorCourse
+    Course.query.filter_by(tutor_id=user_id).update({'tutor_id': None})
+    Question.query.filter_by(assigned_tutor_id=user_id).update({'assigned_tutor_id': None})
+    Notification.query.filter_by(created_by=user_id).update({'created_by': None})
+    TutorCourse.query.filter_by(tutor_id=user_id).delete()
+
     db.session.delete(target)
     db.session.commit()
     return jsonify({'message': 'Usuário removido'}), 200

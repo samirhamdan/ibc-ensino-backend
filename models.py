@@ -36,6 +36,17 @@ class User(db.Model):
 
     progress = db.relationship('Progress', backref='user', lazy=True, cascade='all, delete-orphan')
     questions = db.relationship('Question', backref='author', lazy=True, cascade='all, delete-orphan', foreign_keys='Question.user_id')
+    # Coleções "posse do usuário": sem estes cascades, DELETE de um usuário com
+    # qualquer atividade (aula concluída, trilha, badge, notificação...) viola
+    # FK no Postgres e retorna 500. Referências não-posse (Course.tutor_id,
+    # Question.assigned_tutor_id, Notification.created_by, TutorCourse) são
+    # tratadas explicitamente em routes/auth.py::delete_user.
+    user_trails = db.relationship('UserTrail', backref='user', lazy=True, cascade='all, delete-orphan')
+    user_badges = db.relationship('UserBadge', backref='user', lazy=True, cascade='all, delete-orphan')
+    user_points = db.relationship('UserPoints', backref='user', lazy=True, cascade='all, delete-orphan')
+    user_achievements = db.relationship('UserAchievement', backref='user', lazy=True, cascade='all, delete-orphan')
+    onboarding_answer = db.relationship('OnboardingAnswer', backref='user', lazy=True, cascade='all, delete-orphan')
+    announcement_dismissals = db.relationship('AnnouncementDismissal', backref='user', lazy=True, cascade='all, delete-orphan')
 
     def set_password(self, plain: str):
         self.password_hash = bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
@@ -83,6 +94,9 @@ class Course(db.Model):
                            order_by='Quiz.position')
     questions = db.relationship('Question', backref='course', lazy=True, cascade='all, delete-orphan')
     progress = db.relationship('Progress', backref='course', lazy=True, cascade='all, delete-orphan')
+    # DELETE de curso: LessonProgress, TrailCourse, ActivityFeed e TutorCourse
+    # cascadeiam (e Certificate.course_id anula) via backrefs declarados nos
+    # respectivos modelos — sem eles o Postgres viola FK e retorna 500.
 
     def to_dict(self, include_details=False):
         data = {
@@ -180,9 +194,11 @@ class LessonProgress(db.Model):
     material_percentage = db.Column(db.Float, default=0.0)
     video_watched = db.Column(db.Boolean, default=False)
 
-    user = db.relationship('User', backref='lesson_progresses', lazy=True)
-    course = db.relationship('Course', backref='lesson_progresses', lazy=True)
-    module = db.relationship('Module', backref='lesson_progresses', lazy=True)
+    # cascade nos backrefs: sem isso, DELETE de user/curso/módulo com progresso
+    # registrado viola FK (colunas nullable=False) e retorna 500 no Postgres.
+    user = db.relationship('User', backref=db.backref('lesson_progresses', lazy=True, cascade='all, delete-orphan'), lazy=True)
+    course = db.relationship('Course', backref=db.backref('lesson_progresses', lazy=True, cascade='all, delete-orphan'), lazy=True)
+    module = db.relationship('Module', backref=db.backref('lesson_progresses', lazy=True, cascade='all, delete-orphan'), lazy=True)
 
     __table_args__ = (db.UniqueConstraint('user_id', 'module_id', name='uq_user_module'),)
 
@@ -260,7 +276,8 @@ class TutorCourse(db.Model):
     assigned_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     tutor = db.relationship('User', foreign_keys=[tutor_id])
-    course = db.relationship('Course', foreign_keys=[course_id])
+    course = db.relationship('Course', foreign_keys=[course_id],
+                             backref=db.backref('tutor_links', lazy=True, cascade='all, delete-orphan'))
 
     __table_args__ = (db.UniqueConstraint('tutor_id', 'course_id', name='uq_tutor_course'),)
 
@@ -307,7 +324,8 @@ class PasswordResetToken(db.Model):
     used = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    user = db.relationship('User', foreign_keys=[user_id])
+    user = db.relationship('User', foreign_keys=[user_id],
+                           backref=db.backref('reset_tokens', lazy=True, cascade='all, delete-orphan'))
 
     @staticmethod
     def generate(user_id):
@@ -394,7 +412,7 @@ class TrailCourse(db.Model):
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
     position = db.Column(db.Integer, default=0)
 
-    course = db.relationship('Course')
+    course = db.relationship('Course', backref=db.backref('trail_links', lazy=True, cascade='all, delete-orphan'))
 
     def to_dict(self):
         return {
@@ -473,7 +491,7 @@ class Certificate(db.Model):
     cert_code = db.Column(db.String(20), unique=True, nullable=False)
     issued_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    user = db.relationship('User', backref='certificates', lazy=True)
+    user = db.relationship('User', backref=db.backref('certificates', lazy=True, cascade='all, delete-orphan'), lazy=True)
     course = db.relationship('Course', backref='certificates', lazy=True)
     trail = db.relationship('Trail', backref='certificates', lazy=True)
 
@@ -535,7 +553,8 @@ class Notification(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    user = db.relationship('User', foreign_keys=[user_id])
+    user = db.relationship('User', foreign_keys=[user_id],
+                           backref=db.backref('notifications', lazy=True, cascade='all, delete-orphan'))
     creator = db.relationship('User', foreign_keys=[created_by])
 
     def to_dict(self):
@@ -682,8 +701,10 @@ class StudySession(db.Model):
     started_at = db.Column(db.DateTime, default=datetime.utcnow)
     ended_at = db.Column(db.DateTime, nullable=True)
 
-    user = db.relationship('User', foreign_keys=[user_id])
-    lesson = db.relationship('Module', foreign_keys=[lesson_id])
+    user = db.relationship('User', foreign_keys=[user_id],
+                           backref=db.backref('study_sessions', lazy=True, cascade='all, delete-orphan'))
+    lesson = db.relationship('Module', foreign_keys=[lesson_id],
+                             backref=db.backref('study_sessions', lazy=True))
 
     def to_dict(self):
         return {
@@ -707,8 +728,10 @@ class ActivityFeed(db.Model):
     action = db.Column(db.String(50), default='completed')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    user = db.relationship('User', foreign_keys=[user_id])
-    course = db.relationship('Course', foreign_keys=[course_id])
+    user = db.relationship('User', foreign_keys=[user_id],
+                           backref=db.backref('activity_entries', lazy=True, cascade='all, delete-orphan'))
+    course = db.relationship('Course', foreign_keys=[course_id],
+                             backref=db.backref('activity_entries', lazy=True, cascade='all, delete-orphan'))
 
     def to_dict(self):
         return {
