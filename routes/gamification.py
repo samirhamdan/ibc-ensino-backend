@@ -65,7 +65,7 @@ def unlock_badge(user_id, badge_code):
     badge = Badge.query.filter_by(code=badge_code, tenant_id=current_tenant_id()).first()
     if not badge:
         return None
-    existing = UserBadge.query.filter_by(user_id=user_id, badge_id=badge.id).first()
+    existing = UserBadge.query.filter_by(user_id=user_id, badge_id=badge.id, tenant_id=current_tenant_id()).first()
     if existing:
         return None
     try:
@@ -138,7 +138,7 @@ def _consecutive_days(user_points):
 def check_all_badges(user_id):
     unlocked = []
     for badge in Badge.query.filter_by(tenant_id=current_tenant_id()).all():
-        if UserBadge.query.filter_by(user_id=user_id, badge_id=badge.id).first():
+        if UserBadge.query.filter_by(user_id=user_id, badge_id=badge.id, tenant_id=current_tenant_id()).first():
             continue
         current, target = _badge_progress(user_id, badge.code)
         if current >= target:

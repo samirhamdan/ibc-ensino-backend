@@ -262,7 +262,9 @@ def seed():
         db.session.commit()
 
         # ── Trails ─────────────────────────────────────────────
-        courses_by_name = {c.name: c for c in Course.query.all()}
+        from core.tenancy import current_tenant_id
+        courses_by_name = {c.name: c for c in
+                           Course.query.filter_by(tenant_id=current_tenant_id()).all()}
         trails_data = [
             {
                 'name': 'Trilha do Evangelismo',

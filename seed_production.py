@@ -38,8 +38,9 @@ def seed_admin():
 
 
 def seed_categories():
+    from core.tenancy import current_tenant_id
     for name in DEFAULT_CATEGORIES:
-        if Category.query.filter_by(name=name).first():
+        if Category.query.filter_by(name=name, tenant_id=current_tenant_id()).first():
             continue
         db.session.add(Category(name=name))
     db.session.commit()

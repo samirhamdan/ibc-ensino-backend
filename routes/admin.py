@@ -225,6 +225,7 @@ def get_user_profile(user_id):
             continue
         course_ids = [tc.course_id for tc in t.trail_courses]
         completed_courses = Progress.query.filter(
+            Progress.tenant_id == current_tenant_id(),
             Progress.user_id == u.id,
             Progress.course_id.in_(course_ids),
             Progress.passed == True

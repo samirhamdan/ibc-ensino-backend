@@ -34,6 +34,9 @@ jobs:
       # inválidas), F82 (nome indefinido). Endurecer regra a regra conforme
       # os débitos de estilo forem pagos.
       - run: ruff check --select E9,F63,F7,F82 .
+      # Etapa 3.4: query em tabela tenant-scoped sem filtro de tenant
+      # derruba o pipeline (relatório em docs/AUDITORIA-QUERIES.md)
+      - run: python scripts/audit_queries.py --check
 
   test:
     runs-on: ubuntu-latest
