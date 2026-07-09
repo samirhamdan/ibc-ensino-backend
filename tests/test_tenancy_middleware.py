@@ -17,6 +17,7 @@ def tenant_app(app):
     Reusa o mesmo banco da sessão de teste (DATABASE_URL já aponta pra ele)."""
     import os
     from app import create_app
+    anterior = os.environ.get('TENANT_BASE_DOMAIN')
     os.environ['TENANT_BASE_DOMAIN'] = BASE
     try:
         application = create_app('development')
@@ -31,7 +32,10 @@ def tenant_app(app):
                 db.session.commit()
         yield application
     finally:
-        del os.environ['TENANT_BASE_DOMAIN']
+        if anterior is None:
+            os.environ.pop('TENANT_BASE_DOMAIN', None)
+        else:
+            os.environ['TENANT_BASE_DOMAIN'] = anterior
 
 
 @pytest.fixture()

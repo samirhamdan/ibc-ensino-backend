@@ -23,12 +23,15 @@ feature.
 - **Testes:** `python -m pytest` (suíte de caracterização da Fase 1 em
   `tests/`; SQLite por padrão, `TEST_DATABASE_URL` aponta para Postgres no
   CI). Comportamentos estranhos encontrados vão para `docs/DEBITOS.md`, nunca
-  são "corrigidos" dentro de teste de caracterização. Próximo entregável: a
-  suíte de isolamento (`tests/isolation/`, doc 02 §5.4) — required no CI a
-  partir da Fase 2.
-- **Migrações:** ainda NÃO há Alembic — o schema atual nasce de
-  `db.create_all()` em `app.py`. Alembic entra na Release 0.9; a partir daí,
-  toda migração é reversível (`downgrade` implementado e testado).
+  são "corrigidos" dentro de teste de caracterização. A suíte de isolamento
+  (`tests/isolation/`, doc 02 §5.4) está ATIVA: todo endpoint precisa estar
+  classificado em `tests/isolation/registry.py` — endpoint novo sem caso de
+  isolamento (ou classificação legada justificada) derruba o CI.
+- **Migrações:** Alembic ativo desde TEN-01 (`alembic upgrade head` /
+  `downgrade base`; URL via `DATABASE_URL`). Toda migração é reversível
+  (`downgrade` implementado e testado — o job `migrations` do CI roda o ciclo
+  completo em Postgres). O schema LEGADO ainda nasce de `db.create_all()` em
+  `app.py` e será baselineado no Alembic na Fase 3 do playbook.
 
 ## Regras para agentes (doc 02 §3 — aplicáveis a todo PR)
 

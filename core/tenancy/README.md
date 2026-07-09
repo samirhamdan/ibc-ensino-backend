@@ -44,7 +44,18 @@ Referências: docs/02-ARQUITETURA.md §4–5 · docs/01-PRD.md TEN-01..05.
 - `GET /api/tenant/current` devolve o tenant do contexto (404 fora dele) —
   é como o frontend aplicará o tema do tenant (TEN-03).
 
+## Suíte de isolamento (Etapa 2.3 — NFR-01)
+
+- `tests/isolation/` — casos de isolamento (A não alcança dados de B por
+  contexto, ID, listagem) + **gate de cobertura**: todo endpoint da aplicação
+  precisa estar classificado em `tests/isolation/registry.py`
+  (TENANT_SCOPED com teste · LEGACY_PRE_TENANCY · PUBLIC_INFRA); endpoint
+  novo sem classificação DERRUBA o pipeline. Job `isolation-suite` do CI
+  roda a suíte em Postgres — configurar como required check.
+- Na Fase 3, cada grupo de tabelas migradas move seus endpoints de
+  LEGACY_PRE_TENANCY para TENANT_SCOPED com casos novos.
+
 ## Próximos passos no módulo
 
-- Etapa 2.3: suíte `tests/isolation/` (doc 02 §5.4) — required no CI.
+- Fase 3: tenant_id nas tabelas de domínio (expand → backfill → contract).
 - Fase 4: RLS + claims de tenant no JWT; cache do middleware migra p/ Redis.
