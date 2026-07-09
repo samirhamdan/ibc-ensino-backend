@@ -5,9 +5,15 @@ Sem autogenerate por enquanto: o schema legado ainda nasce de db.create_all()
 tocam apenas tabelas novas de tenancy.
 """
 import os
+import sys
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+# Raiz do repo no sys.path: migrações importam extensions/models, e o binário
+# `alembic` (usado no preDeployCommand do Railway) não inclui o cwd — só
+# `python -m alembic` inclui.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from dotenv import load_dotenv
 load_dotenv()

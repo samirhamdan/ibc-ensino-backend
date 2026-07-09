@@ -82,6 +82,13 @@ def upgrade():
                 coluna, nome_novo = conv
                 globais, uniques_existentes = _uniques_globais(insp, tabela, coluna)
                 for nome in globais:
+                    if nome is None:
+                        # UNIQUE inline sem nome (SQLite de dev antigo) não é
+                        # dropável por nome; no Postgres de produção os uniques
+                        # têm nome automático (ex.: badge_code_key). Em dev,
+                        # recrie o banco (seed.py) se precisar de multi-tenant.
+                        print(f'  aviso: unique sem nome em {tabela}.{coluna} mantido (SQLite legado)')
+                        continue
                     batch.drop_constraint(nome, type_='unique')
                 if nome_novo not in uniques_existentes:
                     batch.create_unique_constraint(nome_novo, ['tenant_id', coluna])
