@@ -3,6 +3,7 @@ Course routes: CRUD for courses, modules, materials
 """
 from flask import Blueprint, request, jsonify, session
 from extensions import db
+from core.tenancy import current_tenant_id
 from models import Course, Module, Material, Quiz, Category, User
 
 courses_bp = Blueprint('courses', __name__)
@@ -272,13 +273,13 @@ def admin_list_courses():
             all_mats.extend(m.materials)
         has_video = any(m.video_url for m in modules)
         has_pdf = any(mat.tipo == 'pdf' for mat in all_mats)
-        enrolled_ids = {p.user_id for p in Progress.query.filter_by(course_id=c.id).all()}
+        enrolled_ids = {p.user_id for p in Progress.query.filter_by(course_id=c.id, tenant_id=current_tenant_id()).all()}
         total_lessons = len(modules)
         avg_progress = 0
         if enrolled_ids and total_lessons > 0:
             user_pcts = []
             for uid2 in enrolled_ids:
-                passed = Progress.query.filter_by(course_id=c.id, user_id=uid2, passed=True).count()
+                passed = Progress.query.filter_by(course_id=c.id, user_id=uid2, passed=True, tenant_id=current_tenant_id()).count()
                 user_pcts.append(round(passed / total_lessons * 100))
             avg_progress = round(sum(user_pcts) / len(user_pcts)) if user_pcts else 0
         tc = TrailCourse.query.filter_by(course_id=c.id).first()

@@ -103,7 +103,7 @@ def continue_learning():
         if not modules:
             continue
         progresses = {p.module_id: p for p in
-                      LessonProgress.query.filter_by(user_id=user.id, course_id=c.id).all()}
+                      LessonProgress.query.filter_by(user_id=user.id, course_id=c.id, tenant_id=current_tenant_id()).all()}
         if not progresses:
             continue
         passed_count = sum(1 for m in modules if progresses.get(m.id) and progresses[m.id].passed)

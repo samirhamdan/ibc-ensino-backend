@@ -104,7 +104,7 @@ def list_aulas(course_id):
     _get_visible_course(course_id, user)
     modules = _ordered_modules(course_id)
 
-    progresses = LessonProgress.query.filter_by(user_id=user.id, course_id=course_id).all()
+    progresses = LessonProgress.query.filter_by(user_id=user.id, course_id=course_id, tenant_id=current_tenant_id()).all()
     progress_map = {p.module_id: p for p in progresses}
 
     result = []
@@ -129,7 +129,7 @@ def get_aula(course_id, aula_num):
     if aula_num < 1 or aula_num > len(modules):
         return jsonify({'error': 'Aula não encontrada'}), 404
 
-    progresses = LessonProgress.query.filter_by(user_id=user.id, course_id=course_id).all()
+    progresses = LessonProgress.query.filter_by(user_id=user.id, course_id=course_id, tenant_id=current_tenant_id()).all()
     progress_map = {p.module_id: p for p in progresses}
 
     # Check unlock: all previous lessons must be passed
@@ -167,7 +167,7 @@ def submit_aula_quiz(course_id, aula_num):
     # nesta rota para completar aulas bloqueadas fora de ordem.
     if user.role not in ('admin', 'tutor'):
         progress_check = {p.module_id: p for p in
-                          LessonProgress.query.filter_by(user_id=user.id, course_id=course_id).all()}
+                          LessonProgress.query.filter_by(user_id=user.id, course_id=course_id, tenant_id=current_tenant_id()).all()}
         for i in range(aula_num - 1):
             prev = progress_check.get(modules[i].id)
             if not (prev and prev.passed):
@@ -208,7 +208,7 @@ def submit_aula_quiz(course_id, aula_num):
                 f['correct_answer'] = None
                 f['explanation'] = None
 
-    prog = LessonProgress.query.filter_by(user_id=user.id, module_id=module.id).first()
+    prog = LessonProgress.query.filter_by(user_id=user.id, module_id=module.id, tenant_id=current_tenant_id()).first()
     is_first_attempt = prog is None or not prog.total
     already_passed = bool(prog and prog.passed)
     if not prog:
@@ -240,7 +240,7 @@ def submit_aula_quiz(course_id, aula_num):
     cert_code = None
     if passed and is_last:
         all_modules = modules
-        all_progs = {p.module_id: p for p in LessonProgress.query.filter_by(user_id=user.id, course_id=course_id).all()}
+        all_progs = {p.module_id: p for p in LessonProgress.query.filter_by(user_id=user.id, course_id=course_id, tenant_id=current_tenant_id()).all()}
         all_done = all(all_progs.get(m.id) and all_progs[m.id].passed for m in all_modules)
         if all_done:
             existing_cert = Certificate.query.filter_by(user_id=user.id, course_id=course_id, cert_type='course', tenant_id=current_tenant_id()).first()
@@ -302,7 +302,7 @@ def next_lesson(course_id):
         return jsonify({'has_next': False, 'lesson': None, 'lesson_count': {'current': 0, 'total': 0}}), 200
 
     progress_map = {p.module_id: p for p in
-                     LessonProgress.query.filter_by(user_id=user.id, course_id=course_id).all()}
+                     LessonProgress.query.filter_by(user_id=user.id, course_id=course_id, tenant_id=current_tenant_id()).all()}
 
     next_idx = None
     for i, m in enumerate(modules):
@@ -341,7 +341,7 @@ def mark_video_watched(course_id, aula_num):
     if not module.video_url:
         return jsonify({'error': 'Esta aula não tem vídeo'}), 400
 
-    prog = LessonProgress.query.filter_by(user_id=user.id, module_id=module.id).first()
+    prog = LessonProgress.query.filter_by(user_id=user.id, module_id=module.id, tenant_id=current_tenant_id()).first()
     already_watched = bool(prog and prog.video_watched)
     if not prog:
         prog = LessonProgress(user_id=user.id, course_id=course_id, module_id=module.id)

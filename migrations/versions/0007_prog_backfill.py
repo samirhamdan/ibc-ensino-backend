@@ -1,28 +1,23 @@
-"""feat(TEN-01) grupo 1 gamificação — BACKFILL: tenant_id = tenant ibc
+"""feat(TEN-01) grupo 2 progresso — BACKFILL: tenant_id = tenant ibc
 
-Revision ID: 0004_gamif_backfill
-Revises: 0003_gamif_expand
-Create Date: 2026-07-08
+Revision ID: 0007_prog_backfill
+Revises: 0006_prog_expand
+Create Date: 2026-07-09
 
-Idempotente e re-executável (só toca linhas com tenant_id IS NULL), em lotes
-de 5.000 para não segurar lock em produção. Garante o tenant 'ibc' antes
-(todo dado legado pertence ao IBC — doc 02 §4).
-
-Downgrade: devolve tenant_id a NULL (reversível sem perda — a informação
-"pertence ao ibc" é reconstituível re-executando o upgrade).
+Idempotente (WHERE tenant_id IS NULL), lotes de 5.000, mesmo padrão da 0004.
 """
 import uuid
 
 from alembic import op
 import sqlalchemy as sa
 
-revision = '0004_gamif_backfill'
-down_revision = '0003_gamif_expand'
+revision = '0007_prog_backfill'
+down_revision = '0006_prog_expand'
 branch_labels = None
 depends_on = None
 
-GRUPO = ['user_points', 'badge', 'user_badge', 'achievements',
-         'user_achievements', 'certificates', 'activity_feed']
+GRUPO = ['lesson_progress', 'progress', 'study_sessions',
+         'user_trails', 'onboarding_answers']
 
 LOTE = 5000
 
@@ -55,7 +50,6 @@ def upgrade():
     for tabela in GRUPO:
         total = 0
         while True:
-            # lotes por PK para não varrer/lockar a tabela inteira de uma vez
             ids = bind.execute(sa.text(
                 f'SELECT id FROM {tabela} WHERE tenant_id IS NULL LIMIT {LOTE}'
             )).fetchall()

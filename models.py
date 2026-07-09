@@ -177,7 +177,7 @@ class Quiz(db.Model):
         return data
 
 
-class LessonProgress(db.Model):
+class LessonProgress(TenantScopedModel, db.Model):
     __tablename__ = 'lesson_progress'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -201,7 +201,9 @@ class LessonProgress(db.Model):
     course = db.relationship('Course', backref=db.backref('lesson_progresses', lazy=True, cascade='all, delete-orphan'), lazy=True)
     module = db.relationship('Module', backref=db.backref('lesson_progresses', lazy=True, cascade='all, delete-orphan'), lazy=True)
 
-    __table_args__ = (db.UniqueConstraint('user_id', 'module_id', name='uq_user_module'),)
+    # __table_args__ próprio sobrepõe o do mixin → índice composto manual
+    __table_args__ = (db.UniqueConstraint('user_id', 'module_id', name='uq_user_module'),
+                      db.Index('ix_lesson_progress_tenant_id_id', 'tenant_id', 'id'))
 
     def to_dict(self):
         return {
@@ -220,7 +222,7 @@ class LessonProgress(db.Model):
         }
 
 
-class Progress(db.Model):
+class Progress(TenantScopedModel, db.Model):
     __tablename__ = 'progress'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -231,7 +233,9 @@ class Progress(db.Model):
     quiz_total = db.Column(db.Integer, default=0)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    __table_args__ = (db.UniqueConstraint('user_id', 'course_id', name='uq_user_course'),)
+    # __table_args__ próprio sobrepõe o do mixin → índice composto manual
+    __table_args__ = (db.UniqueConstraint('user_id', 'course_id', name='uq_user_course'),
+                      db.Index('ix_progress_tenant_id_id', 'tenant_id', 'id'))
 
     PASS_THRESHOLD = 60  # percent — mesmo limiar usado em LessonProgress (routes/lessons.py)
 
@@ -430,7 +434,7 @@ class TrailCourse(db.Model):
         }
 
 
-class UserTrail(db.Model):
+class UserTrail(TenantScopedModel, db.Model):
     __tablename__ = 'user_trails'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -441,7 +445,9 @@ class UserTrail(db.Model):
 
     trail = db.relationship('Trail')
 
-    __table_args__ = (db.UniqueConstraint('user_id', 'trail_id', name='uq_user_trail'),)
+    # __table_args__ próprio sobrepõe o do mixin → índice composto manual
+    __table_args__ = (db.UniqueConstraint('user_id', 'trail_id', name='uq_user_trail'),
+                      db.Index('ix_user_trails_tenant_id_id', 'tenant_id', 'id'))
 
     def to_dict(self):
         return {
@@ -451,16 +457,21 @@ class UserTrail(db.Model):
         }
 
 
-class OnboardingAnswer(db.Model):
+class OnboardingAnswer(TenantScopedModel, db.Model):
     __tablename__ = 'onboarding_answers'
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, unique=True)
+    # unique por tenant: o usuário responde o onboarding em cada tenant
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     goal = db.Column(db.String(50), nullable=False)
     recommended_trail_id = db.Column(db.Integer, db.ForeignKey('trails.id'), nullable=True)
     answered_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     recommended_trail = db.relationship('Trail')
+
+    # __table_args__ próprio sobrepõe o do mixin → índice composto manual
+    __table_args__ = (db.UniqueConstraint('tenant_id', 'user_id', name='uq_onboarding_tenant_user'),
+                      db.Index('ix_onboarding_answers_tenant_id_id', 'tenant_id', 'id'))
 
     def to_dict(self):
         return {
@@ -707,7 +718,7 @@ class UserAchievement(TenantScopedModel, db.Model):
         }
 
 
-class StudySession(db.Model):
+class StudySession(TenantScopedModel, db.Model):
     """Sprint 6.2: tracks time spent studying a given lesson (Modulo) via the
     frontend study timer."""
     __tablename__ = 'study_sessions'

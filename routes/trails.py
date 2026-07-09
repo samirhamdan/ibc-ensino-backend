@@ -62,7 +62,7 @@ def enroll_trail(trail_id):
 
     trail = Trail.query.get_or_404(trail_id)
 
-    existing = UserTrail.query.filter_by(user_id=user.id, trail_id=trail_id).first()
+    existing = UserTrail.query.filter_by(user_id=user.id, trail_id=trail_id, tenant_id=current_tenant_id()).first()
     already = bool(existing)
     if not existing:
         db.session.add(UserTrail(user_id=user.id, trail_id=trail_id))
@@ -81,7 +81,7 @@ def focus_trail(trail_id):
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    enrolled = UserTrail.query.filter_by(user_id=user.id, trail_id=trail_id).first()
+    enrolled = UserTrail.query.filter_by(user_id=user.id, trail_id=trail_id, tenant_id=current_tenant_id()).first()
     if not enrolled:
         return jsonify({'error': 'Você não está inscrito nesta trilha'}), 400
 
@@ -101,7 +101,7 @@ def _completed_course_ids(user_id):
         modules_by_course.setdefault(m.course_id, []).append(m.id)
 
     passed_module_ids = {
-        lp.module_id for lp in LessonProgress.query.filter_by(user_id=user_id, passed=True).all()
+        lp.module_id for lp in LessonProgress.query.filter_by(user_id=user_id, passed=True, tenant_id=current_tenant_id()).all()
     }
 
     done_ids = set()
@@ -147,7 +147,7 @@ def my_trails():
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    enrollments = UserTrail.query.filter_by(user_id=user.id).all()
+    enrollments = UserTrail.query.filter_by(user_id=user.id, tenant_id=current_tenant_id()).all()
     done_course_ids = _completed_course_ids(user.id)
 
     in_progress, completed = [], []
@@ -210,7 +210,7 @@ def active_trail():
     all_done = all(tc['done'] for tc in trail_dict['courses'])
     trail_dict['completed'] = all_done
     if all_done:
-        ut = UserTrail.query.filter_by(user_id=user.id, trail_id=trail.id).first()
+        ut = UserTrail.query.filter_by(user_id=user.id, trail_id=trail.id, tenant_id=current_tenant_id()).first()
         if ut and not ut.completed_at:
             from datetime import datetime
             ut.completed_at = datetime.utcnow()
@@ -247,7 +247,7 @@ def submit_onboarding():
 
     trail = Trail.query.filter_by(goal=goal).first()
 
-    existing = OnboardingAnswer.query.filter_by(user_id=user.id).first()
+    existing = OnboardingAnswer.query.filter_by(user_id=user.id, tenant_id=current_tenant_id()).first()
     if existing:
         existing.goal = goal
         existing.recommended_trail_id = trail.id if trail else None
@@ -287,8 +287,8 @@ def admin_list_trails():
     result = []
     for t in trails:
         trail_courses = TrailCourse.query.filter_by(trail_id=t.id).order_by(TrailCourse.position).all()
-        enrolled = UserTrail.query.filter_by(trail_id=t.id).count()
-        completed = UserTrail.query.filter_by(trail_id=t.id).filter(UserTrail.completed_at.isnot(None)).count()
+        enrolled = UserTrail.query.filter_by(trail_id=t.id, tenant_id=current_tenant_id()).count()
+        completed = UserTrail.query.filter_by(trail_id=t.id, tenant_id=current_tenant_id()).filter(UserTrail.completed_at.isnot(None)).count()
         courses_data = []
         for tc in trail_courses:
             c = Course.query.get(tc.course_id)

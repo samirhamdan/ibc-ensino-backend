@@ -20,3 +20,4 @@ naturalmente na reestruturação da Release 0.9/1.0.
 | 11 | `/health` responde `db: connected` sem consultar o banco | `app.py` | Enganoso para monitoração |
 | 12 | N+1 em serialização: `Course.to_dict` (category_rel), `Question.to_dict` (author), `TrailCourse.to_dict` (course) — listagens disparam 1 query por linha | revisão de código (jul/2026) | Irrelevante no volume atual; tratar nos repositórios da 0.9 |
 | 13 | Schema nasce de `db.create_all()` — sem Alembic, sem migração versionada | `app.py:106` | Resolvido na Fase 2 do playbook (Alembic entra com tenancy) |
+| 14 | `User.onboarding_completed` é flag GLOBAL: concluir o onboarding num tenant marca concluído em todos (a resposta `OnboardingAnswer` em si é por tenant desde o grupo 2) | `routes/trails.py::onboarding_status` | Resolver na Fase 4 junto com papéis por tenant (`tenant_users`) |

@@ -180,7 +180,7 @@ def list_users():
         except (TypeError, ValueError):
             return jsonify({'error': 'Filtro de trilha inválido'}), 400
         enrolled_ids = [
-            ut.user_id for ut in UserTrail.query.filter_by(trail_id=trail_filter_id).all()
+            ut.user_id for ut in UserTrail.query.filter_by(trail_id=trail_filter_id, tenant_id=current_tenant_id()).all()
         ]
         query = query.filter(User.id.in_(enrolled_ids))
 
@@ -192,7 +192,7 @@ def list_users():
     result = []
     for u in users:
         pts = UserPoints.query.filter_by(user_id=u.id, tenant_id=current_tenant_id()).first()
-        trail_count = UserTrail.query.filter_by(user_id=u.id).count()
+        trail_count = UserTrail.query.filter_by(user_id=u.id, tenant_id=current_tenant_id()).count()
         result.append({
             'id': u.id,
             'name': u.name,
@@ -219,7 +219,7 @@ def get_user_profile(user_id):
     pts = UserPoints.query.filter_by(user_id=u.id, tenant_id=current_tenant_id()).first()
 
     trails = []
-    for ut in UserTrail.query.filter_by(user_id=u.id).all():
+    for ut in UserTrail.query.filter_by(user_id=u.id, tenant_id=current_tenant_id()).all():
         t = Trail.query.get(ut.trail_id)
         if not t:
             continue
@@ -251,7 +251,7 @@ def get_user_profile(user_id):
 
     course_progress = []
     done_ids = set()
-    for prog in Progress.query.filter_by(user_id=u.id).all():
+    for prog in Progress.query.filter_by(user_id=u.id, tenant_id=current_tenant_id()).all():
         if prog.course_id in done_ids:
             continue
         done_ids.add(prog.course_id)
@@ -288,9 +288,9 @@ def reset_user_progress(user_id):
 
     u = User.query.get_or_404(user_id)
 
-    Progress.query.filter_by(user_id=u.id).delete()
-    LessonProgress.query.filter_by(user_id=u.id).delete()
-    UserTrail.query.filter_by(user_id=u.id).delete()
+    Progress.query.filter_by(user_id=u.id, tenant_id=current_tenant_id()).delete()
+    LessonProgress.query.filter_by(user_id=u.id, tenant_id=current_tenant_id()).delete()
+    UserTrail.query.filter_by(user_id=u.id, tenant_id=current_tenant_id()).delete()
 
     pts = UserPoints.query.filter_by(user_id=u.id, tenant_id=current_tenant_id()).first()
     if pts:
@@ -317,7 +317,7 @@ def change_user_active_trail(user_id):
 
     if trail_id:
         Trail.query.get_or_404(trail_id)
-        ut = UserTrail.query.filter_by(user_id=u.id, trail_id=trail_id).first()
+        ut = UserTrail.query.filter_by(user_id=u.id, trail_id=trail_id, tenant_id=current_tenant_id()).first()
         if not ut:
             ut = UserTrail(user_id=u.id, trail_id=trail_id)
             db.session.add(ut)
@@ -351,7 +351,7 @@ def bulk_action_users():
         # a operação inteira com 500
         valid_ids = {u.id for u in User.query.filter(User.id.in_(user_ids)).all()}
         for uid in valid_ids:
-            existing = UserTrail.query.filter_by(user_id=uid, trail_id=trail_id).first()
+            existing = UserTrail.query.filter_by(user_id=uid, trail_id=trail_id, tenant_id=current_tenant_id()).first()
             if not existing:
                 db.session.add(UserTrail(user_id=uid, trail_id=trail_id))
         db.session.commit()
@@ -361,7 +361,7 @@ def bulk_action_users():
         if not trail_id:
             return jsonify({'error': 'trail_id obrigatório'}), 400
         for uid in user_ids:
-            UserTrail.query.filter_by(user_id=uid, trail_id=trail_id).delete()
+            UserTrail.query.filter_by(user_id=uid, trail_id=trail_id, tenant_id=current_tenant_id()).delete()
         db.session.commit()
         return jsonify({'ok': True}), 200
 

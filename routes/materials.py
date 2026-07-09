@@ -7,6 +7,7 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify, session, current_app, send_from_directory
 from werkzeug.utils import secure_filename
 from extensions import db
+from core.tenancy import current_tenant_id
 from models import Material, User, LessonProgress, Course
 
 materials_bp = Blueprint('materials', __name__)
@@ -76,7 +77,7 @@ def save_read_progress(material_id):
     except (TypeError, ValueError):
         return jsonify({'error': 'Dados de progresso inválidos'}), 400
 
-    prog = LessonProgress.query.filter_by(user_id=user.id, module_id=material.module_id).first()
+    prog = LessonProgress.query.filter_by(user_id=user.id, module_id=material.module_id, tenant_id=current_tenant_id()).first()
     if not prog:
         prog = LessonProgress(user_id=user.id, course_id=material.course_id, module_id=material.module_id)
         db.session.add(prog)

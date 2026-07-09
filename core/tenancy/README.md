@@ -70,7 +70,12 @@ Referências: docs/02-ARQUITETURA.md §4–5 · docs/01-PRD.md TEN-01..05.
 - Baseline do legado: migração 0002 (checkfirst; downgrade só em ambiente
   descartável — runbook: produção nunca desce abaixo de 0002).
 - `railway.json`: preDeployCommand roda `alembic upgrade head` antes do seed.
-- Pendentes: grupo 2 (progresso) e grupo 3 (conteúdo).
+- **Grupo 2 (progresso) MIGRADO:** lesson_progress, progress,
+  study_sessions, user_trails, onboarding_answers (migrações 0006–0008;
+  onboarding_answers.user_id vira unique por tenant). 18 endpoints movidos
+  para TENANT_SCOPED no registry.
+- Pendente: grupo 3 (conteúdo: trilhas, cursos, módulos, materiais, quiz,
+  perguntas, notificações/avisos).
 
 ## Próximos passos no módulo
 

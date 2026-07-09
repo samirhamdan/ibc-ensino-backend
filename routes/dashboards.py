@@ -59,7 +59,7 @@ def _completed_pct(course, user_id):
     if not modules:
         return 0
     progresses = {p.module_id: p for p in
-                  LessonProgress.query.filter_by(user_id=user_id, course_id=course.id).all()}
+                  LessonProgress.query.filter_by(user_id=user_id, course_id=course.id, tenant_id=current_tenant_id()).all()}
     passed = sum(1 for m in modules if progresses.get(m.id) and progresses[m.id].passed)
     return round(passed / len(modules) * 100)
 
@@ -79,7 +79,7 @@ def admin_dashboard():
 
     total_courses = Course.query.count()
 
-    all_progress = LessonProgress.query.all()
+    all_progress = LessonProgress.query.filter_by(tenant_id=current_tenant_id()).all()
     completion_rate = round(sum(1 for p in all_progress if p.passed) / len(all_progress) * 100, 1) if all_progress else 0.0
 
     week_ago = datetime.utcnow() - timedelta(days=7)
@@ -117,7 +117,7 @@ def admin_dashboard():
     recent_activities = []
     for q in Question.query.order_by(Question.created_at.desc()).limit(3).all():
         recent_activities.append({'user': q.author.name if q.author else '—', 'action': f'fez uma pergunta em "{q.course.name if q.course else ""}"', 'timestamp': q.created_at.isoformat()})
-    for p in LessonProgress.query.filter_by(passed=True).order_by(LessonProgress.completed_at.desc()).limit(3).all():
+    for p in LessonProgress.query.filter_by(passed=True, tenant_id=current_tenant_id()).order_by(LessonProgress.completed_at.desc()).limit(3).all():
         recent_activities.append({'user': p.user.name if p.user else '—', 'action': f'concluiu uma aula em "{p.course.name if p.course else ""}"', 'timestamp': p.completed_at.isoformat() if p.completed_at else ''})
     recent_activities.sort(key=lambda a: a['timestamp'], reverse=True)
     recent_activities = recent_activities[:6]
@@ -200,7 +200,7 @@ def aluno_dashboard():
     enrolled_courses = []
     for c in Course.query.all():
         modules = Module.query.filter_by(course_id=c.id).order_by(Module.position).all()
-        progresses = {p.module_id: p for p in LessonProgress.query.filter_by(user_id=user.id, course_id=c.id).all()}
+        progresses = {p.module_id: p for p in LessonProgress.query.filter_by(user_id=user.id, course_id=c.id, tenant_id=current_tenant_id()).all()}
         if not progresses or not modules:
             continue
         passed_count = sum(1 for m in modules if progresses.get(m.id) and progresses[m.id].passed)
@@ -265,7 +265,7 @@ def aluno_externo_dashboard():
 
         for c in Course.query.filter_by(acesso='publico').all():
             modules = Module.query.filter_by(course_id=c.id).order_by(Module.position).all()
-            progresses = {p.module_id: p for p in LessonProgress.query.filter_by(user_id=user.id, course_id=c.id).all()}
+            progresses = {p.module_id: p for p in LessonProgress.query.filter_by(user_id=user.id, course_id=c.id, tenant_id=current_tenant_id()).all()}
             if not progresses or not modules:
                 continue
             passed_count = sum(1 for m in modules if progresses.get(m.id) and progresses[m.id].passed)
@@ -285,7 +285,7 @@ def aluno_externo_dashboard():
 
     total_users = User.query.count()
     total_courses = Course.query.count()
-    all_progress = LessonProgress.query.all()
+    all_progress = LessonProgress.query.filter_by(tenant_id=current_tenant_id()).all()
     completion_rate = round(sum(1 for p in all_progress if p.passed) / len(all_progress) * 100) if all_progress else 0
 
     return jsonify({

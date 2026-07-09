@@ -85,14 +85,16 @@ def unlock_badge(user_id, badge_code):
 def _badge_progress(user_id, code):
     """Returns (current, target) progress for a badge"""
     if code == 'novo_discipulo':
-        count = LessonProgress.query.filter_by(user_id=user_id).distinct(LessonProgress.course_id).count()
+        count = LessonProgress.query.filter_by(user_id=user_id, tenant_id=current_tenant_id()).distinct(LessonProgress.course_id).count()
         return min(count, 1), 1
     if code == 'estudioso_palavra':
         count = LessonProgress.query.filter(LessonProgress.user_id == user_id,
+                                             LessonProgress.tenant_id == current_tenant_id(),
                                              LessonProgress.material_percentage >= 50).count()
         return min(count, 5), 5
     if code == 'guerreiro_palavra':
         count = LessonProgress.query.filter(LessonProgress.user_id == user_id,
+                                             LessonProgress.tenant_id == current_tenant_id(),
                                              LessonProgress.passed == True,
                                              LessonProgress.score == LessonProgress.total).count()
         return min(count, 3), 3
@@ -108,7 +110,7 @@ def _badge_progress(user_id, code):
     if code == 'corredor_incansavel':
         return 0, 1
     if code == 'servo_fiel':
-        up = UserPoints.query.filter_by(user_id=user_id).first()
+        up = UserPoints.query.filter_by(user_id=user_id, tenant_id=current_tenant_id()).first()
         return (1, 1) if (up and _consecutive_days(up) >= 7) else (_consecutive_days(up) if up else 0, 7)
     return 0, 1
 
@@ -121,7 +123,7 @@ def _completed_courses_count(user_id):
         if not modules:
             continue
         progresses = {p.module_id: p for p in
-                      LessonProgress.query.filter_by(user_id=user_id, course_id=course.id).all()}
+                      LessonProgress.query.filter_by(user_id=user_id, course_id=course.id, tenant_id=current_tenant_id()).all()}
         if all(progresses.get(m.id) and progresses[m.id].passed for m in modules):
             count += 1
     return count
@@ -278,7 +280,7 @@ def add_points():
 # exist concurrently for now — see final report for the flagged duplication.
 
 def get_completed_lessons_count(user_id):
-    return LessonProgress.query.filter_by(user_id=user_id, passed=True).count()
+    return LessonProgress.query.filter_by(user_id=user_id, passed=True, tenant_id=current_tenant_id()).count()
 
 
 def get_completed_courses_count(user_id):
@@ -289,6 +291,7 @@ def get_completed_courses_count(user_id):
 
 def get_completed_trails_count(user_id):
     return UserTrail.query.filter(UserTrail.user_id == user_id,
+                                   UserTrail.tenant_id == current_tenant_id(),
                                    UserTrail.completed_at.isnot(None)).count()
 
 

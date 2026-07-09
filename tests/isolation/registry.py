@@ -36,6 +36,25 @@ TENANT_SCOPED = {
     # routes/certificates.py; classificados aqui com caso do grupo.
     'certificates.verify_certificate': 'test_gamification_isolation.py::test_certificados_nao_vazam_entre_tenants',
     'certificates.download_certificate': 'test_gamification_isolation.py::test_certificados_nao_vazam_entre_tenants',
+    # grupo 2 — progresso (Fase 3)
+    'lessons.list_aulas': 'test_progress_isolation.py::test_progresso_de_aula_nao_desbloqueia_em_outro_tenant',
+    'lessons.get_aula': 'test_progress_isolation.py::test_progresso_de_aula_nao_desbloqueia_em_outro_tenant',
+    'lessons.submit_aula_quiz': 'test_progress_isolation.py::test_progresso_de_aula_nao_desbloqueia_em_outro_tenant',
+    'lessons.next_lesson': 'test_progress_isolation.py::test_progresso_de_aula_nao_desbloqueia_em_outro_tenant',
+    'lessons.mark_video_watched': 'test_progress_isolation.py::test_progresso_de_aula_nao_desbloqueia_em_outro_tenant',
+    'materials.save_read_progress': 'test_progress_isolation.py::test_progresso_de_aula_nao_desbloqueia_em_outro_tenant',
+    'progress.get_progress': 'test_progress_isolation.py::test_progresso_legado_zero_linhas_cruzadas',
+    'progress.save_progress': 'test_progress_isolation.py::test_progresso_legado_zero_linhas_cruzadas',
+    'progress.submit_quiz': 'test_progress_isolation.py::test_progresso_legado_zero_linhas_cruzadas',
+    'progress.quiz_result': 'test_progress_isolation.py::test_progresso_legado_zero_linhas_cruzadas',
+    'trails.my_trails': 'test_progress_isolation.py::test_matricula_em_trilha_nao_vaza',
+    'trails.enroll_trail': 'test_progress_isolation.py::test_matricula_em_trilha_nao_vaza',
+    'trails.active_trail': 'test_progress_isolation.py::test_matricula_em_trilha_nao_vaza',
+    'trails.focus_trail': 'test_progress_isolation.py::test_matricula_em_trilha_nao_vaza',
+    'onboarding.submit_onboarding': 'test_progress_isolation.py::test_onboarding_answer_por_tenant',
+    'aluno.save_study_time': 'test_progress_isolation.py::test_progresso_de_aula_nao_desbloqueia_em_outro_tenant',
+    'aluno.stats': 'test_progress_isolation.py::test_progresso_de_aula_nao_desbloqueia_em_outro_tenant',
+    'aluno.continue_learning': 'test_progress_isolation.py::test_progresso_de_aula_nao_desbloqueia_em_outro_tenant',
 }
 
 # ── Infra pública (sem dado de domínio) ──────────────────────────────────
@@ -79,11 +98,8 @@ LEGACY_PRE_TENANCY = {
     'admin.update_admin_config',
     'admin.update_user',
     # aluno
-    'aluno.continue_learning',
     'aluno.my_questions_with_status',
     'aluno.resolve_question',
-    'aluno.save_study_time',
-    'aluno.stats',
     # (raiz)
     'api_user',
     # auth
@@ -126,15 +142,9 @@ LEGACY_PRE_TENANCY = {
     'dashboards.tutor_dashboard',
     # gamification
     # lessons
-    'lessons.get_aula',
-    'lessons.list_aulas',
-    'lessons.mark_video_watched',
-    'lessons.next_lesson',
-    'lessons.submit_aula_quiz',
     'lessons.update_module_video',
     # materials
     'materials.get_material',
-    'materials.save_read_progress',
     'materials.serve_material_file',
     'materials.upload_material',
     # notifications
@@ -145,14 +155,10 @@ LEGACY_PRE_TENANCY = {
     'notifications.list_notifications',
     'notifications.mark_all_notifications_read',
     'notifications.mark_notification_read',
-    # onboarding
+    # onboarding — status lê a flag GLOBAL User.onboarding_completed
+    # (design atual; ver docs/DEBITOS.md #14) — vira per-tenant na Fase 4
     'onboarding.onboarding_status',
-    'onboarding.submit_onboarding',
     # progress
-    'progress.get_progress',
-    'progress.quiz_result',
-    'progress.save_progress',
-    'progress.submit_quiz',
     # questions
     'questions.answer_question',
     'questions.ask_question',
@@ -160,7 +166,6 @@ LEGACY_PRE_TENANCY = {
     'questions.my_questions',
     'questions.tutor_dashboard',
     # trails
-    'trails.active_trail',
     'trails.admin_add_course_to_trail',
     'trails.admin_available_courses_for_trail',
     'trails.admin_list_trails',
@@ -168,10 +173,7 @@ LEGACY_PRE_TENANCY = {
     'trails.admin_reorder_trail_courses',
     'trails.admin_update_trail',
     'trails.create_trail',
-    'trails.enroll_trail',
-    'trails.focus_trail',
     'trails.list_trails',
-    'trails.my_trails',
     # (raiz)
     'upload_file',
 }

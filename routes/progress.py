@@ -3,6 +3,7 @@ Progress routes: get and save student progress per course
 """
 from flask import Blueprint, request, jsonify, session
 from extensions import db
+from core.tenancy import current_tenant_id
 from models import Progress, Course, Quiz, User
 
 progress_bp = Blueprint('progress', __name__)
@@ -23,7 +24,7 @@ def get_progress(course_id):
 
     Course.query.get_or_404(course_id)
 
-    prog = Progress.query.filter_by(user_id=user.id, course_id=course_id).first()
+    prog = Progress.query.filter_by(user_id=user.id, course_id=course_id, tenant_id=current_tenant_id()).first()
     if not prog:
         return jsonify({
             'user_id': user.id,
@@ -46,7 +47,7 @@ def save_progress(course_id):
 
     data = request.get_json(silent=True) or {}
 
-    prog = Progress.query.filter_by(user_id=user.id, course_id=course_id).first()
+    prog = Progress.query.filter_by(user_id=user.id, course_id=course_id, tenant_id=current_tenant_id()).first()
     if not prog:
         prog = Progress(user_id=user.id, course_id=course_id)
         db.session.add(prog)
@@ -96,7 +97,7 @@ def submit_quiz(course_id):
         })
 
     # Persist progress
-    prog = Progress.query.filter_by(user_id=user.id, course_id=course_id).first()
+    prog = Progress.query.filter_by(user_id=user.id, course_id=course_id, tenant_id=current_tenant_id()).first()
     if not prog:
         prog = Progress(user_id=user.id, course_id=course_id)
         db.session.add(prog)
@@ -118,7 +119,7 @@ def quiz_result(course_id):
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    prog = Progress.query.filter_by(user_id=user.id, course_id=course_id).first()
+    prog = Progress.query.filter_by(user_id=user.id, course_id=course_id, tenant_id=current_tenant_id()).first()
     if not prog or prog.quiz_total == 0:
         return jsonify({'error': 'Nenhum quiz submetido para este curso'}), 404
 
