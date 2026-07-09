@@ -3,6 +3,7 @@ Questions/Q&A routes: students ask questions, tutors answer
 """
 from flask import Blueprint, request, jsonify, session
 from extensions import db
+from core.tenancy import current_tenant_id, get_scoped_or_404
 from models import Question, Course, User, Progress, Notification, TutorCourse
 
 questions_bp = Blueprint('questions', __name__)
@@ -21,8 +22,8 @@ def list_questions(course_id):
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    Course.query.get_or_404(course_id)
-    questions = Question.query.filter_by(course_id=course_id).order_by(Question.created_at.desc()).all()
+    get_scoped_or_404(Course, course_id)
+    questions = Question.query.filter_by(tenant_id=current_tenant_id(), course_id=course_id).order_by(Question.created_at.desc()).all()
     return jsonify([q.to_dict() for q in questions]), 200
 
 
@@ -32,7 +33,7 @@ def ask_question(course_id):
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    Course.query.get_or_404(course_id)
+    get_scoped_or_404(Course, course_id)
 
     data = request.get_json(silent=True) or {}
     texto = (data.get('texto') or '').strip()
@@ -64,7 +65,7 @@ def answer_question(question_id):
     if user.role not in ('admin', 'tutor'):
         return jsonify({'error': 'Apenas tutores podem responder perguntas'}), 403
 
-    question = Question.query.get_or_404(question_id)
+    question = get_scoped_or_404(Question, question_id)
 
     # Tutor pode responder se: é o tutor principal do curso, OU foi vinculado
     # ao curso via TutorCourse (admin /tutors/<id>/assign-course), OU a pergunta
@@ -72,7 +73,7 @@ def answer_question(question_id):
     # do curso passava — o fluxo de atribuição do admin ficava inoperante (403).
     if user.role == 'tutor':
         is_course_tutor = bool(question.course and question.course.tutor_id == user.id)
-        is_linked_tutor = bool(question.course and TutorCourse.query.filter_by(
+        is_linked_tutor = bool(question.course and TutorCourse.query.filter_by(tenant_id=current_tenant_id(), 
             tutor_id=user.id, course_id=question.course_id).first())
         is_assigned = question.assigned_tutor_id == user.id
         if not (is_course_tutor or is_linked_tutor or is_assigned):
@@ -120,7 +121,7 @@ def my_questions():
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    questions = Question.query.filter_by(user_id=user.id).order_by(Question.created_at.desc()).all()
+    questions = Question.query.filter_by(tenant_id=current_tenant_id(), user_id=user.id).order_by(Question.created_at.desc()).all()
     result = []
     for q in questions:
         d = q.to_dict()
@@ -139,12 +140,12 @@ def tutor_dashboard():
     if user.role not in ('admin', 'tutor'):
         return jsonify({'error': 'Acesso negado'}), 403
 
-    query = Question.query
+    query = Question.query.filter_by(tenant_id=current_tenant_id())
     if user.role == 'tutor':
         # mesmos critérios de answer_question: cursos onde é tutor principal,
         # cursos vinculados via TutorCourse e perguntas atribuídas diretamente
-        course_ids = {c.id for c in Course.query.filter_by(tutor_id=user.id).all()}
-        course_ids.update(tc.course_id for tc in TutorCourse.query.filter_by(tutor_id=user.id).all())
+        course_ids = {c.id for c in Course.query.filter_by(tenant_id=current_tenant_id(), tutor_id=user.id).all()}
+        course_ids.update(tc.course_id for tc in TutorCourse.query.filter_by(tenant_id=current_tenant_id(), tutor_id=user.id).all())
         query = query.filter(db.or_(Question.course_id.in_(course_ids),
                                     Question.assigned_tutor_id == user.id))
 

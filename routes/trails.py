@@ -3,7 +3,7 @@ Trails + Onboarding endpoints
 """
 from flask import Blueprint, jsonify, session, request
 from extensions import db
-from core.tenancy import current_tenant_id
+from core.tenancy import current_tenant_id, get_scoped, get_scoped_or_404
 from models import Trail, TrailCourse, UserTrail, OnboardingAnswer, User, UserPoints, Badge, UserBadge, Module, LessonProgress
 
 trails_bp = Blueprint('trails', __name__)
@@ -50,7 +50,7 @@ def _award_badge(user_id, code):
 
 @trails_bp.route('', methods=['GET'])
 def list_trails():
-    trails = Trail.query.all()
+    trails = Trail.query.filter_by(tenant_id=current_tenant_id()).all()
     return jsonify([t.to_dict(include_courses=True) for t in trails])
 
 
@@ -60,7 +60,7 @@ def enroll_trail(trail_id):
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    trail = Trail.query.get_or_404(trail_id)
+    trail = get_scoped_or_404(Trail, trail_id)
 
     existing = UserTrail.query.filter_by(user_id=user.id, trail_id=trail_id, tenant_id=current_tenant_id()).first()
     already = bool(existing)
@@ -97,7 +97,7 @@ def _completed_course_ids(user_id):
     `Progress` fica sempre vazio e a conclusão de trilha nunca disparava
     (bug crítico do ROADMAP.md, seção 1.2)."""
     modules_by_course = {}
-    for m in Module.query.all():
+    for m in Module.query.filter_by(tenant_id=current_tenant_id()).all():
         modules_by_course.setdefault(m.course_id, []).append(m.id)
 
     passed_module_ids = {
@@ -178,7 +178,7 @@ def active_trail():
     if not user.active_trail_id:
         return jsonify(None)
 
-    trail = Trail.query.get(user.active_trail_id)
+    trail = get_scoped(Trail, user.active_trail_id)
     if not trail:
         return jsonify(None)
 
@@ -245,7 +245,7 @@ def submit_onboarding():
     data = request.get_json(silent=True) or {}
     goal = data.get('goal', '')
 
-    trail = Trail.query.filter_by(goal=goal).first()
+    trail = Trail.query.filter_by(tenant_id=current_tenant_id(), goal=goal).first()
 
     existing = OnboardingAnswer.query.filter_by(user_id=user.id, tenant_id=current_tenant_id()).first()
     if existing:
@@ -283,15 +283,15 @@ def admin_list_trails():
     user, err = _admin_required()
     if err: return err
     from models import Course
-    trails = Trail.query.all()
+    trails = Trail.query.filter_by(tenant_id=current_tenant_id()).all()
     result = []
     for t in trails:
-        trail_courses = TrailCourse.query.filter_by(trail_id=t.id).order_by(TrailCourse.position).all()
+        trail_courses = TrailCourse.query.filter_by(tenant_id=current_tenant_id(), trail_id=t.id).order_by(TrailCourse.position).all()
         enrolled = UserTrail.query.filter_by(trail_id=t.id, tenant_id=current_tenant_id()).count()
         completed = UserTrail.query.filter_by(trail_id=t.id, tenant_id=current_tenant_id()).filter(UserTrail.completed_at.isnot(None)).count()
         courses_data = []
         for tc in trail_courses:
-            c = Course.query.get(tc.course_id)
+            c = get_scoped(Course, tc.course_id)
             if c:
                 courses_data.append({'id': c.id, 'name': c.name, 'position': tc.position})
         result.append({
@@ -307,7 +307,7 @@ def admin_list_trails():
 def admin_update_trail(trail_id):
     user, err = _admin_required()
     if err: return err
-    t = Trail.query.get_or_404(trail_id)
+    t = get_scoped_or_404(Trail, trail_id)
     data = request.get_json() or {}
     if 'name' in data: t.name = data['name']
     if 'description' in data: t.description = data['description']
@@ -329,7 +329,7 @@ def admin_reorder_trail_courses(trail_id):
     data = request.get_json() or {}
     course_ids = data.get('course_ids', [])
     for idx, cid in enumerate(course_ids, 1):
-        tc = TrailCourse.query.filter_by(trail_id=trail_id, course_id=cid).first()
+        tc = TrailCourse.query.filter_by(tenant_id=current_tenant_id(), trail_id=trail_id, course_id=cid).first()
         if tc:
             tc.position = idx
     db.session.commit()
@@ -343,7 +343,7 @@ def admin_add_course_to_trail(trail_id):
     course_id = data.get('course_id')
     if not course_id:
         return jsonify({'error': 'course_id required'}), 400
-    existing = TrailCourse.query.filter_by(trail_id=trail_id, course_id=course_id).first()
+    existing = TrailCourse.query.filter_by(tenant_id=current_tenant_id(), trail_id=trail_id, course_id=course_id).first()
     if existing:
         return jsonify({'error': 'Curso já na trilha'}), 409
     max_pos = db.session.query(db.func.max(TrailCourse.position)).filter_by(trail_id=trail_id).scalar() or 0
@@ -356,7 +356,7 @@ def admin_add_course_to_trail(trail_id):
 def admin_remove_course_from_trail(trail_id, course_id):
     user, err = _admin_required()
     if err: return err
-    tc = TrailCourse.query.filter_by(trail_id=trail_id, course_id=course_id).first()
+    tc = TrailCourse.query.filter_by(tenant_id=current_tenant_id(), trail_id=trail_id, course_id=course_id).first()
     if tc:
         db.session.delete(tc)
         db.session.commit()
@@ -367,8 +367,8 @@ def admin_available_courses_for_trail(trail_id):
     user, err = _admin_required()
     if err: return err
     from models import Course
-    trail_course_ids = {tc.course_id for tc in TrailCourse.query.filter_by(trail_id=trail_id).all()}
-    all_courses = Course.query.all()
+    trail_course_ids = {tc.course_id for tc in TrailCourse.query.filter_by(tenant_id=current_tenant_id(), trail_id=trail_id).all()}
+    all_courses = Course.query.filter_by(tenant_id=current_tenant_id()).all()
     available = [{'id': c.id, 'name': c.name} for c in all_courses if c.id not in trail_course_ids]
     return jsonify({'courses': available})
 

@@ -7,7 +7,7 @@ from io import BytesIO
 from datetime import datetime
 from flask import Blueprint, jsonify, session, send_file, request, current_app
 from extensions import db
-from core.tenancy import current_tenant_id
+from core.tenancy import current_tenant_id, get_scoped
 from models import Certificate, User, Course, Trail, UserTrail, ActivityFeed
 
 certificates_bp = Blueprint('certificates', __name__)
@@ -57,13 +57,13 @@ def issue_certificate():
     done_course_ids = _completed_course_ids(user.id)
 
     if cert_type == 'course':
-        if not Course.query.get(entity_id):
+        if not get_scoped(Course, entity_id):
             return jsonify({'error': 'Curso não encontrado'}), 404
         if entity_id not in done_course_ids:
             return jsonify({'error': 'Curso ainda não foi concluído'}), 403
         existing = Certificate.query.filter_by(user_id=user.id, course_id=entity_id, cert_type='course', tenant_id=current_tenant_id()).first()
     else:
-        trail = Trail.query.get(entity_id)
+        trail = get_scoped(Trail, entity_id)
         if not trail:
             return jsonify({'error': 'Trilha não encontrada'}), 404
         trail_course_ids = [tc.course_id for tc in trail.trail_courses]

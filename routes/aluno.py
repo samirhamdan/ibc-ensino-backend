@@ -5,7 +5,7 @@ certificates list and "continue learning" info.
 from datetime import datetime
 from flask import Blueprint, jsonify, session, request
 from extensions import db
-from core.tenancy import current_tenant_id
+from core.tenancy import current_tenant_id, get_scoped
 from models import (User, Course, Module, LessonProgress, UserPoints,
                      Achievement, UserAchievement, Certificate, Question,
                      StudySession)
@@ -98,8 +98,8 @@ def continue_learning():
         return err
 
     candidate = None
-    for c in Course.query.all():
-        modules = Module.query.filter_by(course_id=c.id).order_by(Module.position).all()
+    for c in Course.query.filter_by(tenant_id=current_tenant_id()).all():
+        modules = Module.query.filter_by(tenant_id=current_tenant_id(), course_id=c.id).order_by(Module.position).all()
         if not modules:
             continue
         progresses = {p.module_id: p for p in
@@ -144,7 +144,7 @@ def my_questions_with_status():
     if err:
         return err
 
-    questions = Question.query.filter_by(user_id=user.id).order_by(Question.created_at.desc()).all()
+    questions = Question.query.filter_by(tenant_id=current_tenant_id(), user_id=user.id).order_by(Question.created_at.desc()).all()
     result = []
     for q in questions:
         d = q.to_dict()
@@ -161,7 +161,7 @@ def resolve_question(question_id):
     if err:
         return err
 
-    question = Question.query.filter_by(id=question_id, user_id=user.id).first()
+    question = Question.query.filter_by(tenant_id=current_tenant_id(), id=question_id, user_id=user.id).first()
     if not question:
         return jsonify({'error': 'Pergunta não encontrada'}), 404
 
@@ -194,7 +194,7 @@ def save_study_time():
     seconds = max(0, min(seconds, 12 * 3600))
 
     # lesson_id fantasma violava FK no commit → 500
-    if lesson_id is not None and not Module.query.get(lesson_id):
+    if lesson_id is not None and not get_scoped(Module, lesson_id):
         lesson_id = None
 
     session_row = StudySession(

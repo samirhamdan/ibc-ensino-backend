@@ -7,7 +7,7 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify, session, current_app, send_from_directory
 from werkzeug.utils import secure_filename
 from extensions import db
-from core.tenancy import current_tenant_id
+from core.tenancy import current_tenant_id, get_scoped, get_scoped_or_404
 from models import Material, User, LessonProgress, Course
 
 materials_bp = Blueprint('materials', __name__)
@@ -23,7 +23,7 @@ def _current_user():
 def _can_access_material(user, material):
     if user.role in ('admin', 'tutor'):
         return True
-    course = Course.query.get(material.course_id)
+    course = get_scoped(Course, material.course_id)
     if not course:
         return False
     if course.acesso == 'publico':
@@ -37,7 +37,7 @@ def get_material(material_id):
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    material = Material.query.get_or_404(material_id)
+    material = get_scoped_or_404(Material, material_id)
     if not _can_access_material(user, material):
         return jsonify({'error': 'Acesso negado'}), 403
 
@@ -65,7 +65,7 @@ def save_read_progress(material_id):
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    material = Material.query.get_or_404(material_id)
+    material = get_scoped_or_404(Material, material_id)
     if not material.module_id:
         return jsonify({'error': 'Material não vinculado a uma aula'}), 400
 
@@ -158,7 +158,7 @@ def serve_material_file(filename):
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    material = Material.query.filter_by(url=f'/uploads/materials/{filename}').first()
+    material = Material.query.filter_by(tenant_id=current_tenant_id(), url=f'/uploads/materials/{filename}').first()
     if not material or not _can_access_material(user, material):
         return jsonify({'error': 'Acesso negado'}), 403
 

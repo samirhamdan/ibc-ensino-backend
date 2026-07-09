@@ -4,6 +4,7 @@ User-facing notification and announcement routes
 from datetime import datetime
 from flask import Blueprint, request, jsonify, session
 from extensions import db
+from core.tenancy import current_tenant_id, get_scoped_or_404
 from models import Notification, Announcement, AnnouncementDismissal, User, PlatformConfig, Level
 
 notifications_bp = Blueprint('notifications', __name__)
@@ -20,11 +21,11 @@ def list_notifications():
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    query = Notification.query.filter_by(user_id=user.id)
+    query = Notification.query.filter_by(tenant_id=current_tenant_id(), user_id=user.id)
     if request.args.get('unread_only') == 'true':
         query = query.filter_by(is_read=False)
     notifications = query.order_by(Notification.created_at.desc()).all()
-    unread_count = Notification.query.filter_by(user_id=user.id, is_read=False).count()
+    unread_count = Notification.query.filter_by(tenant_id=current_tenant_id(), user_id=user.id, is_read=False).count()
 
     return jsonify({
         'notifications': [n.to_dict() for n in notifications],
@@ -38,7 +39,7 @@ def mark_notification_read(notification_id):
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    n = Notification.query.filter_by(id=notification_id, user_id=user.id).first_or_404()
+    n = Notification.query.filter_by(tenant_id=current_tenant_id(), id=notification_id, user_id=user.id).first_or_404()
     n.is_read = True
     db.session.commit()
     return jsonify({'ok': True}), 200
@@ -50,7 +51,7 @@ def mark_all_notifications_read():
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    Notification.query.filter_by(user_id=user.id, is_read=False).update({'is_read': True})
+    Notification.query.filter_by(tenant_id=current_tenant_id(), user_id=user.id, is_read=False).update({'is_read': True})
     db.session.commit()
     return jsonify({'ok': True}), 200
 
@@ -63,10 +64,10 @@ def list_active_announcements():
 
     now = datetime.utcnow()
     dismissed_ids = {
-        d.announcement_id for d in AnnouncementDismissal.query.filter_by(user_id=user.id).all()
+        d.announcement_id for d in AnnouncementDismissal.query.filter_by(tenant_id=current_tenant_id(), user_id=user.id).all()
     }
 
-    announcements = Announcement.query.filter(
+    announcements = Announcement.query.filter(Announcement.tenant_id == current_tenant_id(), 
         Announcement.is_active == True,
         Announcement.target_role.in_([user.role, 'all']),
     ).order_by(Announcement.created_at.desc()).all()
@@ -88,8 +89,8 @@ def dismiss_announcement(announcement_id):
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    Announcement.query.get_or_404(announcement_id)
-    existing = AnnouncementDismissal.query.filter_by(
+    get_scoped_or_404(Announcement, announcement_id)
+    existing = AnnouncementDismissal.query.filter_by(tenant_id=current_tenant_id(), 
         user_id=user.id, announcement_id=announcement_id
     ).first()
     if not existing:

@@ -99,10 +99,10 @@ def _badge_progress(user_id, code):
                                              LessonProgress.score == LessonProgress.total).count()
         return min(count, 3), 3
     if code == 'buscador_verdade':
-        count = Question.query.filter_by(user_id=user_id).count()
+        count = Question.query.filter_by(tenant_id=current_tenant_id(), user_id=user_id).count()
         return min(count, 5), 5
     if code == 'iluminado_graca':
-        count = Question.query.filter(Question.user_id == user_id, Question.resposta != '').count()
+        count = Question.query.filter(Question.tenant_id == current_tenant_id(), Question.user_id == user_id, Question.resposta != '').count()
         return min(count, 1), 1
     if code == 'edificador':
         course_count = _completed_courses_count(user_id)
@@ -118,8 +118,8 @@ def _badge_progress(user_id, code):
 def _completed_courses_count(user_id):
     """Count courses where user passed all modules"""
     count = 0
-    for course in Course.query.all():
-        modules = Module.query.filter_by(course_id=course.id).all()
+    for course in Course.query.filter_by(tenant_id=current_tenant_id()).all():
+        modules = Module.query.filter_by(tenant_id=current_tenant_id(), course_id=course.id).all()
         if not modules:
             continue
         progresses = {p.module_id: p for p in
@@ -296,7 +296,7 @@ def get_completed_trails_count(user_id):
 
 
 def get_questions_count(user_id):
-    return Question.query.filter_by(user_id=user_id).count()
+    return Question.query.filter_by(tenant_id=current_tenant_id(), user_id=user_id).count()
 
 
 def get_certificates_count(user_id):

@@ -38,10 +38,11 @@ def test_progresso_de_aula_nao_desbloqueia_em_outro_tenant(aluno_em, iso_app, se
     assert r.status_code == 200 and r.get_json()['passed'] is True
     assert a.get(f'/api/courses/{cid}/aulas/2').status_code == 200  # desbloqueou em A
 
-    # em B, o mesmo curso segue intocado: aula 2 bloqueada, progresso zero
-    assert b.get(f'/api/courses/{cid}/aulas/2').status_code == 403
-    aulas_b = b.get(f'/api/courses/{cid}/aulas').get_json()
-    assert all(x['progress'] is None for x in aulas_b)
+    # em B o curso NEM EXISTE (grupo 3: conteúdo é por tenant) — 404 em tudo,
+    # que é isolamento ainda mais forte que progresso zerado
+    assert b.get(f'/api/courses/{cid}/aulas/2').status_code == 404
+    assert b.get(f'/api/courses/{cid}/aulas').status_code == 404
+    assert b.get(f'/api/courses/{cid}').status_code == 404
 
     _limpa_progresso(iso_app, seeded)
 

@@ -4,7 +4,7 @@ Admin-only routes: tutor management, user management, question assignment
 from datetime import datetime
 from flask import Blueprint, request, jsonify, session
 from extensions import db
-from core.tenancy import current_tenant_id
+from core.tenancy import current_tenant_id, get_scoped, get_scoped_or_404
 from models import (
     User, Course, Question, TutorCourse, UserTrail, UserPoints,
     Certificate, Progress, Trail, Notification, Announcement, AnnouncementDismissal,
@@ -34,21 +34,21 @@ def list_tutors():
     tutors = User.query.filter_by(role='tutor').order_by(User.name).all()
     result = []
     for t in tutors:
-        assigned_courses = TutorCourse.query.filter_by(tutor_id=t.id).all()
+        assigned_courses = TutorCourse.query.filter_by(tenant_id=current_tenant_id(), tutor_id=t.id).all()
         course_ids = [tc.course_id for tc in assigned_courses]
 
-        pending = Question.query.filter(
+        pending = Question.query.filter(Question.tenant_id == current_tenant_id(), 
             Question.assigned_tutor_id == t.id,
             Question.resposta == ''
         ).count()
-        total_answered = Question.query.filter(
+        total_answered = Question.query.filter(Question.tenant_id == current_tenant_id(), 
             Question.assigned_tutor_id == t.id,
             Question.resposta != ''
         ).count()
 
         courses_data = []
         for tc in assigned_courses:
-            c = Course.query.get(tc.course_id)
+            c = get_scoped(Course, tc.course_id)
             if c:
                 courses_data.append({'id': c.id, 'name': c.name, 'icon': c.icon or ''})
 
@@ -79,9 +79,9 @@ def assign_course_to_tutor(tutor_id):
     if not course_id:
         return jsonify({'error': 'course_id obrigatório'}), 400
 
-    Course.query.get_or_404(course_id)
+    get_scoped_or_404(Course, course_id)
 
-    existing = TutorCourse.query.filter_by(tutor_id=tutor_id, course_id=course_id).first()
+    existing = TutorCourse.query.filter_by(tenant_id=current_tenant_id(), tutor_id=tutor_id, course_id=course_id).first()
     if existing:
         return jsonify({'error': 'Curso já atribuído a este tutor'}), 409
 
@@ -97,7 +97,7 @@ def unassign_course_from_tutor(tutor_id, course_id):
     if err:
         return err
 
-    tc = TutorCourse.query.filter_by(tutor_id=tutor_id, course_id=course_id).first_or_404()
+    tc = TutorCourse.query.filter_by(tenant_id=current_tenant_id(), tutor_id=tutor_id, course_id=course_id).first_or_404()
     db.session.delete(tc)
     db.session.commit()
     return jsonify({'ok': True}), 200
@@ -111,7 +111,7 @@ def list_unassigned_questions():
     if err:
         return err
 
-    questions = Question.query.filter(
+    questions = Question.query.filter(Question.tenant_id == current_tenant_id(), 
         Question.assigned_tutor_id.is_(None),
         Question.resposta == ''
     ).order_by(Question.created_at.asc()).all()
@@ -131,7 +131,7 @@ def assign_question(question_id):
     if err:
         return err
 
-    q = Question.query.get_or_404(question_id)
+    q = get_scoped_or_404(Question, question_id)
     data = request.get_json(silent=True) or {}
     tutor_id = data.get('tutor_id')
 
@@ -153,7 +153,7 @@ def list_courses_simple():
     if err:
         return err
 
-    courses = Course.query.order_by(Course.name).all()
+    courses = Course.query.filter_by(tenant_id=current_tenant_id()).order_by(Course.name).all()
     return jsonify([{'id': c.id, 'name': c.name, 'icon': c.icon or ''} for c in courses]), 200
 
 
@@ -220,7 +220,7 @@ def get_user_profile(user_id):
 
     trails = []
     for ut in UserTrail.query.filter_by(user_id=u.id, tenant_id=current_tenant_id()).all():
-        t = Trail.query.get(ut.trail_id)
+        t = get_scoped(Trail, ut.trail_id)
         if not t:
             continue
         course_ids = [tc.course_id for tc in t.trail_courses]
@@ -242,7 +242,7 @@ def get_user_profile(user_id):
 
     certs = []
     for cert in Certificate.query.filter_by(user_id=u.id, tenant_id=current_tenant_id()).all():
-        c = Course.query.get(cert.course_id)
+        c = get_scoped(Course, cert.course_id)
         certs.append({
             'id': cert.id,
             'course_name': c.name if c else '',
@@ -255,7 +255,7 @@ def get_user_profile(user_id):
         if prog.course_id in done_ids:
             continue
         done_ids.add(prog.course_id)
-        c = Course.query.get(prog.course_id)
+        c = get_scoped(Course, prog.course_id)
         if c:
             course_progress.append({
                 'course_id': prog.course_id,
@@ -316,7 +316,7 @@ def change_user_active_trail(user_id):
     trail_id = data.get('trail_id')
 
     if trail_id:
-        Trail.query.get_or_404(trail_id)
+        get_scoped_or_404(Trail, trail_id)
         ut = UserTrail.query.filter_by(user_id=u.id, trail_id=trail_id, tenant_id=current_tenant_id()).first()
         if not ut:
             ut = UserTrail(user_id=u.id, trail_id=trail_id)
@@ -346,7 +346,7 @@ def bulk_action_users():
     if action == 'enroll_trail':
         if not trail_id:
             return jsonify({'error': 'trail_id obrigatório'}), 400
-        Trail.query.get_or_404(trail_id)
+        get_scoped_or_404(Trail, trail_id)
         # só ids que existem: um id fantasma na lista violava FK e derrubava
         # a operação inteira com 500
         valid_ids = {u.id for u in User.query.filter(User.id.in_(user_ids)).all()}
@@ -545,11 +545,11 @@ def list_announcements():
     if err:
         return err
 
-    anns = Announcement.query.order_by(Announcement.created_at.desc()).all()
+    anns = Announcement.query.filter_by(tenant_id=current_tenant_id()).order_by(Announcement.created_at.desc()).all()
     result = []
     for a in anns:
         d = a.to_dict()
-        d['dismissed_count'] = AnnouncementDismissal.query.filter_by(announcement_id=a.id).count()
+        d['dismissed_count'] = AnnouncementDismissal.query.filter_by(tenant_id=current_tenant_id(), announcement_id=a.id).count()
         result.append(d)
     return jsonify(result), 200
 
@@ -560,7 +560,7 @@ def delete_announcement(announcement_id):
     if err:
         return err
 
-    ann = Announcement.query.get_or_404(announcement_id)
+    ann = get_scoped_or_404(Announcement, announcement_id)
     ann.is_active = False
     db.session.commit()
     return jsonify({'ok': True}), 200
@@ -663,7 +663,7 @@ def toggle_course_status(course_id):
     if err:
         return err
 
-    course = Course.query.get_or_404(course_id)
+    course = get_scoped_or_404(Course, course_id)
     data = request.get_json(silent=True) or {}
     status = data.get('status')
     if status not in ('published', 'draft', 'archived'):
@@ -680,7 +680,7 @@ def duplicate_course(course_id):
     if err:
         return err
 
-    course = Course.query.get_or_404(course_id)
+    course = get_scoped_or_404(Course, course_id)
     new_course = Course(
         name=f'Cópia de {course.name}',
         icon=course.icon,
@@ -697,7 +697,7 @@ def duplicate_course(course_id):
     db.session.add(new_course)
     db.session.flush()
 
-    for m in Module.query.filter_by(course_id=course.id).order_by(Module.position).all():
+    for m in Module.query.filter_by(tenant_id=current_tenant_id(), course_id=course.id).order_by(Module.position).all():
         new_module = Module(
             course_id=new_course.id, nome=m.nome, dur=m.dur, position=m.position,
             video_url=m.video_url, video_provider=m.video_provider,
@@ -705,13 +705,13 @@ def duplicate_course(course_id):
         db.session.add(new_module)
         db.session.flush()
 
-        for mat in Material.query.filter_by(module_id=m.id).all():
+        for mat in Material.query.filter_by(tenant_id=current_tenant_id(), module_id=m.id).all():
             db.session.add(Material(
                 course_id=new_course.id, module_id=new_module.id,
                 name=mat.name, url=mat.url, tipo=mat.tipo, size=mat.size,
             ))
 
-        for q in Quiz.query.filter_by(module_id=m.id).order_by(Quiz.position).all():
+        for q in Quiz.query.filter_by(tenant_id=current_tenant_id(), module_id=m.id).order_by(Quiz.position).all():
             db.session.add(Quiz(
                 course_id=new_course.id, module_id=new_module.id,
                 q=q.q, opts=q.opts, ans=q.ans, exp=q.exp, position=q.position,

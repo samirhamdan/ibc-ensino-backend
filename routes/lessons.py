@@ -6,7 +6,7 @@ from flask import Blueprint, request, jsonify, session
 from extensions import db
 from models import Course, Module, LessonProgress, User, UserPoints, Badge, UserBadge, Certificate, ActivityFeed
 from routes.gamification import award_points, check_and_grant_achievements
-from core.tenancy import current_tenant_id
+from core.tenancy import current_tenant_id, get_scoped_or_404
 
 lessons_bp = Blueprint('lessons', __name__)
 
@@ -26,7 +26,7 @@ def _get_visible_course(course_id, user):
     """404 para aluno se o curso não está publicado — as rotas de aula eram o
     único caminho que ignorava Course.status (aluno via conteúdo, fazia quiz e
     emitia certificado de curso draft/archived acessando a URL direto)."""
-    course = Course.query.get_or_404(course_id)
+    course = get_scoped_or_404(Course, course_id)
     if course.status != 'published' and (not user or user.role not in ('admin', 'tutor')):
         from flask import abort
         abort(404)
@@ -34,7 +34,7 @@ def _get_visible_course(course_id, user):
 
 
 def _ordered_modules(course_id):
-    return Module.query.filter_by(course_id=course_id).order_by(Module.position).all()
+    return Module.query.filter_by(tenant_id=current_tenant_id(), course_id=course_id).order_by(Module.position).all()
 
 
 def _merge_points(a, b):
@@ -375,7 +375,7 @@ def update_module_video(course_id, module_id):
     if not user or user.role not in ('admin', 'tutor'):
         return jsonify({'error': 'Acesso negado'}), 403
 
-    module = Module.query.filter_by(id=module_id, course_id=course_id).first_or_404()
+    module = Module.query.filter_by(tenant_id=current_tenant_id(), id=module_id, course_id=course_id).first_or_404()
     data = request.get_json(silent=True) or {}
     video_url = data.get('video_url', '').strip() or None
 

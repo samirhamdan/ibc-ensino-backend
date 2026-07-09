@@ -71,3 +71,23 @@ def default_tenant_id():
 def clear_default_tenant_cache():
     global _default_tenant_id_cache
     _default_tenant_id_cache = None
+
+
+def get_scoped(model, pk):
+    """Busca por PK ESCOPADA: devolve None se o registro não existe OU
+    pertence a outro tenant — substitui Model.query.get() para modelos
+    tenant-scoped (buscar por PK sem checar tenant é vazamento por IDOR)."""
+    obj = model.query.get(pk)
+    if obj is None or obj.tenant_id != current_tenant_id():
+        return None
+    return obj
+
+
+def get_scoped_or_404(model, pk):
+    """Como get_scoped, mas aborta 404 — substitui Model.query.get_or_404().
+    Registro de outro tenant responde 404 (nunca 403: não revelar que o
+    recurso existe — doc 02 §5.4)."""
+    obj = get_scoped(model, pk)
+    if obj is None:
+        abort(404)
+    return obj

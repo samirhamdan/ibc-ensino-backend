@@ -55,7 +55,7 @@ def _current_user():
 
 
 def _completed_pct(course, user_id):
-    modules = Module.query.filter_by(course_id=course.id).all()
+    modules = Module.query.filter_by(tenant_id=current_tenant_id(), course_id=course.id).all()
     if not modules:
         return 0
     progresses = {p.module_id: p for p in
@@ -77,7 +77,7 @@ def admin_dashboard():
     admins = User.query.filter_by(role='admin').count()
     total_users = alunos + tutores + admins
 
-    total_courses = Course.query.count()
+    total_courses = Course.query.filter_by(tenant_id=current_tenant_id()).count()
 
     all_progress = LessonProgress.query.filter_by(tenant_id=current_tenant_id()).all()
     completion_rate = round(sum(1 for p in all_progress if p.passed) / len(all_progress) * 100, 1) if all_progress else 0.0
@@ -98,8 +98,8 @@ def admin_dashboard():
     }
 
     alerts = []
-    for course in Course.query.all():
-        modules = Module.query.filter_by(course_id=course.id).all()
+    for course in Course.query.filter_by(tenant_id=current_tenant_id()).all():
+        modules = Module.query.filter_by(tenant_id=current_tenant_id(), course_id=course.id).all()
         if not modules:
             continue
         students = db.session.query(LessonProgress.user_id).filter_by(course_id=course.id).distinct().count()
@@ -115,7 +115,7 @@ def admin_dashboard():
         alerts.append({'type': 'ok', 'message': 'Nenhum alerta no momento. Tudo funcionando bem! ✅', 'severity': 'info'})
 
     recent_activities = []
-    for q in Question.query.order_by(Question.created_at.desc()).limit(3).all():
+    for q in Question.query.filter_by(tenant_id=current_tenant_id()).order_by(Question.created_at.desc()).limit(3).all():
         recent_activities.append({'user': q.author.name if q.author else '—', 'action': f'fez uma pergunta em "{q.course.name if q.course else ""}"', 'timestamp': q.created_at.isoformat()})
     for p in LessonProgress.query.filter_by(passed=True, tenant_id=current_tenant_id()).order_by(LessonProgress.completed_at.desc()).limit(3).all():
         recent_activities.append({'user': p.user.name if p.user else '—', 'action': f'concluiu uma aula em "{p.course.name if p.course else ""}"', 'timestamp': p.completed_at.isoformat() if p.completed_at else ''})
@@ -142,11 +142,11 @@ def tutor_dashboard():
     if not user or user.role not in ('tutor', 'admin'):
         return jsonify({'error': 'Acesso negado'}), 403
 
-    my_courses_q = Course.query if user.role == 'admin' else Course.query.filter_by(tutor_id=user.id)
+    my_courses_q = Course.query if user.role == 'admin' else Course.query.filter_by(tenant_id=current_tenant_id(), tutor_id=user.id)
     my_courses_list = my_courses_q.all()
     course_ids = [c.id for c in my_courses_list]
 
-    pending = Question.query.filter(Question.course_id.in_(course_ids), Question.resposta == '') \
+    pending = Question.query.filter(Question.tenant_id == current_tenant_id(), Question.course_id.in_(course_ids), Question.resposta == '') \
         .order_by(Question.created_at.asc()).limit(10).all()
     pending_questions = [{
         'id': q.id, 'author': q.author.name if q.author else '—', 'text': q.texto,
@@ -155,7 +155,7 @@ def tutor_dashboard():
 
     my_courses = []
     for c in my_courses_list:
-        modules = Module.query.filter_by(course_id=c.id).all()
+        modules = Module.query.filter_by(tenant_id=current_tenant_id(), course_id=c.id).all()
         student_ids = [uid for uid, in db.session.query(LessonProgress.user_id).filter_by(course_id=c.id).distinct()]
         completed = sum(1 for uid in student_ids if modules and _completed_pct(c, uid) == 100)
         rate = round(completed / len(student_ids) * 100) if student_ids else 0
@@ -166,8 +166,8 @@ def tutor_dashboard():
         })
 
     week_ago = datetime.utcnow() - timedelta(days=7)
-    new_questions = Question.query.filter(Question.course_id.in_(course_ids), Question.created_at >= week_ago).count()
-    answered = Question.query.filter(Question.course_id.in_(course_ids), Question.created_at >= week_ago, Question.resposta != '').count()
+    new_questions = Question.query.filter(Question.tenant_id == current_tenant_id(), Question.course_id.in_(course_ids), Question.created_at >= week_ago).count()
+    answered = Question.query.filter(Question.tenant_id == current_tenant_id(), Question.course_id.in_(course_ids), Question.created_at >= week_ago, Question.resposta != '').count()
     new_students = User.query.filter(User.created_at >= week_ago, User.role == 'aluno').count()
 
     return jsonify({
@@ -198,8 +198,8 @@ def aluno_dashboard():
     trofeus_unlocked = [{'icon': ub.badge.icon, 'name': ub.badge.name, 'date': ub.unlocked_at.isoformat()} for ub in user_badges]
 
     enrolled_courses = []
-    for c in Course.query.all():
-        modules = Module.query.filter_by(course_id=c.id).order_by(Module.position).all()
+    for c in Course.query.filter_by(tenant_id=current_tenant_id()).all():
+        modules = Module.query.filter_by(tenant_id=current_tenant_id(), course_id=c.id).order_by(Module.position).all()
         progresses = {p.module_id: p for p in LessonProgress.query.filter_by(user_id=user.id, course_id=c.id, tenant_id=current_tenant_id()).all()}
         if not progresses or not modules:
             continue
@@ -214,7 +214,7 @@ def aluno_dashboard():
 
     in_progress_course = next((c for c in enrolled_courses if c['status'] == 'em_andamento'), None)
     other_courses = [c for c in enrolled_courses if c is not in_progress_course]
-    not_enrolled = [c for c in Course.query.all() if c.id not in {ec['id'] for ec in enrolled_courses}]
+    not_enrolled = [c for c in Course.query.filter_by(tenant_id=current_tenant_id()).all() if c.id not in {ec['id'] for ec in enrolled_courses}]
     for c in not_enrolled[:4]:
         other_courses.append({'id': c.id, 'name': c.name, 'icon': c.icon, 'status': 'nao_iniciado'})
 
@@ -228,7 +228,7 @@ def aluno_dashboard():
                                        ~Badge.id.in_([ub.badge_id for ub in user_badges])).limit(2).all()
     for b in locked_badges:
         next_metas.append({'description': f'Conquistar "{b.name}"', 'type': 'trofeu'})
-    pending_q = Question.query.filter_by(user_id=user.id, resposta='').count()
+    pending_q = Question.query.filter_by(tenant_id=current_tenant_id(), user_id=user.id, resposta='').count()
     if pending_q:
         next_metas.append({'description': f'Você tem {pending_q} pergunta(s) aguardando resposta', 'type': 'duvida'})
 
@@ -263,8 +263,8 @@ def aluno_externo_dashboard():
         user_badges = UserBadge.query.filter_by(user_id=user.id, tenant_id=current_tenant_id()).order_by(UserBadge.unlocked_at.desc()).all()
         trofeus_unlocked = [{'icon': ub.badge.icon, 'name': ub.badge.name, 'description': ub.badge.description, 'date': ub.unlocked_at.isoformat()} for ub in user_badges]
 
-        for c in Course.query.filter_by(acesso='publico').all():
-            modules = Module.query.filter_by(course_id=c.id).order_by(Module.position).all()
+        for c in Course.query.filter_by(tenant_id=current_tenant_id(), acesso='publico').all():
+            modules = Module.query.filter_by(tenant_id=current_tenant_id(), course_id=c.id).order_by(Module.position).all()
             progresses = {p.module_id: p for p in LessonProgress.query.filter_by(user_id=user.id, course_id=c.id, tenant_id=current_tenant_id()).all()}
             if not progresses or not modules:
                 continue
@@ -276,15 +276,15 @@ def aluno_externo_dashboard():
                 break
 
     featured_courses = []
-    for c in Course.query.filter_by(acesso='publico').limit(4).all():
-        n_modules = Module.query.filter_by(course_id=c.id).count()
+    for c in Course.query.filter_by(tenant_id=current_tenant_id(), acesso='publico').limit(4).all():
+        n_modules = Module.query.filter_by(tenant_id=current_tenant_id(), course_id=c.id).count()
         featured_courses.append({
             'id': c.id, 'name': c.name, 'icon': c.icon, 'category': c.category_rel.name if c.category_rel else '',
             'rating': 4.8, 'review_count': 50 + c.id * 37, 'lessons': n_modules,
         })
 
     total_users = User.query.count()
-    total_courses = Course.query.count()
+    total_courses = Course.query.filter_by(tenant_id=current_tenant_id()).count()
     all_progress = LessonProgress.query.filter_by(tenant_id=current_tenant_id()).all()
     completion_rate = round(sum(1 for p in all_progress if p.passed) / len(all_progress) * 100) if all_progress else 0
 

@@ -9,6 +9,7 @@ from flask_cors import CORS
 from datetime import timedelta
 from dotenv import load_dotenv
 from extensions import db, limiter
+from core.tenancy import current_tenant_id
 
 # Carrega .env ANTES de qualquer leitura de os.getenv — python-dotenv estava
 # em requirements.txt mas load_dotenv() nunca era chamado: um .env local com
@@ -197,7 +198,7 @@ def create_app(config_name='development'):
 
             # Se o arquivo é um material de curso registrado, aplica a mesma
             # regra de acesso usada em routes/materials.py (get_material).
-            material = Material.query.filter_by(url=f'/uploads/{safe}').first()
+            material = Material.query.filter_by(tenant_id=current_tenant_id(), url=f'/uploads/{safe}').first()
             if material:
                 from routes.materials import _can_access_material
                 if not _can_access_material(user, material):

@@ -74,10 +74,17 @@ Referências: docs/02-ARQUITETURA.md §4–5 · docs/01-PRD.md TEN-01..05.
   study_sessions, user_trails, onboarding_answers (migrações 0006–0008;
   onboarding_answers.user_id vira unique por tenant). 18 endpoints movidos
   para TENANT_SCOPED no registry.
-- Pendente: grupo 3 (conteúdo: trilhas, cursos, módulos, materiais, quiz,
-  perguntas, notificações/avisos).
+- **Grupo 3 (conteúdo) MIGRADO — TEN-01 completo:** categories, courses,
+  modules, materials, quiz, questions, trails, trail_courses, tutor_courses,
+  announcements, notifications, announcement_dismissals (migrações
+  0009–0011; categories.name vira unique por tenant). Helpers
+  `get_scoped()`/`get_scoped_or_404()` substituem os gets por PK (recurso de
+  outro tenant → 404, nunca 403). ~160 queries escopadas no total.
+- Fora do escopo de tenant (com justificativa no registry): users (global
+  por design — papéis por tenant na Fase 4), PlatformConfig/Level (config
+  global legada, DEBITOS #1).
 
 ## Próximos passos no módulo
 
-- Fase 3 grupos 2 e 3: progresso e conteúdo (mesmo padrão do grupo 1).
+- Etapa 3.4: auditoria de queries órfãs (docs/AUDITORIA-QUERIES.md).
 - Fase 4: RLS + claims de tenant no JWT; cache do middleware migra p/ Redis.

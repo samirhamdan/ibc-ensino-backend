@@ -55,6 +55,63 @@ TENANT_SCOPED = {
     'aluno.save_study_time': 'test_progress_isolation.py::test_progresso_de_aula_nao_desbloqueia_em_outro_tenant',
     'aluno.stats': 'test_progress_isolation.py::test_progresso_de_aula_nao_desbloqueia_em_outro_tenant',
     'aluno.continue_learning': 'test_progress_isolation.py::test_progresso_de_aula_nao_desbloqueia_em_outro_tenant',
+    # grupo 3 — conteúdo (Fase 3, fecha TEN-01)
+    'courses.list_courses': 'test_content_isolation.py::test_catalogo_por_tenant',
+    'courses.get_course': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'courses.create_course': 'test_content_isolation.py::test_catalogo_por_tenant',
+    'courses.update_course': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'courses.delete_course': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'courses.add_module': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'courses.delete_module': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'courses.add_material': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'courses.delete_material': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'courses.list_categories': 'test_content_isolation.py::test_catalogo_por_tenant',
+    'courses.admin_list_courses': 'test_content_isolation.py::test_catalogo_por_tenant',
+    'courses.admin_get_lessons': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'courses.admin_update_lesson': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'courses.admin_delete_lesson': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'courses.admin_reorder_lessons': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'courses.admin_update_exercise': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'courses.admin_add_material': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'courses.admin_delete_material': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'lessons.update_module_video': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'materials.get_material': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'materials.serve_material_file': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'materials.upload_material': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'trails.list_trails': 'test_content_isolation.py::test_trilhas_por_tenant',
+    'trails.admin_list_trails': 'test_content_isolation.py::test_trilhas_por_tenant',
+    'trails.create_trail': 'test_content_isolation.py::test_trilhas_por_tenant',
+    'trails.admin_update_trail': 'test_content_isolation.py::test_trilhas_por_tenant',
+    'trails.admin_add_course_to_trail': 'test_content_isolation.py::test_trilhas_por_tenant',
+    'trails.admin_remove_course_from_trail': 'test_content_isolation.py::test_trilhas_por_tenant',
+    'trails.admin_reorder_trail_courses': 'test_content_isolation.py::test_trilhas_por_tenant',
+    'trails.admin_available_courses_for_trail': 'test_content_isolation.py::test_trilhas_por_tenant',
+    'questions.list_questions': 'test_content_isolation.py::test_perguntas_por_tenant',
+    'questions.ask_question': 'test_content_isolation.py::test_perguntas_por_tenant',
+    'questions.answer_question': 'test_content_isolation.py::test_perguntas_por_tenant',
+    'questions.my_questions': 'test_content_isolation.py::test_perguntas_por_tenant',
+    'questions.tutor_dashboard': 'test_content_isolation.py::test_perguntas_por_tenant',
+    'aluno.my_questions_with_status': 'test_content_isolation.py::test_perguntas_por_tenant',
+    'aluno.resolve_question': 'test_content_isolation.py::test_perguntas_por_tenant',
+    'notifications.list_notifications': 'test_content_isolation.py::test_notificacoes_por_tenant',
+    'notifications.mark_notification_read': 'test_content_isolation.py::test_notificacoes_por_tenant',
+    'notifications.mark_all_notifications_read': 'test_content_isolation.py::test_notificacoes_por_tenant',
+    'notifications.list_active_announcements': 'test_content_isolation.py::test_avisos_ativos_por_tenant',
+    'notifications.dismiss_announcement': 'test_content_isolation.py::test_avisos_ativos_por_tenant',
+    'admin.create_announcement': 'test_content_isolation.py::test_avisos_ativos_por_tenant',
+    'admin.list_announcements': 'test_content_isolation.py::test_avisos_ativos_por_tenant',
+    'admin.delete_announcement': 'test_content_isolation.py::test_avisos_ativos_por_tenant',
+    'admin.list_courses_simple': 'test_content_isolation.py::test_catalogo_por_tenant',
+    'admin.toggle_course_status': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'admin.duplicate_course': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'admin.assign_course_to_tutor': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'admin.unassign_course_from_tutor': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'admin.list_unassigned_questions': 'test_content_isolation.py::test_perguntas_por_tenant',
+    'admin.assign_question': 'test_content_isolation.py::test_perguntas_por_tenant',
+    'dashboards.aluno_dashboard': 'test_content_isolation.py::test_catalogo_por_tenant',
+    'dashboards.aluno_externo_dashboard': 'test_content_isolation.py::test_catalogo_por_tenant',
+    'dashboards.tutor_dashboard': 'test_content_isolation.py::test_catalogo_por_tenant',
+    'dashboards.admin_dashboard': 'test_content_isolation.py::test_catalogo_por_tenant',
 }
 
 # ── Infra pública (sem dado de domínio) ──────────────────────────────────
@@ -69,40 +126,11 @@ PUBLIC_INFRA = {
     'serve_upload',        # dado de curso, mas o controle é por material (Fase 3)
 }
 
-# ── Legado pré-tenancy (Fase 3 migra grupo a grupo) ──────────────────────
+# ── Legado com justificativa (não migra na Fase 3) ───────────────────────
 LEGACY_PRE_TENANCY = {
-    # admin
-    'admin.admin_reset_user_password',
-    'admin.assign_course_to_tutor',
-    'admin.assign_question',
-    'admin.bulk_action_users',
-    'admin.change_user_active_trail',
-    'admin.create_announcement',
-    'admin.delete_announcement',
-    'admin.duplicate_course',
-    'admin.get_admin_config',
-    'admin.get_user_profile',
-    'admin.invite_user',
-    'admin.list_announcements',
-    'admin.list_courses_simple',
-    'admin.list_levels',
-    'admin.list_tutors',
-    'admin.list_unassigned_questions',
-    'admin.list_users',
-    'admin.replace_levels',
-    'admin.reset_user_progress',
-    'admin.send_user_message',
-    'admin.toggle_course_status',
-    'admin.toggle_user_active',
-    'admin.unassign_course_from_tutor',
-    'admin.update_admin_config',
-    'admin.update_user',
-    # aluno
-    'aluno.my_questions_with_status',
-    'aluno.resolve_question',
-    # (raiz)
-    'api_user',
-    # auth
+    # users é GLOBAL por design (doc 02 §4: papéis por tenant vivem em
+    # tenant_users) — endpoints de identidade/gestão de usuário viram
+    # tenant-aware na Fase 4 (AUTH-01/AUTH-03, JWT com claims de tenant)
     'auth.change_password',
     'auth.delete_user',
     'auth.forgot_password',
@@ -115,65 +143,29 @@ LEGACY_PRE_TENANCY = {
     'auth.reset_password_token',
     'auth.signup',
     'auth.update_profile',
-    # certificates
-    # courses
-    'courses.add_material',
-    'courses.add_module',
-    'courses.admin_add_material',
-    'courses.admin_delete_lesson',
-    'courses.admin_delete_material',
-    'courses.admin_get_lessons',
-    'courses.admin_list_courses',
-    'courses.admin_reorder_lessons',
-    'courses.admin_update_exercise',
-    'courses.admin_update_lesson',
-    'courses.create_course',
-    'courses.delete_course',
-    'courses.delete_material',
-    'courses.delete_module',
-    'courses.get_course',
-    'courses.list_categories',
-    'courses.list_courses',
-    'courses.update_course',
-    # dashboards
-    'dashboards.admin_dashboard',
-    'dashboards.aluno_dashboard',
-    'dashboards.aluno_externo_dashboard',
-    'dashboards.tutor_dashboard',
-    # gamification
-    # lessons
-    'lessons.update_module_video',
-    # materials
-    'materials.get_material',
-    'materials.serve_material_file',
-    'materials.upload_material',
-    # notifications
-    'notifications.dismiss_announcement',
-    'notifications.get_gamification_config',
+    'api_user',
+    'admin.list_users',
+    'admin.update_user',
+    'admin.get_user_profile',
+    'admin.admin_reset_user_password',
+    'admin.reset_user_progress',
+    'admin.toggle_user_active',
+    'admin.invite_user',
+    'admin.bulk_action_users',
+    'admin.send_user_message',
+    'admin.change_user_active_trail',
+    'admin.list_tutors',
+    # PlatformConfig e Level são config GLOBAL legada (docs/DEBITOS.md #1) —
+    # decisão pendente de consolidação dos sistemas de nível
+    'admin.list_levels',
+    'admin.replace_levels',
+    'admin.get_admin_config',
+    'admin.update_admin_config',
     'notifications.get_public_config',
-    'notifications.list_active_announcements',
-    'notifications.list_notifications',
-    'notifications.mark_all_notifications_read',
-    'notifications.mark_notification_read',
-    # onboarding — status lê a flag GLOBAL User.onboarding_completed
-    # (design atual; ver docs/DEBITOS.md #14) — vira per-tenant na Fase 4
+    'notifications.get_gamification_config',
+    # flag global User.onboarding_completed (docs/DEBITOS.md #14)
     'onboarding.onboarding_status',
-    # progress
-    # questions
-    'questions.answer_question',
-    'questions.ask_question',
-    'questions.list_questions',
-    'questions.my_questions',
-    'questions.tutor_dashboard',
-    # trails
-    'trails.admin_add_course_to_trail',
-    'trails.admin_available_courses_for_trail',
-    'trails.admin_list_trails',
-    'trails.admin_remove_course_from_trail',
-    'trails.admin_reorder_trail_courses',
-    'trails.admin_update_trail',
-    'trails.create_trail',
-    'trails.list_trails',
-    # (raiz)
+    # upload bruto de arquivo (sem linha de domínio; o REGISTRO do material é
+    # tenant-scoped e o serve verifica acesso via material)
     'upload_file',
 }

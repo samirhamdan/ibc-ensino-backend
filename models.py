@@ -9,12 +9,16 @@ import bcrypt
 import secrets
 
 
-class Category(db.Model):
+class Category(TenantScopedModel, db.Model):
     __tablename__ = 'categories'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
+    # name único POR TENANT (cada tenant tem suas categorias)
+    name = db.Column(db.String(100), nullable=False)
     courses = db.relationship('Course', backref='category_rel', lazy=True)
+
+    __table_args__ = (db.UniqueConstraint('tenant_id', 'name', name='uq_categories_tenant_name'),
+                      db.Index('ix_categories_tenant_id_id', 'tenant_id', 'id'))
 
     def to_dict(self):
         return {'id': self.id, 'name': self.name}
@@ -69,7 +73,7 @@ class User(db.Model):
         }
 
 
-class Course(db.Model):
+class Course(TenantScopedModel, db.Model):
     __tablename__ = 'courses'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -119,7 +123,7 @@ class Course(db.Model):
         return data
 
 
-class Module(db.Model):
+class Module(TenantScopedModel, db.Model):
     __tablename__ = 'modules'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -141,7 +145,7 @@ class Module(db.Model):
         }
 
 
-class Material(db.Model):
+class Material(TenantScopedModel, db.Model):
     __tablename__ = 'materials'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -158,7 +162,7 @@ class Material(db.Model):
                 'module_id': self.module_id, 'original_name': self.original_name}
 
 
-class Quiz(db.Model):
+class Quiz(TenantScopedModel, db.Model):
     __tablename__ = 'quiz'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -272,7 +276,7 @@ class Progress(TenantScopedModel, db.Model):
         }
 
 
-class TutorCourse(db.Model):
+class TutorCourse(TenantScopedModel, db.Model):
     __tablename__ = 'tutor_courses'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -284,10 +288,12 @@ class TutorCourse(db.Model):
     course = db.relationship('Course', foreign_keys=[course_id],
                              backref=db.backref('tutor_links', lazy=True, cascade='all, delete-orphan'))
 
-    __table_args__ = (db.UniqueConstraint('tutor_id', 'course_id', name='uq_tutor_course'),)
+    # __table_args__ próprio sobrepõe o do mixin → índice composto manual
+    __table_args__ = (db.UniqueConstraint('tutor_id', 'course_id', name='uq_tutor_course'),
+                      db.Index('ix_tutor_courses_tenant_id_id', 'tenant_id', 'id'))
 
 
-class Question(db.Model):
+class Question(TenantScopedModel, db.Model):
     __tablename__ = 'questions'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -383,7 +389,7 @@ class UserBadge(TenantScopedModel, db.Model):
                       db.Index('ix_user_badge_tenant_id_id', 'tenant_id', 'id'))
 
 
-class Trail(db.Model):
+class Trail(TenantScopedModel, db.Model):
     __tablename__ = 'trails'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -415,7 +421,7 @@ class Trail(db.Model):
         return data
 
 
-class TrailCourse(db.Model):
+class TrailCourse(TenantScopedModel, db.Model):
     __tablename__ = 'trail_courses'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -534,7 +540,7 @@ class Certificate(TenantScopedModel, db.Model):
         }
 
 
-class Announcement(db.Model):
+class Announcement(TenantScopedModel, db.Model):
     __tablename__ = 'announcements'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -563,7 +569,7 @@ class Announcement(db.Model):
         }
 
 
-class Notification(db.Model):
+class Notification(TenantScopedModel, db.Model):
     __tablename__ = 'notifications'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -594,7 +600,7 @@ class Notification(db.Model):
         }
 
 
-class AnnouncementDismissal(db.Model):
+class AnnouncementDismissal(TenantScopedModel, db.Model):
     __tablename__ = 'announcement_dismissals'
 
     id = db.Column(db.Integer, primary_key=True)

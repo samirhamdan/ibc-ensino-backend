@@ -3,7 +3,7 @@ Course routes: CRUD for courses, modules, materials
 """
 from flask import Blueprint, request, jsonify, session
 from extensions import db
-from core.tenancy import current_tenant_id
+from core.tenancy import current_tenant_id, get_scoped, get_scoped_or_404
 from models import Course, Module, Material, Quiz, Category, User
 
 courses_bp = Blueprint('courses', __name__)
@@ -41,13 +41,13 @@ def _can_edit_course(user, course):
 @courses_bp.route('', methods=['GET'])
 def list_courses():
     user = _current_user()
-    query = Course.query
+    query = Course.query.filter_by(tenant_id=current_tenant_id())
     if not user or user.role not in ('admin', 'tutor'):
         query = query.filter_by(status='published')
 
     category = request.args.get('category')
     if category:
-        cat = Category.query.filter_by(name=category).first()
+        cat = Category.query.filter_by(tenant_id=current_tenant_id(), name=category).first()
         if cat:
             query = query.filter_by(category_id=cat.id)
 
@@ -58,7 +58,7 @@ def list_courses():
 @courses_bp.route('/<int:course_id>', methods=['GET'])
 def get_course(course_id):
     user = _current_user()
-    course = Course.query.get_or_404(course_id)
+    course = get_scoped_or_404(Course, course_id)
 
     is_staff = bool(user and user.role in ('admin', 'tutor'))
     if not is_staff:
@@ -85,7 +85,7 @@ def create_course():
     category_id = None
     cat_name = (data.get('category') or '').strip()
     if cat_name:
-        cat = Category.query.filter_by(name=cat_name).first()
+        cat = Category.query.filter_by(tenant_id=current_tenant_id(), name=cat_name).first()
         if not cat:
             cat = Category(name=cat_name)
             db.session.add(cat)
@@ -112,7 +112,7 @@ def update_course(course_id):
     if err:
         return err
 
-    course = Course.query.get_or_404(course_id)
+    course = get_scoped_or_404(Course, course_id)
 
     if not _can_edit_course(user, course):
         return jsonify({'error': 'Acesso negado'}), 403
@@ -126,7 +126,7 @@ def update_course(course_id):
     if 'category' in data:
         cat_name = (data['category'] or '').strip()
         if cat_name:
-            cat = Category.query.filter_by(name=cat_name).first()
+            cat = Category.query.filter_by(tenant_id=current_tenant_id(), name=cat_name).first()
             if not cat:
                 cat = Category(name=cat_name)
                 db.session.add(cat)
@@ -148,7 +148,7 @@ def delete_course(course_id):
     if err:
         return err
 
-    course = Course.query.get_or_404(course_id)
+    course = get_scoped_or_404(Course, course_id)
     db.session.delete(course)
     db.session.commit()
     return jsonify({'message': 'Curso removido'}), 200
@@ -162,7 +162,7 @@ def add_module(course_id):
     if err:
         return err
 
-    course = Course.query.get_or_404(course_id)
+    course = get_scoped_or_404(Course, course_id)
     if not _can_edit_course(user, course):
         return jsonify({'error': 'Acesso negado'}), 403
 
@@ -171,7 +171,7 @@ def add_module(course_id):
     if not nome:
         return jsonify({'error': 'nome é obrigatório'}), 400
 
-    position = Module.query.filter_by(course_id=course_id).count()
+    position = Module.query.filter_by(tenant_id=current_tenant_id(), course_id=course_id).count()
     module = Module(course_id=course_id, nome=nome, dur=data.get('dur', ''), position=position)
     db.session.add(module)
     db.session.commit()
@@ -184,11 +184,11 @@ def delete_module(course_id, module_id):
     if err:
         return err
 
-    course = Course.query.get_or_404(course_id)
+    course = get_scoped_or_404(Course, course_id)
     if not _can_edit_course(user, course):
         return jsonify({'error': 'Acesso negado'}), 403
 
-    module = Module.query.filter_by(id=module_id, course_id=course_id).first_or_404()
+    module = Module.query.filter_by(tenant_id=current_tenant_id(), id=module_id, course_id=course_id).first_or_404()
     db.session.delete(module)
     db.session.commit()
     return jsonify({'message': 'Módulo removido'}), 200
@@ -202,7 +202,7 @@ def add_material(course_id):
     if err:
         return err
 
-    course = Course.query.get_or_404(course_id)
+    course = get_scoped_or_404(Course, course_id)
     if not _can_edit_course(user, course):
         return jsonify({'error': 'Acesso negado'}), 403
 
@@ -230,11 +230,11 @@ def delete_material(course_id, mat_id):
     if err:
         return err
 
-    course = Course.query.get_or_404(course_id)
+    course = get_scoped_or_404(Course, course_id)
     if not _can_edit_course(user, course):
         return jsonify({'error': 'Acesso negado'}), 403
 
-    mat = Material.query.filter_by(id=mat_id, course_id=course_id).first_or_404()
+    mat = Material.query.filter_by(tenant_id=current_tenant_id(), id=mat_id, course_id=course_id).first_or_404()
     db.session.delete(mat)
     db.session.commit()
     return jsonify({'message': 'Material removido'}), 200
@@ -244,7 +244,7 @@ def delete_material(course_id, mat_id):
 
 @courses_bp.route('/categories', methods=['GET'])
 def list_categories():
-    cats = Category.query.all()
+    cats = Category.query.filter_by(tenant_id=current_tenant_id()).all()
     return jsonify([c.to_dict() for c in cats]), 200
 
 
@@ -264,7 +264,7 @@ def admin_list_courses():
     user, err = _course_admin_required()
     if err: return err
     from models import TrailCourse, Trail, Progress
-    courses = Course.query.all()
+    courses = Course.query.filter_by(tenant_id=current_tenant_id()).all()
     result = []
     for c in courses:
         modules = c.modules
@@ -282,10 +282,10 @@ def admin_list_courses():
                 passed = Progress.query.filter_by(course_id=c.id, user_id=uid2, passed=True, tenant_id=current_tenant_id()).count()
                 user_pcts.append(round(passed / total_lessons * 100))
             avg_progress = round(sum(user_pcts) / len(user_pcts)) if user_pcts else 0
-        tc = TrailCourse.query.filter_by(course_id=c.id).first()
+        tc = TrailCourse.query.filter_by(tenant_id=current_tenant_id(), course_id=c.id).first()
         trail_name = None
         if tc:
-            t = Trail.query.get(tc.trail_id)
+            t = get_scoped(Trail, tc.trail_id)
             trail_name = t.name if t else None
         result.append({
             'id': c.id, 'name': c.name,
@@ -305,10 +305,10 @@ def admin_list_courses():
 def admin_get_lessons(course_id):
     user, err = _course_admin_required()
     if err: return err
-    modules = Module.query.filter_by(course_id=course_id).order_by(Module.position).all()
+    modules = Module.query.filter_by(tenant_id=current_tenant_id(), course_id=course_id).order_by(Module.position).all()
     result = []
     for m in modules:
-        quiz = Quiz.query.filter_by(module_id=m.id).first()
+        quiz = Quiz.query.filter_by(tenant_id=current_tenant_id(), module_id=m.id).first()
         exercise = None
         if quiz:
             exercise = {'id': quiz.id, 'question': quiz.q, 'options': quiz.opts or [], 'correct_index': quiz.ans or 0}
@@ -328,7 +328,7 @@ def admin_reorder_lessons(course_id):
     data = request.get_json() or {}
     lesson_ids = data.get('lesson_ids', [])
     for idx, lid in enumerate(lesson_ids, 1):
-        m = Module.query.get(lid)
+        m = get_scoped(Module, lid)
         if m and m.course_id == course_id:
             m.position = idx
     db.session.commit()
@@ -338,7 +338,7 @@ def admin_reorder_lessons(course_id):
 def admin_update_lesson(lesson_id):
     user, err = _course_admin_required()
     if err: return err
-    m = Module.query.get_or_404(lesson_id)
+    m = get_scoped_or_404(Module, lesson_id)
     data = request.get_json() or {}
     if 'nome' in data: m.nome = data['nome']
     if 'dur' in data: m.dur = data['dur']
@@ -356,7 +356,7 @@ def admin_update_lesson(lesson_id):
 def admin_add_material(lesson_id):
     user, err = _course_admin_required()
     if err: return err
-    m = Module.query.get_or_404(lesson_id)
+    m = get_scoped_or_404(Module, lesson_id)
     data = request.get_json() or {}
     mat = Material(course_id=m.course_id, module_id=m.id,
                    name=data.get('name', 'Material'),
@@ -370,7 +370,7 @@ def admin_add_material(lesson_id):
 def admin_delete_material(material_id):
     user, err = _course_admin_required()
     if err: return err
-    mat = Material.query.get_or_404(material_id)
+    mat = get_scoped_or_404(Material, material_id)
     db.session.delete(mat)
     db.session.commit()
     return jsonify({'success': True})
@@ -379,9 +379,9 @@ def admin_delete_material(material_id):
 def admin_update_exercise(lesson_id):
     user, err = _course_admin_required()
     if err: return err
-    m = Module.query.get_or_404(lesson_id)
+    m = get_scoped_or_404(Module, lesson_id)
     data = request.get_json() or {}
-    quiz = Quiz.query.filter_by(module_id=m.id).first()
+    quiz = Quiz.query.filter_by(tenant_id=current_tenant_id(), module_id=m.id).first()
     if not quiz:
         quiz = Quiz(course_id=m.course_id, module_id=m.id,
                     q=data.get('question', ''), opts=data.get('options', []), ans=data.get('correct_index', 0))
@@ -397,7 +397,7 @@ def admin_update_exercise(lesson_id):
 def admin_delete_lesson(lesson_id):
     user, err = _course_admin_required()
     if err: return err
-    m = Module.query.get_or_404(lesson_id)
+    m = get_scoped_or_404(Module, lesson_id)
     db.session.delete(m)  # cascade deletes materials, quiz, progress
     db.session.commit()
     return jsonify({'success': True})
