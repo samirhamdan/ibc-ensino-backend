@@ -22,7 +22,10 @@ config = context.config
 
 basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 default_url = f"sqlite:///{os.path.join(basedir, 'instance', 'ibc_ensino.db')}"
-url = os.getenv('DATABASE_URL', default_url)
+# Migrações usam role PRIVILEGIADA (BYPASSRLS) quando configurada — com
+# FORCE RLS ativo, rodar migração como role de app atualizaria 0 linhas
+# silenciosamente (docs/RUNBOOK-RLS.md).
+url = os.getenv('ALEMBIC_DATABASE_URL') or os.getenv('DATABASE_URL', default_url)
 if url.startswith('postgres://'):
     url = url.replace('postgres://', 'postgresql://', 1)
 config.set_main_option('sqlalchemy.url', url)

@@ -84,7 +84,23 @@ Referências: docs/02-ARQUITETURA.md §4–5 · docs/01-PRD.md TEN-01..05.
   por design — papéis por tenant na Fase 4), PlatformConfig/Level (config
   global legada, DEBITOS #1).
 
+## RLS — defesa em profundidade (Etapa 4.1)
+
+- Migração 0012: ENABLE + FORCE ROW LEVEL SECURITY + política
+  `tenant_isolation` em TODAS as 25 tabelas com tenant_id (PostgreSQL;
+  no-op com aviso em SQLite). Fail-closed: sem `app.tenant_id`, zero linhas.
+- `core/tenancy/rls.py`: SET LOCAL `app.tenant_id` por transação (listener
+  de Session; `set_config(..., true)` parametrizado — nunca SET de sessão).
+- Migrações usam `ALEMBIC_DATABASE_URL` (role privilegiada) — com FORCE
+  RLS, migração como role de app atualizaria 0 linhas.
+- **Ativação em produção é operacional**: docs/RUNBOOK-RLS.md (criar role
+  `ibc_app` sem BYPASSRLS e trocar a DATABASE_URL do serviço). Até lá o
+  RLS é inócuo (superuser bypassa).
+- Prova em CI: tests/test_rls.py — query SEM filtro de aplicação não lê
+  nem escreve outro tenant; sem GUC → zero linhas; superuser bypassa (por
+  isso a role importa).
+
 ## Próximos passos no módulo
 
-- Etapa 3.4: auditoria de queries órfãs (docs/AUDITORIA-QUERIES.md).
-- Fase 4: RLS + claims de tenant no JWT; cache do middleware migra p/ Redis.
+- Etapa 4.2: JWT com claims de tenant; papéis migram para tenant_users.
+- Etapa 4.3: Redis (cache de tenant, rate limiting, base para RQ).

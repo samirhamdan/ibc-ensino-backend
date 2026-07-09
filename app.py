@@ -117,6 +117,12 @@ def create_app(config_name='development'):
         # configurado, nada muda para os hosts atuais (Railway/localhost);
         # o override X-Tenant-Slug só existe fora de produção.
         init_tenant_middleware(app, allow_header_override=not is_production)
+
+        # Etapa 4.1: SET LOCAL app.tenant_id por transação (RLS — doc 02 §5.3).
+        # Inócuo em SQLite e enquanto a app conectar com role BYPASSRLS;
+        # vira defesa real após o runbook docs/RUNBOOK-RLS.md.
+        from core.tenancy.rls import init_rls
+        init_rls()
         
         # Criar tabelas
         db.create_all()
