@@ -31,9 +31,20 @@ Referências: docs/02-ARQUITETURA.md §4–5 · docs/01-PRD.md TEN-01..05.
 
 `seed.py::seed_tenants()` cria os tenants `ibc` e `demo` (idempotente).
 
+## Middleware de resolução (Etapa 2.2 — TEN-02)
+
+- `init_tenant_middleware(app)` registra o `before_request`: subdomínio sob
+  `TENANT_BASE_DOMAIN` → `g.tenant` (um `TenantContext`, snapshot leve — não
+  objeto ORM); inexistente → **404 institucional**; suspenso → **403
+  explicativo** (TEN-04). Hosts fora do domínio-base (Railway/localhost)
+  seguem SEM tenant — paridade total com a produção atual até a Fase 6.
+- Cache em memória com TTL 60s (`clear_tenant_cache()` invalida; Redis entra
+  na Fase 4). O TTL satisfaz o aceite "suspensão vale em <60s".
+- Dev/teste: header `X-Tenant-Slug` como override (desligado em produção).
+- `GET /api/tenant/current` devolve o tenant do contexto (404 fora dele) —
+  é como o frontend aplicará o tema do tenant (TEN-03).
+
 ## Próximos passos no módulo
 
-- Etapa 2.2: middleware de resolução por subdomínio (cache TTL em dict;
-  Redis na Fase 4) + header `X-Tenant-Slug` como override de dev.
 - Etapa 2.3: suíte `tests/isolation/` (doc 02 §5.4) — required no CI.
-- Fase 4: RLS + claims de tenant no JWT.
+- Fase 4: RLS + claims de tenant no JWT; cache do middleware migra p/ Redis.

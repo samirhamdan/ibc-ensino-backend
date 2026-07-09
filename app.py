@@ -110,7 +110,12 @@ def create_app(config_name='development'):
         # Tenancy (Release 0.9): tabelas gerenciadas por Alembic; registrar os
         # models aqui faz o create_all de dev/teste criá-las também (pula as
         # existentes) até o schema legado ser baselineado na Fase 3.
-        from core.tenancy import Tenant, TenantUser
+        from core.tenancy import Tenant, TenantUser, init_tenant_middleware
+
+        # TEN-02: resolução de tenant por subdomínio. Sem TENANT_BASE_DOMAIN
+        # configurado, nada muda para os hosts atuais (Railway/localhost);
+        # o override X-Tenant-Slug só existe fora de produção.
+        init_tenant_middleware(app, allow_header_override=not is_production)
         
         # Criar tabelas
         db.create_all()
