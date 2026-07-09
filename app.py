@@ -107,6 +107,10 @@ def create_app(config_name='development'):
     with app.app_context():
         # Importar modelos
         from models import User, Course, Material, Module, Quiz, Progress, Question, Category, Trail, TrailCourse, UserTrail, OnboardingAnswer, Certificate, Announcement, Notification, AnnouncementDismissal, PlatformConfig, Level, Achievement, UserAchievement, StudySession, ActivityFeed
+        # Tenancy (Release 0.9): tabelas gerenciadas por Alembic; registrar os
+        # models aqui faz o create_all de dev/teste criá-las também (pula as
+        # existentes) até o schema legado ser baselineado na Fase 3.
+        from core.tenancy import Tenant, TenantUser
         
         # Criar tabelas
         db.create_all()

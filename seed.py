@@ -100,6 +100,17 @@ def seed_achievements():
     print("Conquistas (achievements) verificadas/criadas.")
 
 
+def seed_tenants():
+    """TEN-01 (Fase 2): tenants de desenvolvimento ibc e demo. Idempotente."""
+    from core.tenancy import Tenant
+    for slug, nome, sub in (('ibc', 'IBC Ensino', 'ibc'), ('demo', 'Tenant Demo', 'demo')):
+        if not Tenant.query.filter_by(slug=slug).first():
+            db.session.add(Tenant(slug=slug, nome=nome, subdominio=sub,
+                                  tema_json={'cor_primaria': '#008ea8'}))
+    db.session.commit()
+    print("Tenants de desenvolvimento verificados/criados (ibc, demo).")
+
+
 def seed():
     app = create_app()
     with app.app_context():
@@ -108,6 +119,7 @@ def seed():
         seed_config()
         seed_levels()
         seed_achievements()
+        seed_tenants()
 
         if User.query.first():
             print("Database already seeded — skipping.")
