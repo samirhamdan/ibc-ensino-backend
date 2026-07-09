@@ -1,0 +1,115 @@
+# CI — Fase 1, Etapa 1.2 do playbook (docs/PLAYBOOK-MIGRACAO-0.9.md)
+#
+# Jobs:
+#   lint             regras críticas apenas (sintaxe/nomes indefinidos) — o
+#                    código legado tem débitos de estilo que a Fase 1 não corrige
+#   test             suíte de caracterização contra Postgres de serviço
+#                    (mesmo engine de produção; local usa SQLite)
+#   migrations       reversibilidade Alembic (upgrade → downgrade → upgrade).
+#                    Hoje NÃO há Alembic (schema via db.create_all) — o job
+#                    detecta a ausência e passa com aviso; vira gate real na
+#                    Fase 2, quando a primeira migração entrar.
+#   isolation-suite  placeholder required (doc 02 §5.4) — passa vazio até a
+#                    Fase 2 implementar tests/isolation/. Marcar como required
+#                    check na proteção de branch do GitHub (main e
+#                    release/0.9-tenancy).
+
+name: CI
+
+on:
+  push:
+    branches: [main, 'release/**', 'feat/**', 'claude/**']
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install ruff
+      # Apenas erros críticos: E9 (sintaxe), F63/F7 (comparações/sintaxe
+      # inválidas), F82 (nome indefinido). Endurecer regra a regra conforme
+      # os débitos de estilo forem pagos.
+      - run: ruff check --select E9,F63,F7,F82 .
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ibc
+          POSTGRES_PASSWORD: ibc
+          POSTGRES_DB: ibc_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ibc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      SECRET_KEY: ci-test-secret
+      TEST_DATABASE_URL: postgresql://ibc:ibc@localhost:5432/ibc_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: python -m pytest
+
+  migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ibc
+          POSTGRES_PASSWORD: ibc
+          POSTGRES_DB: ibc_migrations
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ibc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      SECRET_KEY: ci-test-secret
+      DATABASE_URL: postgresql://ibc:ibc@localhost:5432/ibc_migrations
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Reversibilidade Alembic (upgrade → downgrade → upgrade)
+        run: |
+          if [ ! -d migrations ]; then
+            echo "::warning::Sem Alembic ainda (schema via db.create_all)."
+            echo "Este job vira gate real na Fase 2 — primeira migração de tenancy."
+            exit 0
+          fi
+          pip install alembic
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+
+  isolation-suite:
+    # Placeholder OBRIGATÓRIO (doc 02 §5.4 / NFR-01): configurar como required
+    # check na proteção de branch. Na Fase 2 este job roda tests/isolation/ e
+    # FALHA se um endpoint novo não tiver caso de isolamento registrado.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Suíte de isolamento (placeholder até a Fase 2)
+        run: |
+          if [ -d tests/isolation ]; then
+            echo "::error::tests/isolation/ existe mas este job ainda é placeholder — atualize o CI (Fase 2, Etapa 2.3)."
+            exit 1
+          fi
+          echo "Placeholder verde: suíte de isolamento entra na Fase 2 (Etapa 2.3)."
