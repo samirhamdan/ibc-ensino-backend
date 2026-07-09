@@ -55,7 +55,24 @@ Referências: docs/02-ARQUITETURA.md §4–5 · docs/01-PRD.md TEN-01..05.
 - Na Fase 3, cada grupo de tabelas migradas move seus endpoints de
   LEGACY_PRE_TENANCY para TENANT_SCOPED com casos novos.
 
+## Fase 3 — migração das tabelas de domínio (em andamento)
+
+- **Grupo 1 (gamificação) MIGRADO:** user_points, badge, user_badge,
+  achievements, user_achievements, certificates, activity_feed com tenant_id
+  NOT NULL + FK (migrações 0003–0005, expand → backfill → contract, todas
+  reversíveis). Uniques convertidos para por-tenant: (tenant_id, user_id) em
+  user_points e (tenant_id, code) em badge/achievements.
+- Escritas escopam automaticamente via default do mixin
+  (`current_tenant_id()`); leituras filtram explicitamente em cada query.
+- **Modo mono-tenant:** sem tenant resolvido, `current_tenant_id()` usa o
+  tenant padrão (`DEFAULT_TENANT_SLUG`, default `ibc`) — produção atual segue
+  idêntica até o DNS da Fase 6.
+- Baseline do legado: migração 0002 (checkfirst; downgrade só em ambiente
+  descartável — runbook: produção nunca desce abaixo de 0002).
+- `railway.json`: preDeployCommand roda `alembic upgrade head` antes do seed.
+- Pendentes: grupo 2 (progresso) e grupo 3 (conteúdo).
+
 ## Próximos passos no módulo
 
-- Fase 3: tenant_id nas tabelas de domínio (expand → backfill → contract).
+- Fase 3 grupos 2 e 3: progresso e conteúdo (mesmo padrão do grupo 1).
 - Fase 4: RLS + claims de tenant no JWT; cache do middleware migra p/ Redis.

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, session
 from sqlalchemy.exc import IntegrityError
 from extensions import db
+from core.tenancy import current_tenant_id
 from models import (User, Badge, UserBadge, UserPoints, LessonProgress,
                     Question, Course, Module, Achievement, UserAchievement,
                     UserTrail, Certificate)
@@ -44,7 +45,8 @@ def calculate_level(total_points):
 
 
 def _get_or_create_points(user_id):
-    up = UserPoints.query.filter_by(user_id=user_id).first()
+    tid = current_tenant_id()
+    up = UserPoints.query.filter_by(user_id=user_id, tenant_id=tid).first()
     if not up:
         try:
             with db.session.begin_nested():
@@ -53,14 +55,14 @@ def _get_or_create_points(user_id):
                 db.session.flush()
         except IntegrityError:
             # Corrida: outra requisição concorrente já criou o registro
-            # (UserPoints.user_id é unique). Recarrega o que foi criado.
-            up = UserPoints.query.filter_by(user_id=user_id).first()
+            # (unique (tenant_id, user_id)). Recarrega o que foi criado.
+            up = UserPoints.query.filter_by(user_id=user_id, tenant_id=tid).first()
     return up
 
 
 def unlock_badge(user_id, badge_code):
     """Returns badge dict if newly unlocked, else None"""
-    badge = Badge.query.filter_by(code=badge_code).first()
+    badge = Badge.query.filter_by(code=badge_code, tenant_id=current_tenant_id()).first()
     if not badge:
         return None
     existing = UserBadge.query.filter_by(user_id=user_id, badge_id=badge.id).first()
@@ -133,7 +135,7 @@ def _consecutive_days(user_points):
 
 def check_all_badges(user_id):
     unlocked = []
-    for badge in Badge.query.all():
+    for badge in Badge.query.filter_by(tenant_id=current_tenant_id()).all():
         if UserBadge.query.filter_by(user_id=user_id, badge_id=badge.id).first():
             continue
         current, target = _badge_progress(user_id, badge.code)
@@ -198,12 +200,13 @@ def user_stats():
     up = _get_or_create_points(user.id)
     db.session.commit()
 
-    unlocked_ids = {ub.badge_id for ub in UserBadge.query.filter_by(user_id=user.id).all()}
-    user_badges = {ub.badge_id: ub for ub in UserBadge.query.filter_by(user_id=user.id).all()}
+    tid = current_tenant_id()
+    unlocked_ids = {ub.badge_id for ub in UserBadge.query.filter_by(user_id=user.id, tenant_id=tid).all()}
+    user_badges = {ub.badge_id: ub for ub in UserBadge.query.filter_by(user_id=user.id, tenant_id=tid).all()}
 
     badges_unlocked = []
     badges_locked = []
-    for badge in Badge.query.all():
+    for badge in Badge.query.filter_by(tenant_id=tid).all():
         if badge.id in unlocked_ids:
             ub = user_badges[badge.id]
             badges_unlocked.append({
@@ -233,9 +236,10 @@ def list_badges():
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    unlocked = {ub.badge_id: ub for ub in UserBadge.query.filter_by(user_id=user.id).all()}
+    tid = current_tenant_id()
+    unlocked = {ub.badge_id: ub for ub in UserBadge.query.filter_by(user_id=user.id, tenant_id=tid).all()}
     result = []
-    for badge in Badge.query.all():
+    for badge in Badge.query.filter_by(tenant_id=tid).all():
         d = badge.to_dict()
         if badge.id in unlocked:
             d['unlocked'] = True
@@ -293,7 +297,7 @@ def get_questions_count(user_id):
 
 
 def get_certificates_count(user_id):
-    return Certificate.query.filter_by(user_id=user_id).count()
+    return Certificate.query.filter_by(user_id=user_id, tenant_id=current_tenant_id()).count()
 
 
 def _achievement_progress_value(user_id, criteria_type):
@@ -308,7 +312,7 @@ def _achievement_progress_value(user_id, criteria_type):
     if criteria_type == 'certificates_earned':
         return get_certificates_count(user_id)
     if criteria_type == 'points_total':
-        up = UserPoints.query.filter_by(user_id=user_id).first()
+        up = UserPoints.query.filter_by(user_id=user_id, tenant_id=current_tenant_id()).first()
         return up.total_points if up else 0
     return 0
 
@@ -317,10 +321,11 @@ def check_and_grant_achievements(user_id):
     """Checks all Achievement rows not yet earned by the user; grants any
     whose criteria is now met (creating UserAchievement + awarding points).
     Returns a list of newly granted Achievement dicts (for popup display)."""
-    earned_ids = {ua.achievement_id for ua in UserAchievement.query.filter_by(user_id=user_id).all()}
+    tid = current_tenant_id()
+    earned_ids = {ua.achievement_id for ua in UserAchievement.query.filter_by(user_id=user_id, tenant_id=tid).all()}
     newly_granted = []
 
-    for ach in Achievement.query.all():
+    for ach in Achievement.query.filter_by(tenant_id=tid).all():
         if ach.id in earned_ids:
             continue
         current = _achievement_progress_value(user_id, ach.criteria_type)

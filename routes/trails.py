@@ -3,6 +3,7 @@ Trails + Onboarding endpoints
 """
 from flask import Blueprint, jsonify, session, request
 from extensions import db
+from core.tenancy import current_tenant_id
 from models import Trail, TrailCourse, UserTrail, OnboardingAnswer, User, UserPoints, Badge, UserBadge, Module, LessonProgress
 
 trails_bp = Blueprint('trails', __name__)
@@ -22,7 +23,7 @@ def _current_user():
 
 
 def _add_xp(user_id, points):
-    up = UserPoints.query.filter_by(user_id=user_id).first()
+    up = UserPoints.query.filter_by(user_id=user_id, tenant_id=current_tenant_id()).first()
     if not up:
         up = UserPoints(user_id=user_id, total_points=0, current_level=1, points_in_level=0)
         db.session.add(up)
@@ -35,7 +36,7 @@ def _add_xp(user_id, points):
 
 
 def _award_badge(user_id, code):
-    badge = Badge.query.filter_by(code=code).first()
+    badge = Badge.query.filter_by(code=code, tenant_id=current_tenant_id()).first()
     if not badge:
         return None
     existing = UserBadge.query.filter_by(user_id=user_id, badge_id=badge.id).first()

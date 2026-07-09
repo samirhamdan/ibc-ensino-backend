@@ -12,7 +12,7 @@ import os
 
 from app import create_app, db
 from models import User, Category
-from seed import seed_config, seed_levels, seed_achievements, seed_badges
+from seed import seed_config, seed_levels, seed_achievements, seed_badges, seed_tenants
 
 DEFAULT_CATEGORIES = ['Teologia', 'Crescimento', 'Bíblia']
 
@@ -51,6 +51,7 @@ def main():
     with app.app_context():
         db.create_all()
 
+        seed_tenants()   # PRIMEIRO: badges/achievements são por tenant
         seed_config()
         seed_levels()
         seed_badges()

@@ -63,12 +63,17 @@ BADGES = [
 
 
 def seed_badges():
-    for code, name, desc, icon, rarity in BADGES:
-        if Badge.query.filter_by(code=code).first():
-            continue
-        db.session.add(Badge(code=code, name=name, description=desc, icon=icon, rarity=rarity))
+    """Catálogo de badges POR TENANT (GAM-01: gamificação por tenant).
+    Requer seed_tenants() antes. Idempotente por (tenant, code)."""
+    from core.tenancy import Tenant
+    for tenant in Tenant.query.all():
+        for code, name, desc, icon, rarity in BADGES:
+            if Badge.query.filter_by(code=code, tenant_id=tenant.id).first():
+                continue
+            db.session.add(Badge(code=code, name=name, description=desc,
+                                 icon=icon, rarity=rarity, tenant_id=tenant.id))
     db.session.commit()
-    print("Badges verificadas/criadas.")
+    print("Badges verificadas/criadas (por tenant).")
 
 
 ACHIEVEMENTS = [
@@ -88,16 +93,19 @@ ACHIEVEMENTS = [
 
 
 def seed_achievements():
-    for code, name, desc, icon, criteria_type, criteria_value, points_reward in ACHIEVEMENTS:
-        if Achievement.query.filter_by(code=code).first():
-            continue
-        db.session.add(Achievement(
-            code=code, name=name, description=desc, icon=icon,
-            criteria_type=criteria_type, criteria_value=criteria_value,
-            points_reward=points_reward,
-        ))
+    """Catálogo de conquistas POR TENANT. Requer seed_tenants() antes."""
+    from core.tenancy import Tenant
+    for tenant in Tenant.query.all():
+        for code, name, desc, icon, criteria_type, criteria_value, points_reward in ACHIEVEMENTS:
+            if Achievement.query.filter_by(code=code, tenant_id=tenant.id).first():
+                continue
+            db.session.add(Achievement(
+                code=code, name=name, description=desc, icon=icon,
+                criteria_type=criteria_type, criteria_value=criteria_value,
+                points_reward=points_reward, tenant_id=tenant.id,
+            ))
     db.session.commit()
-    print("Conquistas (achievements) verificadas/criadas.")
+    print("Conquistas (achievements) verificadas/criadas (por tenant).")
 
 
 def seed_tenants():
@@ -115,11 +123,11 @@ def seed():
     app = create_app()
     with app.app_context():
         db.create_all()
+        seed_tenants()   # PRIMEIRO: badges/achievements são por tenant
         seed_badges()
         seed_config()
         seed_levels()
         seed_achievements()
-        seed_tenants()
 
         if User.query.first():
             print("Database already seeded — skipping.")

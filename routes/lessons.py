@@ -6,6 +6,7 @@ from flask import Blueprint, request, jsonify, session
 from extensions import db
 from models import Course, Module, LessonProgress, User, UserPoints, Badge, UserBadge, Certificate, ActivityFeed
 from routes.gamification import award_points, check_and_grant_achievements
+from core.tenancy import current_tenant_id
 
 lessons_bp = Blueprint('lessons', __name__)
 
@@ -242,7 +243,7 @@ def submit_aula_quiz(course_id, aula_num):
         all_progs = {p.module_id: p for p in LessonProgress.query.filter_by(user_id=user.id, course_id=course_id).all()}
         all_done = all(all_progs.get(m.id) and all_progs[m.id].passed for m in all_modules)
         if all_done:
-            existing_cert = Certificate.query.filter_by(user_id=user.id, course_id=course_id, cert_type='course').first()
+            existing_cert = Certificate.query.filter_by(user_id=user.id, course_id=course_id, cert_type='course', tenant_id=current_tenant_id()).first()
             if not existing_cert:
                 from routes.certificates import generate_cert_code
                 code = generate_cert_code()

@@ -21,6 +21,21 @@ Classificações:
 # endpoint → teste que prova o isolamento
 TENANT_SCOPED = {
     'tenant_current': 'test_tenant_isolation.py::test_tenant_current_nao_vaza_outro_tenant',
+    # grupo 1 — gamificação (Fase 3)
+    'gamification.user_stats': 'test_gamification_isolation.py::test_pontos_independentes_por_tenant',
+    'gamification.list_badges': 'test_gamification_isolation.py::test_badges_desbloqueados_nao_vazam',
+    'gamification.check_badge_progress': 'test_gamification_isolation.py::test_badges_desbloqueados_nao_vazam',
+    'gamification.add_points': 'test_gamification_isolation.py::test_pontos_independentes_por_tenant',
+    'certificates.my_certificates': 'test_gamification_isolation.py::test_certificados_nao_vazam_entre_tenants',
+    'certificates.issue_certificate': 'test_gamification_isolation.py::test_certificados_nao_vazam_entre_tenants',
+    'dashboards.activity_feed': 'test_gamification_isolation.py::test_mural_de_atividades_por_tenant',
+    'aluno.achievements': 'test_gamification_isolation.py::test_pontos_independentes_por_tenant',
+    'aluno.certificates': 'test_gamification_isolation.py::test_certificados_nao_vazam_entre_tenants',
+    # verify/download por cert_code são lookups globais INTENCIONAIS
+    # (verificação pública por código único não-adivinhável) — ver
+    # routes/certificates.py; classificados aqui com caso do grupo.
+    'certificates.verify_certificate': 'test_gamification_isolation.py::test_certificados_nao_vazam_entre_tenants',
+    'certificates.download_certificate': 'test_gamification_isolation.py::test_certificados_nao_vazam_entre_tenants',
 }
 
 # ── Infra pública (sem dado de domínio) ──────────────────────────────────
@@ -64,8 +79,6 @@ LEGACY_PRE_TENANCY = {
     'admin.update_admin_config',
     'admin.update_user',
     # aluno
-    'aluno.achievements',
-    'aluno.certificates',
     'aluno.continue_learning',
     'aluno.my_questions_with_status',
     'aluno.resolve_question',
@@ -87,10 +100,6 @@ LEGACY_PRE_TENANCY = {
     'auth.signup',
     'auth.update_profile',
     # certificates
-    'certificates.download_certificate',
-    'certificates.issue_certificate',
-    'certificates.my_certificates',
-    'certificates.verify_certificate',
     # courses
     'courses.add_material',
     'courses.add_module',
@@ -111,16 +120,11 @@ LEGACY_PRE_TENANCY = {
     'courses.list_courses',
     'courses.update_course',
     # dashboards
-    'dashboards.activity_feed',
     'dashboards.admin_dashboard',
     'dashboards.aluno_dashboard',
     'dashboards.aluno_externo_dashboard',
     'dashboards.tutor_dashboard',
     # gamification
-    'gamification.add_points',
-    'gamification.check_badge_progress',
-    'gamification.list_badges',
-    'gamification.user_stats',
     # lessons
     'lessons.get_aula',
     'lessons.list_aulas',

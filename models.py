@@ -3,6 +3,7 @@ SQLAlchemy models for IBC Ensino
 """
 from datetime import datetime, timedelta
 from extensions import db
+from core.tenancy.models import TenantScopedModel
 from sqlalchemy.ext.hybrid import hybrid_property
 import bcrypt
 import secrets
@@ -337,16 +338,20 @@ class PasswordResetToken(db.Model):
         return not self.used and datetime.utcnow() < self.expires_at
 
 
-class Badge(db.Model):
+class Badge(TenantScopedModel, db.Model):
     __tablename__ = 'badge'
 
     id = db.Column(db.Integer, primary_key=True)
-    code = db.Column(db.String(50), unique=True, nullable=False)
+    # code único POR TENANT (catálogo de badges é por tenant — GAM-01)
+    code = db.Column(db.String(50), nullable=False)
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
     icon = db.Column(db.String(10), nullable=False)
     rarity = db.Column(db.String(20))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint('tenant_id', 'code', name='uq_badge_tenant_code'),
+                      db.Index('ix_badge_tenant_id_id', 'tenant_id', 'id'))
 
     def to_dict(self):
         return {
@@ -359,7 +364,7 @@ class Badge(db.Model):
         }
 
 
-class UserBadge(db.Model):
+class UserBadge(TenantScopedModel, db.Model):
     __tablename__ = 'user_badge'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -369,7 +374,9 @@ class UserBadge(db.Model):
 
     badge = db.relationship('Badge')
 
-    __table_args__ = (db.UniqueConstraint('user_id', 'badge_id', name='uq_user_badge'),)
+    # __table_args__ próprio sobrepõe o do mixin → índice composto manual
+    __table_args__ = (db.UniqueConstraint('user_id', 'badge_id', name='uq_user_badge'),
+                      db.Index('ix_user_badge_tenant_id_id', 'tenant_id', 'id'))
 
 
 class Trail(db.Model):
@@ -462,15 +469,20 @@ class OnboardingAnswer(db.Model):
         }
 
 
-class UserPoints(db.Model):
+class UserPoints(TenantScopedModel, db.Model):
     __tablename__ = 'user_points'
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     total_points = db.Column(db.Integer, default=0)
     current_level = db.Column(db.Integer, default=1)
     points_in_level = db.Column(db.Integer, default=0)
     last_activity_date = db.Column(db.Date)
+
+    # __table_args__ próprio sobrepõe o do mixin → índice composto manual.
+    # Unique por tenant: o mesmo usuário tem pontuação separada em cada tenant.
+    __table_args__ = (db.UniqueConstraint('tenant_id', 'user_id', name='uq_user_points_tenant_user'),
+                      db.Index('ix_user_points_tenant_id_id', 'tenant_id', 'id'))
 
     def to_dict(self):
         return {
@@ -480,7 +492,7 @@ class UserPoints(db.Model):
         }
 
 
-class Certificate(db.Model):
+class Certificate(TenantScopedModel, db.Model):
     __tablename__ = 'certificates'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -638,14 +650,15 @@ class Level(db.Model):
         }
 
 
-class Achievement(db.Model):
+class Achievement(TenantScopedModel, db.Model):
     """New 'Conquistas' system (Sprint 6.1) — distinct from the legacy
     Badge/UserBadge tables used in the hero/dashboard. See routes/gamification.py
     for the criteria checking logic."""
     __tablename__ = 'achievements'
 
     id = db.Column(db.Integer, primary_key=True)
-    code = db.Column(db.String(50), unique=True, nullable=False)
+    # code único POR TENANT (catálogo de conquistas é por tenant — GAM-01)
+    code = db.Column(db.String(50), nullable=False)
     name = db.Column(db.String(150), nullable=False)
     description = db.Column(db.Text, default='')
     icon = db.Column(db.String(10), default='🏆')
@@ -655,6 +668,9 @@ class Achievement(db.Model):
     criteria_value = db.Column(db.Integer, nullable=False, default=1)
     points_reward = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint('tenant_id', 'code', name='uq_achievements_tenant_code'),
+                      db.Index('ix_achievements_tenant_id_id', 'tenant_id', 'id'))
 
     def to_dict(self):
         return {
@@ -669,7 +685,7 @@ class Achievement(db.Model):
         }
 
 
-class UserAchievement(db.Model):
+class UserAchievement(TenantScopedModel, db.Model):
     __tablename__ = 'user_achievements'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -679,7 +695,9 @@ class UserAchievement(db.Model):
 
     achievement = db.relationship('Achievement')
 
-    __table_args__ = (db.UniqueConstraint('user_id', 'achievement_id', name='uq_user_achievement'),)
+    # __table_args__ próprio sobrepõe o do mixin → índice composto manual
+    __table_args__ = (db.UniqueConstraint('user_id', 'achievement_id', name='uq_user_achievement'),
+                      db.Index('ix_user_achievements_tenant_id_id', 'tenant_id', 'id'))
 
     def to_dict(self):
         return {
@@ -717,7 +735,7 @@ class StudySession(db.Model):
         }
 
 
-class ActivityFeed(db.Model):
+class ActivityFeed(TenantScopedModel, db.Model):
     """Sprint 6.2: 'Mural de Conclusões' — records when a student completes
     a course, to power the 'Comunidade em Ação' feed on the dashboard."""
     __tablename__ = 'activity_feed'

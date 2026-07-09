@@ -7,6 +7,7 @@ from io import BytesIO
 from datetime import datetime
 from flask import Blueprint, jsonify, session, send_file, request, current_app
 from extensions import db
+from core.tenancy import current_tenant_id
 from models import Certificate, User, Course, Trail, UserTrail, ActivityFeed
 
 certificates_bp = Blueprint('certificates', __name__)
@@ -60,7 +61,7 @@ def issue_certificate():
             return jsonify({'error': 'Curso não encontrado'}), 404
         if entity_id not in done_course_ids:
             return jsonify({'error': 'Curso ainda não foi concluído'}), 403
-        existing = Certificate.query.filter_by(user_id=user.id, course_id=entity_id, cert_type='course').first()
+        existing = Certificate.query.filter_by(user_id=user.id, course_id=entity_id, cert_type='course', tenant_id=current_tenant_id()).first()
     else:
         trail = Trail.query.get(entity_id)
         if not trail:
@@ -68,7 +69,7 @@ def issue_certificate():
         trail_course_ids = [tc.course_id for tc in trail.trail_courses]
         if not trail_course_ids or not all(cid in done_course_ids for cid in trail_course_ids):
             return jsonify({'error': 'Trilha ainda não foi concluída'}), 403
-        existing = Certificate.query.filter_by(user_id=user.id, trail_id=entity_id, cert_type='trail').first()
+        existing = Certificate.query.filter_by(user_id=user.id, trail_id=entity_id, cert_type='trail', tenant_id=current_tenant_id()).first()
 
     if existing:
         return jsonify({'certificate_issued': False, 'cert': existing.to_dict()}), 200
@@ -109,7 +110,7 @@ def my_certificates():
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    certs = Certificate.query.filter_by(user_id=user.id).order_by(Certificate.issued_at.desc()).all()
+    certs = Certificate.query.filter_by(user_id=user.id, tenant_id=current_tenant_id()).order_by(Certificate.issued_at.desc()).all()
     return jsonify([c.to_dict() for c in certs]), 200
 
 
@@ -117,6 +118,8 @@ def my_certificates():
 
 @certificates_bp.route('/verify/<cert_code>', methods=['GET'])
 def verify_certificate(cert_code):
+    # Lookup global INTENCIONAL: verificação pública por código único
+    # (empregadores etc.) — não vaza listagem, só o certificado exato.
     cert = Certificate.query.filter_by(cert_code=cert_code).first()
     if not cert:
         return jsonify({'valid': False}), 200

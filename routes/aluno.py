@@ -5,6 +5,7 @@ certificates list and "continue learning" info.
 from datetime import datetime
 from flask import Blueprint, jsonify, session, request
 from extensions import db
+from core.tenancy import current_tenant_id
 from models import (User, Course, Module, LessonProgress, UserPoints,
                      Achievement, UserAchievement, Certificate, Question,
                      StudySession)
@@ -61,9 +62,9 @@ def achievements():
     if err:
         return err
 
-    earned = {ua.achievement_id: ua for ua in UserAchievement.query.filter_by(user_id=user.id).all()}
+    earned = {ua.achievement_id: ua for ua in UserAchievement.query.filter_by(user_id=user.id, tenant_id=current_tenant_id()).all()}
     result = []
-    for ach in Achievement.query.order_by(Achievement.criteria_type, Achievement.criteria_value).all():
+    for ach in Achievement.query.filter_by(tenant_id=current_tenant_id()).order_by(Achievement.criteria_type, Achievement.criteria_value).all():
         d = ach.to_dict()
         ua = earned.get(ach.id)
         d['earned'] = ua is not None
@@ -78,7 +79,7 @@ def certificates():
     if err:
         return err
 
-    certs = Certificate.query.filter_by(user_id=user.id).order_by(Certificate.issued_at.desc()).all()
+    certs = Certificate.query.filter_by(user_id=user.id, tenant_id=current_tenant_id()).order_by(Certificate.issued_at.desc()).all()
     result = []
     for c in certs:
         d = c.to_dict()

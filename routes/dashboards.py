@@ -4,6 +4,7 @@ Profile-specific dashboard routes: admin, tutor, aluno, aluno-externo
 from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, session, request
 from extensions import db
+from core.tenancy import current_tenant_id
 from models import (User, Course, Module, Question, LessonProgress,
                     Badge, UserBadge, UserPoints, ActivityFeed)
 
@@ -185,7 +186,7 @@ def aluno_dashboard():
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    up = UserPoints.query.filter_by(user_id=user.id).first()
+    up = UserPoints.query.filter_by(user_id=user.id, tenant_id=current_tenant_id()).first()
     user_stats = {
         'level': up.current_level if up else 1,
         'level_name': LEVEL_NAMES.get(up.current_level if up else 1, ''),
@@ -193,7 +194,7 @@ def aluno_dashboard():
         'points_in_level': up.points_in_level if up else 0,
     }
 
-    user_badges = UserBadge.query.filter_by(user_id=user.id).order_by(UserBadge.unlocked_at.desc()).all()
+    user_badges = UserBadge.query.filter_by(user_id=user.id, tenant_id=current_tenant_id()).order_by(UserBadge.unlocked_at.desc()).all()
     trofeus_unlocked = [{'icon': ub.badge.icon, 'name': ub.badge.name, 'date': ub.unlocked_at.isoformat()} for ub in user_badges]
 
     enrolled_courses = []
@@ -223,7 +224,8 @@ def aluno_dashboard():
     if up and up.current_level < 7:
         falta = 100 - up.points_in_level
         next_metas.append({'description': f'+{falta} pontos para o próximo nível', 'type': 'xp'})
-    locked_badges = Badge.query.filter(~Badge.id.in_([ub.badge_id for ub in user_badges])).limit(2).all()
+    locked_badges = Badge.query.filter(Badge.tenant_id == current_tenant_id(),
+                                       ~Badge.id.in_([ub.badge_id for ub in user_badges])).limit(2).all()
     for b in locked_badges:
         next_metas.append({'description': f'Conquistar "{b.name}"', 'type': 'trofeu'})
     pending_q = Question.query.filter_by(user_id=user.id, resposta='').count()
@@ -251,14 +253,14 @@ def aluno_externo_dashboard():
     in_progress = None
     trofeus_unlocked = []
     if user:
-        up = UserPoints.query.filter_by(user_id=user.id).first()
+        up = UserPoints.query.filter_by(user_id=user.id, tenant_id=current_tenant_id()).first()
         user_stats = {
             'level': up.current_level if up else 1,
             'level_name': LEVEL_NAMES.get(up.current_level if up else 1, ''),
             'total_points': up.total_points if up else 0,
             'points_in_level': up.points_in_level if up else 0,
         }
-        user_badges = UserBadge.query.filter_by(user_id=user.id).order_by(UserBadge.unlocked_at.desc()).all()
+        user_badges = UserBadge.query.filter_by(user_id=user.id, tenant_id=current_tenant_id()).order_by(UserBadge.unlocked_at.desc()).all()
         trofeus_unlocked = [{'icon': ub.badge.icon, 'name': ub.badge.name, 'description': ub.badge.description, 'date': ub.unlocked_at.isoformat()} for ub in user_badges]
 
         for c in Course.query.filter_by(acesso='publico').all():
@@ -315,6 +317,7 @@ def activity_feed():
     limit = max(1, min(limit, 50))
 
     items = (ActivityFeed.query
+             .filter_by(tenant_id=current_tenant_id())
              .order_by(ActivityFeed.created_at.desc())
              .limit(limit)
              .all())

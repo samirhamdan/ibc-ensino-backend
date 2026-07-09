@@ -73,11 +73,21 @@ class TenantUser(db.Model):
     __table_args__ = (db.Index('ix_tenant_users_user_id', 'user_id'),)
 
 
+def _tenant_default():
+    """Default de INSERT: escopa toda escrita ao tenant do request (ou ao
+    tenant padrão no modo mono-tenant) sem exigir mudança nos call sites."""
+    from core.tenancy.context import current_tenant_id
+    return current_tenant_id()
+
+
 class TenantScopedModel:
     """Mixin obrigatório para TODO model de domínio a partir da Release 0.9
-    (regra 1 do doc 02 §3 / CLAUDE.md): tenant_id + índice composto
-    (tenant_id, id). A política RLS correspondente entra na migração de cada
-    tabela (Fase 4).
+    (regra 1 do doc 02 §3 / CLAUDE.md): tenant_id (com default do contexto,
+    escopando escritas automaticamente) + índice composto (tenant_id, id).
+    A política RLS correspondente entra na migração de cada tabela (Fase 4).
+
+    LEITURAS continuam responsabilidade do chamador: toda query em tabela
+    tenant-scoped filtra por current_tenant_id() (a suíte de isolamento cobra).
 
     Nota: subclasse que declarar __table_args__ próprio deve incluir o índice
     composto manualmente (declared_attr não é herdado nesse caso).
@@ -85,7 +95,8 @@ class TenantScopedModel:
 
     @declared_attr
     def tenant_id(cls):
-        return db.Column(db.Uuid, db.ForeignKey('tenants.id'), nullable=False)
+        return db.Column(db.Uuid, db.ForeignKey('tenants.id'), nullable=False,
+                         default=_tenant_default)
 
     @declared_attr
     def __table_args__(cls):

@@ -4,6 +4,7 @@ Admin-only routes: tutor management, user management, question assignment
 from datetime import datetime
 from flask import Blueprint, request, jsonify, session
 from extensions import db
+from core.tenancy import current_tenant_id
 from models import (
     User, Course, Question, TutorCourse, UserTrail, UserPoints,
     Certificate, Progress, Trail, Notification, Announcement, AnnouncementDismissal,
@@ -190,7 +191,7 @@ def list_users():
 
     result = []
     for u in users:
-        pts = UserPoints.query.filter_by(user_id=u.id).first()
+        pts = UserPoints.query.filter_by(user_id=u.id, tenant_id=current_tenant_id()).first()
         trail_count = UserTrail.query.filter_by(user_id=u.id).count()
         result.append({
             'id': u.id,
@@ -215,7 +216,7 @@ def get_user_profile(user_id):
         return err
 
     u = User.query.get_or_404(user_id)
-    pts = UserPoints.query.filter_by(user_id=u.id).first()
+    pts = UserPoints.query.filter_by(user_id=u.id, tenant_id=current_tenant_id()).first()
 
     trails = []
     for ut in UserTrail.query.filter_by(user_id=u.id).all():
@@ -240,7 +241,7 @@ def get_user_profile(user_id):
         })
 
     certs = []
-    for cert in Certificate.query.filter_by(user_id=u.id).all():
+    for cert in Certificate.query.filter_by(user_id=u.id, tenant_id=current_tenant_id()).all():
         c = Course.query.get(cert.course_id)
         certs.append({
             'id': cert.id,
@@ -291,7 +292,7 @@ def reset_user_progress(user_id):
     LessonProgress.query.filter_by(user_id=u.id).delete()
     UserTrail.query.filter_by(user_id=u.id).delete()
 
-    pts = UserPoints.query.filter_by(user_id=u.id).first()
+    pts = UserPoints.query.filter_by(user_id=u.id, tenant_id=current_tenant_id()).first()
     if pts:
         pts.total_points = 0
         pts.current_level = 1

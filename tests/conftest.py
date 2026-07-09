@@ -35,8 +35,9 @@ def app():
 
     with application.app_context():
         from extensions import db
-        from seed import seed_config, seed_levels, seed_badges, seed_achievements
+        from seed import seed_config, seed_levels, seed_badges, seed_achievements, seed_tenants
         db.create_all()
+        seed_tenants()   # PRIMEIRO: badges/achievements são por tenant
         seed_config()
         seed_levels()
         seed_badges()

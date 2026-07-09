@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "preDeployCommand": "python seed_production.py",
+    "preDeployCommand": "alembic upgrade head && python seed_production.py",
     "startCommand": "gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --worker-class gthread \"app:create_app('production')\"",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3
