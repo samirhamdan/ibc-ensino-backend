@@ -10,7 +10,7 @@ from tests.isolation.conftest import TenantClient, HOST_A, HOST_B
 
 
 @pytest.fixture()
-def aluno_em(iso_app, seeded):
+def aluno_em(iso_app, seeded, vinculo_b):
     """Fábrica: cliente autenticado como o aluno seedado, 'dentro' do host
     do tenant indicado."""
     def _login(host):

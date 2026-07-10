@@ -388,25 +388,26 @@ def update_user(user_id):
     u = get_user_scoped_or_404(user_id)
     data = request.get_json(silent=True) or {}
     name = (data.get('name') or '').strip()
-    email = (data.get('email') or '').strip().lower()
     role = data.get('role')
 
-    if not name or not email or not role:
-        return jsonify({'error': 'name, email e role são obrigatórios'}), 400
+    if not name or not role:
+        return jsonify({'error': 'name e role são obrigatórios'}), 400
 
     valid_roles = {'admin', 'tutor', 'aluno'}
     if role not in valid_roles:
         return jsonify({'error': 'role inválido'}), 400
 
-    existing = User.query.filter(User.email == email, User.id != user_id).first()
-    if existing:
-        return jsonify({'error': 'Email já em uso por outro usuário'}), 409
-
     if user_id == admin_user.id and role != role_no_tenant(admin_user):
         return jsonify({'error': 'Não é possível alterar o próprio papel de administrador'}), 400
 
+    # Correção HIGH-1: admin de tenant só altera o VÍNCULO (nome de exibição
+    # aqui é tratado como atributo do vínculo local; e-mail NÃO é mais aceito
+    # nesta rota) e o papel em tenant_users. email/senha/is_active são
+    # identidade GLOBAL do User — só o próprio usuário (self-service:
+    # /api/auth/profile, /api/auth/password) pode alterá-los. Antes, um admin
+    # de QUALQUER tenant conseguia trocar o e-mail de um usuário compartilhado
+    # e, com isso, sequestrar a conta em outro tenant (login com o e-mail novo).
     u.name = name
-    u.email = email
     # Papel gravado em tenant_users (escopado a ESTE tenant) — nunca em
     # User.role global, que vazaria/escalaria o papel para outros tenants
     # onde o usuário ainda não tem vínculo.
@@ -419,32 +420,36 @@ def update_user(user_id):
 
 @admin_bp.route('/users/<int:user_id>/toggle-active', methods=['POST'])
 def toggle_user_active(user_id):
+    """Removida do admin de tenant (correção HIGH-1): is_active é um atributo
+    GLOBAL do User (afeta login em TODOS os tenants), então um admin de
+    tenant não pode mais desativar/reativar a conta de um usuário
+    compartilhado. Ativar/desativar o ACESSO a este tenant específico é feito
+    removendo/reconvidando o vínculo (DELETE /api/auth/users/<id> e
+    POST /api/admin/users/invite) — não há hoje uma coluna "ativo no tenant"
+    em tenant_users (fora de escopo: exigiria migração). Reservado para
+    operador_plataforma (Release 1.0)."""
     _, err = _admin_required()
     if err:
         return err
-
-    u = get_user_scoped_or_404(user_id)
-    u.is_active = not u.is_active
-    db.session.commit()
-    return jsonify(u.to_dict()), 200
+    return jsonify({'error': 'Operação não permitida para admin de tenant: '
+                              'is_active é global. Use remover/reconvidar o '
+                              'usuário para revogar o acesso a este tenant.'}), 403
 
 
 @admin_bp.route('/users/<int:user_id>/reset-password', methods=['POST'])
 def admin_reset_user_password(user_id):
+    """Removida do admin de tenant (correção HIGH-1): senha é identidade
+    GLOBAL do User — um admin de tenant que a redefinisse poderia logar como
+    o usuário em QUALQUER outro tenant onde ele também tem vínculo (tomada de
+    conta cruzada). Redefinição de senha só é permitida como self-service
+    (/api/auth/reset-password, /api/auth/password, fluxo de
+    forgot-password/token) ou por operador_plataforma (Release 1.0)."""
     _, err = _admin_required()
     if err:
         return err
-
-    u = get_user_scoped_or_404(user_id)
-    data = request.get_json(silent=True) or {}
-    new_password = data.get('new_password') or ''
-
-    if len(new_password) < 6:
-        return jsonify({'error': 'A nova senha deve ter ao menos 6 caracteres'}), 400
-
-    u.set_password(new_password)
-    db.session.commit()
-    return jsonify({'ok': True}), 200
+    return jsonify({'error': 'Operação não permitida para admin de tenant: '
+                              'redefinição de senha é self-service ou de '
+                              'operador da plataforma.'}), 403
 
 
 @admin_bp.route('/users/invite', methods=['POST'])

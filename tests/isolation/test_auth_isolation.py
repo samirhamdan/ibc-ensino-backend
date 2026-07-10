@@ -43,38 +43,72 @@ def test_sessao_de_a_nao_vale_em_b(cliente_bruto):
     assert r.status_code == 403
 
 
-def test_relogar_em_b_rebind_a_sessao(cliente_bruto):
+def test_relogar_em_b_rebind_a_sessao(iso_app, seeded, cliente_bruto):
     """Login em B emite sessão nova presa a B: replicá-la para A → 403
     (uma sessão pertence a UM tenant)."""
-    assert _login(cliente_bruto, HOST_B).status_code == 200
-    assert cliente_bruto.get('/api/auth/user', headers={'Host': HOST_B}).status_code == 200
+    with iso_app.app_context():
+        from extensions import db
+        from core.tenancy import TenantUser, Tenant
+        b_id = Tenant.query.filter_by(slug='demo').first().id
+        db.session.add(TenantUser(tenant_id=b_id, user_id=seeded['users']['aluno'], papel='aluno'))
+        db.session.commit()
+    try:
+        assert _login(cliente_bruto, HOST_B).status_code == 200
+        assert cliente_bruto.get('/api/auth/user', headers={'Host': HOST_B}).status_code == 200
 
-    cookie = cliente_bruto.get_cookie('session', domain=HOST_B)
-    cliente_bruto.set_cookie('session', cookie.value, domain=HOST_A)
-    assert cliente_bruto.get('/api/auth/user', headers={'Host': HOST_A}).status_code == 403
+        cookie = cliente_bruto.get_cookie('session', domain=HOST_B)
+        cliente_bruto.set_cookie('session', cookie.value, domain=HOST_A)
+        assert cliente_bruto.get('/api/auth/user', headers={'Host': HOST_A}).status_code == 403
+    finally:
+        with iso_app.app_context():
+            from extensions import db
+            from core.tenancy import TenantUser, Tenant
+            b_id = Tenant.query.filter_by(slug='demo').first().id
+            TenantUser.query.filter_by(user_id=seeded['users']['aluno'], tenant_id=b_id).delete()
+            db.session.commit()
 
 
-def test_login_cria_vinculo_tenant_users(iso_app, seeded, cliente_bruto):
+def test_login_sem_vinculo_no_tenant_nao_cria_e_nega_acesso(iso_app, seeded, cliente_bruto):
+    """Correção HIGH-2: login NUNCA cria tenant_users. Um usuário GLOBAL
+    válido (senha correta) sem vínculo no tenant do subdomínio recebe 403 e
+    nenhuma linha é criada em tenant_users — antes, vincular_usuario_ao_tenant
+    era chamado incondicionalmente no login e recriava o vínculo sozinho."""
     with iso_app.app_context():
         from extensions import db
         from core.tenancy import TenantUser
         TenantUser.query.filter_by(user_id=seeded['users']['aluno']).delete()
         db.session.commit()
 
-    assert _login(cliente_bruto, HOST_A).status_code == 200
+    r = _login(cliente_bruto, HOST_A)
+    assert r.status_code == 403
+    assert 'acesso' in r.get_json()['error'].lower()
 
     with iso_app.app_context():
+        from core.tenancy import TenantUser
+        assert TenantUser.query.filter_by(user_id=seeded['users']['aluno']).count() == 0
+
+    # restaura o baseline do fixture `seeded`
+    with iso_app.app_context():
+        from extensions import db
         from core.tenancy import TenantUser, Tenant
         a_id = Tenant.query.filter_by(slug='ibc').first().id
-        tu = TenantUser.query.filter_by(user_id=seeded['users']['aluno'],
-                                        tenant_id=a_id).first()
-        assert tu is not None
-        assert tu.papel == 'aluno'
+        db.session.add(TenantUser(tenant_id=a_id, user_id=seeded['users']['aluno'], papel='aluno'))
+        db.session.commit()
 
 
 def test_admin_global_e_aluno_em_outro_tenant(iso_app, seeded):
-    """Privilégio NÃO é herdado entre tenants: o admin do ibc entra no demo
-    como aluno — admin em outro tenant é concessão explícita, nunca herança."""
+    """Privilégio NÃO é herdado entre tenants: o admin do ibc, mesmo com um
+    vínculo explícito de 'aluno' no demo, não vira admin lá — admin em outro
+    tenant é concessão explícita, nunca herança. (Desde a correção HIGH-2,
+    login exige vínculo pré-existente, então o vínculo de aluno em B é
+    concedido aqui explicitamente, simulando um convite/onboarding.)"""
+    with iso_app.app_context():
+        from extensions import db
+        from core.tenancy import TenantUser, Tenant
+        b_id = Tenant.query.filter_by(slug='demo').first().id
+        db.session.add(TenantUser(tenant_id=b_id, user_id=seeded['users']['admin'], papel='aluno'))
+        db.session.commit()
+
     c = iso_app.test_client()
     assert _login(c, HOST_B, email='admin@test.com').status_code == 200
     # endpoint de admin no tenant B nega acesso (papel efetivo: aluno)

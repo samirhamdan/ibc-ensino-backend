@@ -9,7 +9,7 @@ from tests.isolation.conftest import TenantClient, HOST_A, HOST_B
 
 
 @pytest.fixture()
-def aluno_em(iso_app, seeded):
+def aluno_em(iso_app, seeded, vinculo_b):
     def _login(host):
         c = TenantClient(iso_app.test_client(), host)
         r = c.post('/api/auth/login', json={'email': 'aluno@test.com',

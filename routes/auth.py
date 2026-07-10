@@ -9,7 +9,8 @@ from email.mime.multipart import MIMEMultipart
 from flask import Blueprint, request, jsonify, session
 from extensions import db, limiter
 from core.tenancy import (current_tenant_id, role_no_tenant, vincular_usuario_ao_tenant,
-                          usuarios_do_tenant_query, get_user_scoped_or_404)
+                          usuarios_do_tenant_query, get_user_scoped_or_404,
+                          tenant_user_ou_none)
 from models import User, PasswordResetToken
 
 auth_bp = Blueprint('auth', __name__)
@@ -84,14 +85,22 @@ def login():
     if not user.is_active:
         return jsonify({'error': 'Conta desativada. Contate o administrador.'}), 403
 
+    # Correção HIGH-2: login NUNCA cria tenant_users — só verifica um vínculo
+    # já existente (criado por signup/convite/auto-cadastro/admin). Se o
+    # login recriasse o vínculo automaticamente, remover um usuário do
+    # tenant (DELETE /users/<id>) não teria efeito: bastaria logar de novo.
+    # No tenant padrão, isso também permitiria um ex-admin recuperar
+    # sozinho o papel global só relogando.
+    if tenant_user_ou_none(user.id) is None:
+        return jsonify({'error': 'Você não possui acesso a este tenant.'}), 403
+
     user.last_login = datetime.utcnow()
     db.session.commit()
 
     session['user_id'] = user.id
     # Etapa 4.2: sessão presa ao tenant onde foi criada (middleware barra uso
-    # cruzado com 403) + vínculo de papel por tenant garantido no login.
+    # cruzado com 403).
     session['tenant_id'] = str(current_tenant_id())
-    vincular_usuario_ao_tenant(user)
 
     # +5 XP de login diário, no máximo 1x por dia (guard: last_activity_date).
     # Concedido aqui no servidor — a ação 'daily_login' não é mais aceita via
@@ -235,17 +244,15 @@ def delete_user(user_id):
     Notification.query.filter_by(tenant_id=current_tenant_id(), created_by=user_id).update({'created_by': None})
     TutorCourse.query.filter_by(tenant_id=current_tenant_id(), tutor_id=user_id).delete()
 
-    # Remove o vínculo com ESTE tenant. Só apaga a conta global (User) se o
-    # usuário não pertencer a nenhum outro tenant — caso contrário a conta
-    # (e os dados dela em outros tenants) precisa sobreviver.
+    # Remove SÓ o vínculo com ESTE tenant (semântica 1 de 3, doc 02 §6.1: HIGH-2).
+    # A conta global (User) nunca é apagada por um admin de tenant — mesmo
+    # que este fosse o último vínculo, a exclusão da IDENTIDADE global é uma
+    # operação de plataforma, não de tenant (fora de escopo até existir o
+    # papel operador_plataforma). Sem vínculo em nenhum tenant, o login já
+    # nega acesso (tenant_user_ou_none) — efeito prático de conta desativada.
+    # "Convidar novamente" (semântica 2) volta a criar o vínculo explicitamente
+    # via /admin/users/invite ou /signup — login NUNCA recria (correção HIGH-2).
     TenantUser.query.filter_by(tenant_id=current_tenant_id(), user_id=user_id).delete()
-    db.session.flush()
-    # Conta vínculos em TODOS os tenants (não só o atual) para decidir se a
-    # conta User global pode ser apagada com segurança.
-    outros_vinculos = TenantUser.query.filter_by(user_id=user_id).count()  # tenant-scope: intencionalmente global
-    if outros_vinculos == 0:
-        db.session.delete(target)
-
     db.session.commit()
     return jsonify({'message': 'Usuário removido'}), 200
 
@@ -273,6 +280,11 @@ def register():
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
+    # Auto-cadastro público é, assim como signup/convite, uma criação
+    # EXPLÍCITA de conta neste tenant (o subdomínio em que o formulário foi
+    # preenchido) — não é o login recriando vínculo. Sem isto o usuário
+    # nunca conseguiria logar (login exige vínculo pré-existente).
+    vincular_usuario_ao_tenant(user, papel='aluno')
     return jsonify({'success': True, 'message': 'Conta criada com sucesso! Faça login para continuar.'}), 201
 
 

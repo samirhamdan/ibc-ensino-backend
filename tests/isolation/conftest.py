@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from core.tenancy import Tenant, clear_tenant_cache
+from core.tenancy import Tenant, TenantUser, clear_tenant_cache
 
 BASE = 'xr.test'
 HOST_A = f'ibc.{BASE}'
@@ -78,3 +78,27 @@ def tenants_ab(iso_app):
         a = Tenant.query.filter_by(slug='ibc').first()
         b = Tenant.query.filter_by(slug='demo').first()
         return {'a_id': a.id, 'b_id': b.id}
+
+
+@pytest.fixture()
+def vinculo_b(iso_app, seeded):
+    """Concede aos usuários seedados um vínculo explícito de 'aluno' no
+    tenant B (demo) — desde a correção HIGH-2, login NUNCA cria tenant_users
+    sozinho, então os testes de isolamento que precisam logar o MESMO
+    usuário em B (para provar que dados/progresso/papel não vazam entre
+    tenants) precisam desse vínculo pré-existente, como um convite/onboarding
+    real teria criado. Limpo ao final do teste."""
+    from extensions import db
+    with iso_app.app_context():
+        b = Tenant.query.filter_by(slug='demo').first()
+        for uid in seeded['users'].values():
+            if not TenantUser.query.filter_by(tenant_id=b.id, user_id=uid).first():
+                db.session.add(TenantUser(tenant_id=b.id, user_id=uid, papel='aluno'))
+        db.session.commit()
+    yield
+    with iso_app.app_context():
+        b = Tenant.query.filter_by(slug='demo').first()
+        TenantUser.query.filter(TenantUser.tenant_id == b.id,
+                                TenantUser.user_id.in_(list(seeded['users'].values()))).delete(
+                                    synchronize_session=False)
+        db.session.commit()

@@ -62,9 +62,30 @@ def role_no_tenant(user):
     return papel
 
 
+def invalidar_cache_papel(user_id):
+    """Limpa o cache de papel (por request, em g) de um usuário — chamar
+    sempre depois de gravar/alterar tenant_users.papel, para que uma leitura
+    de role_no_tenant() mais adiante no MESMO request não devolva o valor
+    antigo (cache era só escrito por vínculo criado no login; escrita de
+    papel por um admin no mesmo request não invalidava)."""
+    cache = getattr(g, '_papel_cache', None)
+    if cache is not None:
+        cache.pop(user_id, None)
+
+
 def vincular_usuario_ao_tenant(user, papel=None):
-    """Garante o vínculo tenant_users no tenant atual (idempotente, seguro
-    sob concorrência).
+    """Cria o vínculo tenant_users no tenant atual (idempotente, seguro sob
+    concorrência).
+
+    IMPORTANTE (correção HIGH-2): esta função NUNCA deve ser chamada pelo
+    fluxo de login — login apenas autentica e verifica um vínculo
+    PRÉ-EXISTENTE (ver routes/auth.py::login). Vínculo se cria só por ação
+    explícita: signup/convite (admin escolhe o papel), auto-cadastro
+    (/register, dentro do tenant do subdomínio) ou um admin adicionando o
+    usuário. Se login recriasse o vínculo automaticamente, remover um
+    usuário do tenant (delete_user) não teria efeito nenhum: bastaria logar
+    de novo para o vínculo voltar — e, no tenant padrão, um ex-admin
+    recuperaria o papel global sozinho.
 
     Papel: se `papel` não for informado, o padrão é o mesmo de sempre — no
     tenant PADRÃO herda o papel global (paridade mono-tenant), em qualquer
@@ -72,9 +93,9 @@ def vincular_usuario_ao_tenant(user, papel=None):
     admin criando um usuário via signup/convite), ele vale APENAS no tenant
     atual — nunca é escrito em User.role (global).
 
-    Concorrência: dois logins simultâneos do mesmo usuário podem colidir no
-    INSERT (unique tenant_id+user_id) — tratado com savepoint + rollback,
-    sem propagar IntegrityError como 500.
+    Concorrência: duas chamadas simultâneas (ex.: convite + auto-cadastro)
+    podem colidir no INSERT (unique tenant_id+user_id) — tratado com
+    savepoint + rollback, sem propagar IntegrityError como 500.
     """
     from sqlalchemy.exc import IntegrityError
     from core.tenancy.models import TenantUser
@@ -110,6 +131,16 @@ def definir_papel_no_tenant(user_id, papel):
         db.session.add(TenantUser(tenant_id=tid, user_id=user_id, papel=papel))
     else:
         tu.papel = papel
+    invalidar_cache_papel(user_id)
+
+
+def tenant_user_ou_none(user_id):
+    """Vínculo (TenantUser) do usuário no tenant atual, ou None — leitura
+    pura, NUNCA cria. Usado pelo login para decidir 403 sem efeito colateral
+    (correção HIGH-2: login não pode recriar tenant_users)."""
+    from core.tenancy.models import TenantUser
+    tid = current_tenant_id()
+    return TenantUser.query.filter_by(tenant_id=tid, user_id=user_id).first()
 
 
 def usuarios_do_tenant_query():

@@ -136,11 +136,12 @@ def test_signup_admin_por_admin_b_nao_vale_no_tenant_padrao(admin_b, iso_app):
         u = User.query.filter_by(email='novo-admin@test.com').first()
         assert u.role == 'aluno'   # global NUNCA vira admin
 
-    # primeiro login no tenant padrão (A): sem vínculo lá ainda — deve ser
-    # 'aluno' (paridade mono-tenant usa o global, que agora é 'aluno')
+    # primeiro login no tenant padrão (A): sem vínculo lá ainda — desde a
+    # correção HIGH-2 (login nunca cria tenant_users), nega acesso; mesmo
+    # que recriasse, seria como 'aluno' (o global agora é 'aluno'), nunca
+    # herdando o admin concedido só em B.
     c = TenantClient(iso_app.test_client(), HOST_A)
-    assert _login(c, HOST_A, 'novo-admin@test.com').status_code == 200
-    assert c.get('/api/admin/users').status_code == 403
+    assert _login(c, HOST_A, 'novo-admin@test.com').status_code == 403
 
 
 def test_admin_update_user_nao_grava_role_global(admin_a, iso_app, seeded):
