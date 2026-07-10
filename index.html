@@ -56,6 +56,7 @@
 <link rel="stylesheet" href="css/components/progress.css">
 <link rel="stylesheet" href="css/components/navigation.css">
 <link rel="stylesheet" href="css/components/dashboard-cards.css">
+<link rel="stylesheet" href="css/components/dashboard-saas.css">
 <link rel="stylesheet" href="css/components/course-cards.css">
 <link rel="stylesheet" href="css/components/utilities.css">
 <link rel="stylesheet" href="css/components/login.css">
@@ -4170,46 +4171,217 @@ async function _renderTutorPanelDashboardInner(){
     </div>`;
 }
 
+// ── Dashboard do aluno — UX_ALUNO_SAAS.md §3/§6 Etapa 2 ───────────────────
+// Estrutura fixa de 5 grupos (§3), grid responsivo (coluna única <768px,
+// 8/4 no desktop). Slots da Release 1.0 (tutor, revisão real, IA) ficam
+// como estado vazio elegante atrás de flags — DASH_SAAS_FLAGS é um
+// placeholder local (default tudo desligado) até existir a fonte real
+// por tenant (tema/tenant table); trocar a leitura aqui não muda o layout.
+const DASH_SAAS_FLAGS = { tutor_enabled: false, revisao_ia_enabled: false, recomendacoes_ia_enabled: false };
+
 async function renderAlunoDashboard(){
   try { return await _renderAlunoDashboardInner(); }
   catch(e){ console.error('[ERRO] renderAlunoDashboard:', e); _renderDashboardError(e, 'painel do aluno'); }
 }
+
+function _dashSaasSkeleton(){
+  return `<div class="dash-saas-skeleton dash-saas-skeleton--linha" style="width:60%"></div>
+          <div class="dash-saas-skeleton dash-saas-skeleton--bloco"></div>`;
+}
+
+function _dashSaasErro(retryFn){
+  return `<div class="dash-saas-erro">
+      <div>${icon('x-circle','24','icon--x-circle')}</div>
+      <div class="dash-saas-erro-msg">Não foi possível carregar esta seção.</div>
+      <button class="btn btn-outline btn-sm" onclick="${retryFn}">${icon('search','14')} Tentar de novo</button>
+    </div>`;
+}
+
 async function _renderAlunoDashboardInner(){
   const el=document.getElementById('main-content');
-  el.innerHTML=`<div id="aluno-dash-body"><div class="alert alert-info"><span class="alert-icon">⏳</span><div class="alert-body">Carregando...</div></div></div>`;
-  const res=await api('GET','/aluno/dashboard');
-  if(!res.ok){ document.getElementById('aluno-dash-body').innerHTML='<div class="alert alert-danger"><span class="alert-icon">'+icon('x-circle','16','icon--x-circle')+'</span><div class="alert-body">Não foi possível carregar.</div></div>'; return; }
-  const d=await res.json();
-  const body=document.getElementById('aluno-dash-body');
-  const s=d.user_stats;
-  const target=s.level>=7?(s.points_in_level||1):100;
-  const pct=Math.min(100,Math.round(s.points_in_level/target*100));
-  const ip=d.in_progress_course;
-  const heroStats={level:s.level,level_name:s.level_name,points_in_level:s.points_in_level,total_points:s.total_points||0,courses_completed:d.trofeus_count||0,badges_count:d.trofeus_count||0};
-  body.innerHTML=`
-    ${renderHero(currentUser, heroStats)}
-    <div id="activityFeedSection"></div>
-    <div id="trailSection"></div>
-    ${ip?`<div class="card" style="border-left:4px solid var(--primary);margin-bottom:var(--space-xl)"><div class="card-body"><h3 class="card-title">${icon('target','16')} Continue de Onde Parou</h3><div style="margin:var(--space-md) 0"><div style="font-size:var(--text-sm);font-weight:var(--fw-semibold);color:var(--dark);margin-bottom:var(--space-sm)">${ip.icon} ${ip.name} — Aula ${ip.aula_atual}/${ip.total_aulas}</div><div class="progress progress-sm" style="margin-bottom:var(--space-xs)"><div class="progress-bar" style="width:${ip.percentage}%"></div></div><div style="font-size:var(--text-xs);color:var(--gray);text-align:right">${ip.percentage}% concluído</div></div><div class="status-grid"><div class="status-item"><span class="status-label">Material</span><span class="status-value">${ip.material_read?icon('checkmark-circle','14','icon--success')+' Lido':icon('clock','14')+' Pendente'}</span></div><div class="status-item"><span class="status-label">Quiz</span><span class="status-value">${ip.quiz_done?icon('checkmark-circle','14','icon--success')+' Concluído':icon('clock','14')+' Pendente'}</span></div></div><button class="btn btn-primary btn-full" style="margin-top:var(--space-md)" onclick="selectCourse(${ip.id})">${icon('arrow-right','16')} CONTINUAR AULA</button></div></div>`:''}
-    <div class="card" style="margin-bottom:var(--space-xl)">
-      <div class="card-body">
-        <h3 class="card-title">${icon('lightbulb','16','icon--lightbulb')} Próximas Metas</h3>
-        <div id="goalsSection"><span style="color:var(--gray);font-size:var(--text-sm)">Carregando...</span></div>
+  el.innerHTML=`
+    <div class="dash-saas-grid">
+      <div class="dash-saas-col-principal">
+        <div class="dash-saas-grupo" id="dash-saas-saudacao">${_dashSaasSkeleton()}</div>
+        <div class="dash-saas-grupo" id="dash-saas-continuar">${_dashSaasSkeleton()}</div>
       </div>
+      <div class="dash-saas-col-lateral">
+        <div class="dash-saas-grupo" id="dash-saas-pontuacao">${_dashSaasSkeleton()}</div>
+        <div class="dash-saas-grupo" id="dash-saas-metas">${_dashSaasSkeleton()}</div>
+      </div>
+      <div class="dash-saas-grupo dash-saas-full" id="dash-saas-recomendacoes">${_dashSaasSkeleton()}</div>
     </div>
-    ${d.recent_trofeus.length?`<div class="card" style="margin-bottom:var(--space-xl)"><div class="card-body"><h3 class="card-title">${icon('achievements','16','icon--gold')} Últimas Conquistas</h3><div style="margin-top:var(--space-md)">${d.recent_trofeus.map(t=>`<div class="achievement-item"><span class="achievement-icon">${t.icon}</span><div><div class="achievement-name">${t.name}</div><div class="achievement-desc">${t.description||''}</div><div class="achievement-date">${new Date(t.date).toLocaleDateString('pt-BR')}</div></div></div>`).join('')}</div></div></div>`:''}
-    <div class="dash-section">
-      <div class="dash-section-title">${icon('catalog','16')} Outros Cursos</div>
-      <div class="grid grid-cols-2 gap-lg">${d.other_courses.map(c=>`<div class="card other-course-card" onclick="selectCourse(${c.id})" style="cursor:pointer"><div class="other-course-icon">${c.icon||'📚'}</div><h3 style="font-size:var(--text-sm);font-weight:var(--fw-bold);color:var(--dark)">${c.name}</h3>${c.status==='concluido'?`<span style="color:var(--success);font-size:var(--text-xs)">${icon('checkmark-circle','12','icon--success')} Concluído</span><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();selectCourse(${c.id})">${icon('certificates','14')} Certificado</button>`:c.status==='em_andamento'?`<span style="color:var(--primary);font-size:var(--text-xs)">${c.percentage}% concluído</span><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();selectCourse(${c.id})">Continuar</button>`:`<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();selectCourse(${c.id})">Começar</button>`}</div>`).join('')}</div>
-    </div>`;
-  // Animate hero ring
-  animateHero(pct);
-  animateStatValues(body);
-  // Load trail section
-  const trailSection = document.getElementById('trailSection');
-  if(trailSection) await loadTrailsSection(trailSection);
-  loadGoalsSection();
+    <div id="activityFeedSection" class="dash-saas-full" style="margin-top:var(--space-lg)"></div>`;
+
+  await _dashSaasCarregarTudo();
   renderActivityFeed();
+}
+
+async function _dashSaasCarregarTudo(){
+  const res = await api('GET','/aluno/dashboard');
+  if(!res.ok){
+    ['dash-saas-saudacao','dash-saas-continuar','dash-saas-pontuacao','dash-saas-metas','dash-saas-recomendacoes']
+      .forEach(id => { const elx=document.getElementById(id); if(elx) elx.innerHTML=_dashSaasErro('_dashSaasCarregarTudo()'); });
+    return;
+  }
+  const d = await res.json();
+  _dashSaasRenderSaudacao(d);
+  _dashSaasRenderContinuar(d);
+  _dashSaasRenderPontuacao(d);
+  _dashSaasRenderMetas(d);
+  _dashSaasRenderRecomendacoes(d);
+}
+
+function _dashSaasSaudacaoPorHorario(){
+  const h = new Date().getHours();
+  if(h < 12) return 'Bom dia';
+  if(h < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+
+function _dashSaasRenderSaudacao(d){
+  const elx = document.getElementById('dash-saas-saudacao');
+  if(!elx) return;
+  const nome = (currentUser && currentUser.name ? currentUser.name.split(' ')[0] : 'aluno');
+  const ip = d.in_progress_course;
+  // Prioridade da frase de contexto (§3 Grupo 1): (a) streak em risco —
+  // ainda não existe (Etapa 3); (b) revisões pendentes — LRN-02 real é
+  // Release 1.0; (c) progresso — sempre disponível hoje, é o fallback.
+  let contexto = 'Pronto para continuar sua jornada de estudos?';
+  if(ip) contexto = `Você está a ${Math.max(0, ip.total_aulas - ip.aula_atual + 1)} aula(s) de concluir "${ip.name}".`;
+  else if(d.next_metas && d.next_metas.length) contexto = d.next_metas[0].description;
+
+  elx.innerHTML = `
+    <div class="dash-saas-saudacao">
+      <div class="dash-saas-saudacao-texto">
+        <h1>${_dashSaasSaudacaoPorHorario()}, ${nome}</h1>
+        <div class="dash-saas-saudacao-contexto">${contexto}</div>
+      </div>
+      <span class="dash-saas-streak-chip" title="Streak chega na próxima etapa">${icon('fire','16')} —</span>
+    </div>`;
+}
+
+function _dashSaasRenderContinuar(d){
+  const elx = document.getElementById('dash-saas-continuar');
+  if(!elx) return;
+  const ip = d.in_progress_course;
+  const secundarios = (d.other_courses||[]).filter(c=>c.status==='em_andamento').slice(0,2);
+
+  if(!ip){
+    elx.innerHTML = `
+      <div class="dash-saas-grupo-titulo">${icon('target','14')} Continue seus estudos</div>
+      <div class="dash-saas-vazio">
+        <div class="dash-saas-vazio-icone">${icon('book','28')}</div>
+        <div class="dash-saas-vazio-msg">Você ainda não começou nenhum curso.</div>
+        <button class="btn btn-primary btn-sm" onclick="showPanel('courses')">${icon('catalog','14')} Ver catálogo</button>
+      </div>`;
+    return;
+  }
+
+  elx.innerHTML = `
+    <div class="dash-saas-grupo-titulo">${icon('target','14')} Continue seus estudos</div>
+    <div class="dash-saas-hero-card">
+      <div class="dash-saas-hero-curso">${ip.icon||''} ${ip.name}</div>
+      <h3>Aula ${ip.aula_atual}/${ip.total_aulas}</h3>
+      <div class="dash-saas-hero-progress"><div style="width:${ip.percentage}%"></div></div>
+      <div style="font-size:var(--text-xs);opacity:.85">${ip.percentage}% concluído</div>
+      <button class="btn btn-full" style="background:var(--brand-on-primary);color:var(--brand-primary)" onclick="selectCourse(${ip.id})">${icon('arrow-right','16')} Continuar lição</button>
+    </div>
+    ${secundarios.length ? `<div class="dash-saas-secundarios">${secundarios.map(c=>`
+      <div class="dash-saas-secundario-card" onclick="selectCourse(${c.id})">
+        <div class="nome">${c.icon||''} ${c.name}</div>
+        <div class="meta">${c.percentage}% concluído</div>
+      </div>`).join('')}</div>` : ''}
+    <div class="dash-saas-slot-tutor">
+      ${DASH_SAAS_FLAGS.tutor_enabled
+        ? `<button class="btn btn-outline btn-sm">${icon('chat','14')} Tirar dúvida com o tutor</button>`
+        : `${icon('chat','14')} Tutor de IA chega em breve`}
+    </div>`;
+}
+
+function _dashSaasRenderPontuacao(d){
+  const elx = document.getElementById('dash-saas-pontuacao');
+  if(!elx) return;
+  const s = d.user_stats || {};
+  const recentes = (d.recent_trofeus||[]).slice(0,3);
+
+  elx.innerHTML = `
+    <div class="dash-saas-grupo-titulo">${icon('bar-chart','14')} Sua pontuação</div>
+    <div class="dash-saas-pontuacao-linha1">
+      <span class="dash-saas-pontuacao-total">${s.total_points||0}</span>
+      <span class="dash-saas-pontuacao-nivel">pts · Nível ${s.level||1} (${s.level_name||''})</span>
+    </div>
+    <div class="dash-saas-streak-chip" style="width:100%;justify-content:center" title="Streak chega na próxima etapa">
+      ${icon('fire','16')} Streak — em breve
+    </div>
+    ${recentes.length ? `<div class="dash-saas-badges-recentes">${recentes.map(t=>`
+      <div class="dash-saas-badge-recente" title="${t.name}">
+        <div class="emoji">${t.icon||'🏅'}</div>
+        <span class="nome">${t.name}</span>
+      </div>`).join('')}</div>` : `<div class="dash-saas-vazio" style="padding:var(--space-md) 0">
+        <div class="dash-saas-vazio-msg">Suas conquistas aparecem aqui.</div>
+      </div>`}`;
+}
+
+function _dashSaasRenderMetas(d){
+  const elx = document.getElementById('dash-saas-metas');
+  if(!elx) return;
+  const metas = d.next_metas || [];
+
+  const revisaoHtml = DASH_SAAS_FLAGS.revisao_ia_enabled
+    ? '' // Release 1.0: card real de revisão do dia (LRN-02)
+    : `<div class="dash-saas-meta-revisao">
+         <div style="font-weight:var(--fw-semibold);font-size:var(--text-sm)">${icon('lightbulb','14')} Revisão do dia</div>
+         <div style="font-size:var(--text-xs);color:var(--gray)">Chega na Release 1.0 — vai te ajudar a fixar o que você já aprendeu.</div>
+       </div>`;
+
+  if(!metas.length){
+    elx.innerHTML = `
+      <div class="dash-saas-grupo-titulo">${icon('lightbulb','14','icon--lightbulb')} Próximas metas</div>
+      ${revisaoHtml}
+      <div class="dash-saas-vazio">
+        <div class="dash-saas-vazio-msg">Nenhuma meta pendente — explore as recomendações abaixo.</div>
+      </div>`;
+    return;
+  }
+
+  elx.innerHTML = `
+    <div class="dash-saas-grupo-titulo">${icon('lightbulb','14','icon--lightbulb')} Próximas metas</div>
+    ${revisaoHtml}
+    ${metas.map(m=>`<div class="dash-saas-meta-item">
+        <span>${icon(m.type==='xp'?'points':m.type==='trofeu'?'achievements':m.type==='duvida'?'chat':'book','16')}</span>
+        <span style="font-size:var(--text-sm)">${m.description}</span>
+      </div>`).join('')}`;
+}
+
+function _dashSaasRenderRecomendacoes(d){
+  const elx = document.getElementById('dash-saas-recomendacoes');
+  if(!elx) return;
+  // Ordenação por popularidade (slot LRN-03) chega na Etapa 4; por ora,
+  // a ordem que o backend já devolve (sem inventar endpoint novo).
+  const cursos = d.other_courses || [];
+
+  if(!cursos.length){
+    elx.innerHTML = `
+      <div class="dash-saas-grupo-titulo">${icon('catalog','14')} Recomendações</div>
+      <div class="dash-saas-vazio">
+        <div class="dash-saas-vazio-msg">Novos cursos aparecem aqui assim que forem publicados.</div>
+      </div>`;
+    return;
+  }
+
+  elx.innerHTML = `
+    <div class="dash-saas-grupo-titulo">${icon('catalog','14')} Recomendações</div>
+    <div class="dash-saas-recomendacoes-grid">${cursos.map(c=>`
+      <div class="card other-course-card" onclick="selectCourse(${c.id})" style="cursor:pointer">
+        <div class="other-course-icon">${c.icon||'📚'}</div>
+        <h3 style="font-size:var(--text-sm);font-weight:var(--fw-bold);color:var(--dark)">${c.name}</h3>
+        ${c.status==='concluido'
+          ? `<span style="color:var(--success);font-size:var(--text-xs)">${icon('checkmark-circle','12','icon--success')} Concluído</span>`
+          : c.status==='em_andamento'
+            ? `<span style="color:var(--brand-primary);font-size:var(--text-xs)">${c.percentage}% concluído</span>`
+            : `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();selectCourse(${c.id})">Começar</button>`}
+      </div>`).join('')}</div>`;
 }
 
 // ── Mural de Conclusões / "Comunidade em Ação" (Sprint 6.2) ───────────────
@@ -5525,8 +5697,8 @@ function closeOnboardingModal(){
 
 // ── Guided Tour ──
 const TOUR_STEPS = [
-  { selector: '#trailSection', title: 'Sua Trilha', body: 'Aqui fica sua trilha de aprendizado. Siga os cursos na ordem para ganhar pontos de bônus!', arrow: 'top' },
-  { selector: '.dashboard-hero', title: 'Seu Progresso', body: 'O anel dourado mostra seu progresso de pontos no nível atual. Continue estudando para subir de nível!', arrow: 'top' },
+  { selector: '#dash-saas-continuar', title: 'Continue seus estudos', body: 'Aqui fica a aula onde você parou. Continue de onde parou para não perder o ritmo!', arrow: 'top' },
+  { selector: '#dash-saas-pontuacao', title: 'Sua Pontuação', body: 'Acompanhe seus pontos, nível e conquistas mais recentes. Continue estudando para subir de nível!', arrow: 'top' },
   { selector: '#nav-questions', title: 'Tire Dúvidas', body: 'Tem alguma dúvida sobre o conteúdo? Envie sua pergunta e um tutor vai responder!', arrow: 'left' },
 ];
 let _tourStep = 0;

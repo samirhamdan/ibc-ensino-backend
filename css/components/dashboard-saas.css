@@ -1,0 +1,169 @@
+/* ─── Dashboard do Aluno (UX_ALUNO_SAAS.md §3) — Etapa 2 ───────────────
+   Grid dos 5 grupos verticais + os 4 estados obrigatórios de cada grupo
+   (§4.4: loading/vazio/erro/conteúdo). Usa só os tokens do design system
+   atual (claro) — --brand-* entram como acento de identidade (CTAs,
+   gradiente do hero), não como reskin geral (decisão registrada no PR:
+   a Etapa 1 já deixou explícito que o tema do tenant é aditivo, não uma
+   reescrita visual da plataforma). Zero hex hardcoded aqui. */
+
+.dash-saas-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-lg);
+}
+
+@media (min-width: 768px) {
+  .dash-saas-grid {
+    grid-template-columns: 8fr 4fr;
+    align-items: start;
+  }
+  .dash-saas-col-principal { grid-column: 1; display: flex; flex-direction: column; gap: var(--space-lg); }
+  .dash-saas-col-lateral   { grid-column: 2; display: flex; flex-direction: column; gap: var(--space-lg); }
+  .dash-saas-full          { grid-column: 1 / -1; }
+}
+
+.dash-saas-grupo {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-lg);
+}
+
+.dash-saas-grupo-titulo {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--gray);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  margin-bottom: var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* ── Estados obrigatórios (§4.4) — cada grupo usa um destes 4 ── */
+
+.dash-saas-skeleton {
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg, var(--gray-lighter) 25%, var(--gray-light) 37%, var(--gray-lighter) 63%);
+  background-size: 400% 100%;
+  animation: dash-saas-shimmer 1.4s ease infinite;
+}
+@keyframes dash-saas-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+.dash-saas-skeleton--linha { height: 1rem; margin-bottom: var(--space-sm); }
+.dash-saas-skeleton--bloco { height: 6rem; }
+
+.dash-saas-vazio {
+  text-align: center;
+  padding: var(--space-lg) var(--space-md);
+  color: var(--gray);
+}
+.dash-saas-vazio-icone { opacity: .5; margin-bottom: var(--space-sm); }
+.dash-saas-vazio-msg { font-size: var(--text-sm); margin-bottom: var(--space-md); }
+
+.dash-saas-erro {
+  text-align: center;
+  padding: var(--space-lg) var(--space-md);
+  color: var(--danger-700);
+}
+.dash-saas-erro-msg { font-size: var(--text-sm); margin-bottom: var(--space-md); }
+
+/* ── Grupo 1: Saudação ── */
+.dash-saas-saudacao {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+.dash-saas-saudacao-texto h1 { font-size: var(--text-h4); margin: 0 0 .25rem; color: var(--dark); }
+.dash-saas-saudacao-contexto { font-size: var(--text-sm); color: var(--gray); }
+.dash-saas-streak-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .4rem .75rem;
+  border-radius: var(--radius-full);
+  background: var(--gray-lighter);
+  color: var(--gray);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  cursor: default;
+}
+
+/* ── Grupo 2: Continue seus estudos ── */
+.dash-saas-hero-card {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--brand-gradient);
+  color: var(--brand-on-primary);
+  padding: var(--space-lg);
+}
+.dash-saas-hero-card .dash-saas-hero-curso { font-size: var(--text-xs); opacity: .85; text-transform: uppercase; letter-spacing: var(--tracking-wide); }
+.dash-saas-hero-card h3 { margin: .25rem 0 var(--space-md); font-size: var(--text-h4); }
+.dash-saas-hero-progress { background: rgba(255,255,255,.3); border-radius: var(--radius-full); height: 6px; overflow: hidden; margin-bottom: var(--space-sm); }
+.dash-saas-hero-progress > div { height: 100%; background: var(--brand-on-primary); border-radius: var(--radius-full); }
+.dash-saas-hero-card .btn { margin-top: var(--space-md); }
+
+.dash-saas-secundarios { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-sm); margin-top: var(--space-md); }
+.dash-saas-secundario-card {
+  border-radius: var(--radius-md);
+  background: var(--gray-lighter);
+  padding: var(--space-sm) var(--space-md);
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+.dash-saas-secundario-card:hover { transform: translateY(-2px); }
+.dash-saas-secundario-card .nome { font-size: var(--text-sm); font-weight: var(--fw-semibold); color: var(--dark); }
+.dash-saas-secundario-card .meta { font-size: var(--text-xs); color: var(--gray); }
+
+.dash-saas-slot-tutor {
+  margin-top: var(--space-md);
+  border: 1px dashed var(--gray-light);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-xs);
+  color: var(--gray);
+  text-align: center;
+}
+
+/* ── Grupo 3: Sua pontuação ── */
+.dash-saas-pontuacao-linha1 { display: flex; align-items: baseline; gap: var(--space-sm); margin-bottom: var(--space-md); }
+.dash-saas-pontuacao-total { font-size: var(--text-h3); font-weight: var(--fw-bold); color: var(--dark); }
+.dash-saas-pontuacao-nivel { font-size: var(--text-sm); color: var(--gray); }
+
+.dash-saas-badges-recentes { display: flex; gap: var(--space-sm); flex-wrap: wrap; margin-top: var(--space-md); }
+.dash-saas-badge-recente { text-align: center; width: 3.5rem; }
+.dash-saas-badge-recente .emoji { font-size: 1.6rem; }
+.dash-saas-badge-recente .nome { font-size: .65rem; color: var(--gray); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Grupo 4: Próximas metas ── */
+.dash-saas-meta-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--gray-lighter);
+}
+.dash-saas-meta-item:last-child { border-bottom: none; }
+.dash-saas-meta-revisao {
+  background: var(--brand-primary-subtle, var(--primary-lighter));
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+/* ── Grupo 5: Recomendações (scaffold — carrossel Netflix vem na Etapa 4) ── */
+.dash-saas-recomendacoes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-md);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-saas-skeleton { animation: none; }
+  .dash-saas-secundario-card { transition: none; }
+}
