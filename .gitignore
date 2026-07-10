@@ -9,3 +9,12 @@ instance/
 uploads/
 .claude/
 .vercel/
+
+# Fase 5 (ensaio de staging) — NUNCA versionar credenciais reais de banco.
+# scripts/rehearsal.sh é genérico (lê variáveis de ambiente); só o wrapper
+# local com as URLs de verdade fica de fora do repo — ver docs/OPS-STAGING.md.
+scripts/run_rehearsal.sh
+*staging-rehearsal-report*.txt
+rehearsal-*.log
+rehearsal-backup-*.dump
+rehearsal-backup-*.sql
