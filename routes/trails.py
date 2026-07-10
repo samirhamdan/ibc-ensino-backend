@@ -3,7 +3,7 @@ Trails + Onboarding endpoints
 """
 from flask import Blueprint, jsonify, session, request
 from extensions import db
-from core.tenancy import current_tenant_id, get_scoped, get_scoped_or_404
+from core.tenancy import current_tenant_id, get_scoped, get_scoped_or_404, role_no_tenant
 from models import Trail, TrailCourse, UserTrail, OnboardingAnswer, User, UserPoints, Badge, UserBadge, Module, LessonProgress
 
 trails_bp = Blueprint('trails', __name__)
@@ -274,7 +274,7 @@ def submit_onboarding():
 def _admin_required():
     uid = session.get('user_id')
     user = User.query.get(uid) if uid else None
-    if not user or user.role != 'admin':
+    if not user or role_no_tenant(user) != 'admin':
         return None, (jsonify({'error': 'Acesso negado'}), 403)
     return user, None
 
@@ -378,7 +378,7 @@ def admin_available_courses_for_trail(trail_id):
 def create_trail():
     uid = session.get('user_id')
     user = User.query.get(uid) if uid else None
-    if not user or user.role != 'admin':
+    if not user or role_no_tenant(user) != 'admin':
         return jsonify({'error': 'Acesso negado'}), 403
     
     data = request.get_json() or {}

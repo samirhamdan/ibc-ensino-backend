@@ -4,7 +4,7 @@ Profile-specific dashboard routes: admin, tutor, aluno, aluno-externo
 from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, session, request
 from extensions import db
-from core.tenancy import current_tenant_id
+from core.tenancy import current_tenant_id, role_no_tenant
 from models import (User, Course, Module, Question, LessonProgress,
                     Badge, UserBadge, UserPoints, ActivityFeed)
 
@@ -69,7 +69,7 @@ def _completed_pct(course, user_id):
 @dashboards_bp.route('/admin/dashboard', methods=['GET'])
 def admin_dashboard():
     user = _current_user()
-    if not user or user.role != 'admin':
+    if not user or role_no_tenant(user) != 'admin':
         return jsonify({'error': 'Acesso negado'}), 403
 
     alunos = User.query.filter(User.role == 'aluno').count()
@@ -139,10 +139,10 @@ def admin_dashboard():
 @dashboards_bp.route('/tutor/dashboard', methods=['GET'])
 def tutor_dashboard():
     user = _current_user()
-    if not user or user.role not in ('tutor', 'admin'):
+    if not user or role_no_tenant(user) not in ('tutor', 'admin'):
         return jsonify({'error': 'Acesso negado'}), 403
 
-    my_courses_q = Course.query if user.role == 'admin' else Course.query.filter_by(tenant_id=current_tenant_id(), tutor_id=user.id)
+    my_courses_q = Course.query if role_no_tenant(user) == 'admin' else Course.query.filter_by(tenant_id=current_tenant_id(), tutor_id=user.id)
     my_courses_list = my_courses_q.all()
     course_ids = [c.id for c in my_courses_list]
 

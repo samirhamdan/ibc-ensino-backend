@@ -63,6 +63,9 @@ def test_tenant_user_papel_por_tenant(app, seeded):
         demo = Tenant.query.filter_by(slug='demo').first()
 
         uid = seeded['users']['aluno']
+        # Etapa 4.2: o LOGIN cria o vínculo no tenant da sessão — limpa
+        # vínculos de testes anteriores antes de montar o cenário manual
+        TenantUser.query.filter_by(user_id=uid).delete()
         db.session.add(TenantUser(tenant_id=ibc.id, user_id=uid, papel='aluno'))
         db.session.add(TenantUser(tenant_id=demo.id, user_id=uid, papel='admin_tenant'))
         db.session.commit()

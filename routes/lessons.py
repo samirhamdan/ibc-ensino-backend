@@ -6,7 +6,7 @@ from flask import Blueprint, request, jsonify, session
 from extensions import db
 from models import Course, Module, LessonProgress, User, UserPoints, Badge, UserBadge, Certificate, ActivityFeed
 from routes.gamification import award_points, check_and_grant_achievements
-from core.tenancy import current_tenant_id, get_scoped_or_404
+from core.tenancy import current_tenant_id, get_scoped_or_404, role_no_tenant
 
 lessons_bp = Blueprint('lessons', __name__)
 
@@ -27,7 +27,7 @@ def _get_visible_course(course_id, user):
     único caminho que ignorava Course.status (aluno via conteúdo, fazia quiz e
     emitia certificado de curso draft/archived acessando a URL direto)."""
     course = get_scoped_or_404(Course, course_id)
-    if course.status != 'published' and (not user or user.role not in ('admin', 'tutor')):
+    if course.status != 'published' and (not user or role_no_tenant(user) not in ('admin', 'tutor')):
         from flask import abort
         abort(404)
     return course
@@ -140,7 +140,7 @@ def get_aula(course_id, aula_num):
             unlocked = False
             break
 
-    if not unlocked and user.role not in ('admin', 'tutor'):
+    if not unlocked and role_no_tenant(user) not in ('admin', 'tutor'):
         return jsonify({'error': 'Esta aula está bloqueada. Conclua a aula anterior primeiro.'}), 403
 
     module = modules[aula_num - 1]
@@ -165,7 +165,7 @@ def submit_aula_quiz(course_id, aula_num):
 
     # Mesmo bloqueio sequencial de get_aula: sem isso, bastava POSTar direto
     # nesta rota para completar aulas bloqueadas fora de ordem.
-    if user.role not in ('admin', 'tutor'):
+    if role_no_tenant(user) not in ('admin', 'tutor'):
         progress_check = {p.module_id: p for p in
                           LessonProgress.query.filter_by(user_id=user.id, course_id=course_id, tenant_id=current_tenant_id()).all()}
         for i in range(aula_num - 1):
@@ -372,7 +372,7 @@ def mark_video_watched(course_id, aula_num):
 def update_module_video(course_id, module_id):
     """Admin/tutor: set or clear video URL on a module."""
     user = _current_user()
-    if not user or user.role not in ('admin', 'tutor'):
+    if not user or role_no_tenant(user) not in ('admin', 'tutor'):
         return jsonify({'error': 'Acesso negado'}), 403
 
     module = Module.query.filter_by(tenant_id=current_tenant_id(), id=module_id, course_id=course_id).first_or_404()

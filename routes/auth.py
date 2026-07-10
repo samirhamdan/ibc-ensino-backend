@@ -8,7 +8,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import Blueprint, request, jsonify, session
 from extensions import db, limiter
-from core.tenancy import current_tenant_id
+from core.tenancy import current_tenant_id, role_no_tenant
 from models import User, PasswordResetToken
 
 auth_bp = Blueprint('auth', __name__)
@@ -40,7 +40,7 @@ def signup():
     # sempre cria um 'aluno', independentemente do que for enviado.
     requester = _current_user()
     valid_roles = {'aluno', 'tutor', 'admin'}
-    if requester and requester.role == 'admin' and role in valid_roles:
+    if requester and role_no_tenant(requester) == 'admin' and role in valid_roles:
         pass
     else:
         role = 'aluno'
@@ -54,6 +54,9 @@ def signup():
     db.session.commit()
 
     session['user_id'] = user.id
+    from core.tenancy import current_tenant_id, vincular_usuario_ao_tenant
+    session['tenant_id'] = str(current_tenant_id())
+    vincular_usuario_ao_tenant(user)
     return jsonify(user.to_dict()), 201
 
 
@@ -78,6 +81,11 @@ def login():
     db.session.commit()
 
     session['user_id'] = user.id
+    # Etapa 4.2: sessão presa ao tenant onde foi criada (middleware barra uso
+    # cruzado com 403) + vínculo de papel por tenant garantido no login.
+    from core.tenancy import current_tenant_id, vincular_usuario_ao_tenant
+    session['tenant_id'] = str(current_tenant_id())
+    vincular_usuario_ao_tenant(user)
 
     # +5 XP de login diário, no máximo 1x por dia (guard: last_activity_date).
     # Concedido aqui no servidor — a ação 'daily_login' não é mais aceita via
@@ -190,7 +198,7 @@ def list_users():
     user = _current_user()
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
-    if user.role not in ('admin', 'tutor'):
+    if role_no_tenant(user) not in ('admin', 'tutor'):
         return jsonify({'error': 'Acesso negado'}), 403
     users = User.query.order_by(User.created_at).all()
     return jsonify([u.to_dict() for u in users]), 200
@@ -201,7 +209,7 @@ def delete_user(user_id):
     user = _current_user()
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
-    if user.role != 'admin':
+    if role_no_tenant(user) != 'admin':
         return jsonify({'error': 'Acesso negado'}), 403
     if user.id == user_id:
         return jsonify({'error': 'Não é possível remover a si mesmo'}), 400

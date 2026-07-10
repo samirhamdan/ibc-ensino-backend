@@ -15,6 +15,8 @@ invalidação explícita.
 """
 import os
 import time
+
+from flask import session as flask_session
 from dataclasses import dataclass, field
 
 from flask import request, jsonify, g
@@ -143,6 +145,31 @@ def init_tenant_middleware(app, allow_header_override=False):
         if ctx.status == 'suspended':
             return _resposta_403_suspenso(ctx)
         set_current_tenant(ctx)
+        return None
+
+    @app.before_request
+    def enforce_sessao_do_tenant():
+        """Regra dura (doc 02 §5.2): credencial emitida no tenant A não vale
+        no tenant B → 403. Sessões antigas (sem tenant gravado) são religadas
+        ao tenant atual uma única vez — grandfathering da virada."""
+        if 'user_id' not in flask_session:
+            return None
+        from core.tenancy.context import current_tenant_id
+        atual = str(current_tenant_id())
+        da_sessao = flask_session.get('tenant_id')
+        if da_sessao is None:
+            flask_session['tenant_id'] = atual
+            return None
+        if da_sessao != atual:
+            if _wants_json():
+                return jsonify({'error': 'Sessão pertence a outro ambiente. '
+                                         'Entre novamente.'}), 403
+            return ('<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">'
+                    '<title>Sessão inválida</title></head><body '
+                    'style="font-family:sans-serif;text-align:center;padding:4rem">'
+                    '<h1>Sessão inválida neste endereço</h1>'
+                    '<p>Sua sessão pertence a outro ambiente. Faça login novamente.</p>'
+                    '</body></html>'), 403
         return None
 
     @app.route('/api/tenant/current', methods=['GET'])

@@ -4,7 +4,7 @@ Admin-only routes: tutor management, user management, question assignment
 from datetime import datetime
 from flask import Blueprint, request, jsonify, session
 from extensions import db
-from core.tenancy import current_tenant_id, get_scoped, get_scoped_or_404
+from core.tenancy import current_tenant_id, get_scoped, get_scoped_or_404, role_no_tenant
 from models import (
     User, Course, Question, TutorCourse, UserTrail, UserPoints,
     Certificate, Progress, Trail, Notification, Announcement, AnnouncementDismissal,
@@ -18,7 +18,7 @@ admin_bp = Blueprint('admin', __name__)
 def _admin_required():
     uid = session.get('user_id')
     user = User.query.get(uid) if uid else None
-    if not user or user.role != 'admin':
+    if not user or role_no_tenant(user) != 'admin':
         return None, (jsonify({'error': 'Acesso negado'}), 403)
     return user, None
 
@@ -197,7 +197,7 @@ def list_users():
             'id': u.id,
             'name': u.name,
             'email': u.email,
-            'role': u.role,
+            'role': role_no_tenant(u),
             'created_at': u.created_at.isoformat() if u.created_at else None,
             'total_points': pts.total_points if pts else 0,
             'current_level': pts.current_level if pts else 1,
@@ -268,7 +268,7 @@ def get_user_profile(user_id):
         'id': u.id,
         'name': u.name,
         'email': u.email,
-        'role': u.role,
+        'role': role_no_tenant(u),
         'created_at': u.created_at.isoformat() if u.created_at else None,
         'active_trail_id': u.active_trail_id,
         'onboarding_completed': u.onboarding_completed,

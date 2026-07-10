@@ -4,7 +4,7 @@ User-facing notification and announcement routes
 from datetime import datetime
 from flask import Blueprint, request, jsonify, session
 from extensions import db
-from core.tenancy import current_tenant_id, get_scoped_or_404
+from core.tenancy import current_tenant_id, get_scoped_or_404, role_no_tenant
 from models import Notification, Announcement, AnnouncementDismissal, User, PlatformConfig, Level
 
 notifications_bp = Blueprint('notifications', __name__)
@@ -69,7 +69,7 @@ def list_active_announcements():
 
     announcements = Announcement.query.filter(Announcement.tenant_id == current_tenant_id(), 
         Announcement.is_active == True,
-        Announcement.target_role.in_([user.role, 'all']),
+        Announcement.target_role.in_([role_no_tenant(user), 'all']),
     ).order_by(Announcement.created_at.desc()).all()
 
     result = []

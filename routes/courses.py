@@ -3,7 +3,7 @@ Course routes: CRUD for courses, modules, materials
 """
 from flask import Blueprint, request, jsonify, session
 from extensions import db
-from core.tenancy import current_tenant_id, get_scoped, get_scoped_or_404
+from core.tenancy import current_tenant_id, get_scoped, get_scoped_or_404, role_no_tenant
 from models import Course, Module, Material, Quiz, Category, User
 
 courses_bp = Blueprint('courses', __name__)
@@ -27,13 +27,13 @@ def _require_admin():
     user, err = _require_auth()
     if err:
         return None, err
-    if user.role != 'admin':
+    if role_no_tenant(user) != 'admin':
         return None, (jsonify({'error': 'Acesso negado'}), 403)
     return user, None
 
 
 def _can_edit_course(user, course):
-    return user.role == 'admin' or (user.role == 'tutor' and course.tutor_id == user.id)
+    return role_no_tenant(user) == 'admin' or (role_no_tenant(user) == 'tutor' and course.tutor_id == user.id)
 
 
 # ── Courses ────────────────────────────────────────────────────────────────────
@@ -42,7 +42,7 @@ def _can_edit_course(user, course):
 def list_courses():
     user = _current_user()
     query = Course.query.filter_by(tenant_id=current_tenant_id())
-    if not user or user.role not in ('admin', 'tutor'):
+    if not user or role_no_tenant(user) not in ('admin', 'tutor'):
         query = query.filter_by(status='published')
 
     category = request.args.get('category')
@@ -60,7 +60,7 @@ def get_course(course_id):
     user = _current_user()
     course = get_scoped_or_404(Course, course_id)
 
-    is_staff = bool(user and user.role in ('admin', 'tutor'))
+    is_staff = bool(user and role_no_tenant(user) in ('admin', 'tutor'))
     if not is_staff:
         if course.status != 'published':
             return jsonify({'error': 'Curso não encontrado'}), 404
@@ -135,7 +135,7 @@ def update_course(course_id):
         else:
             course.category_id = None
 
-    if 'tutor_id' in data and user.role == 'admin':
+    if 'tutor_id' in data and role_no_tenant(user) == 'admin':
         course.tutor_id = data['tutor_id']
 
     db.session.commit()
@@ -255,7 +255,7 @@ def list_categories():
 def _course_admin_required():
     uid = session.get('user_id')
     user = User.query.get(uid) if uid else None
-    if not user or user.role not in ('admin', 'tutor'):
+    if not user or role_no_tenant(user) not in ('admin', 'tutor'):
         return None, (jsonify({'error': 'Acesso negado'}), 403)
     return user, None
 

@@ -5,7 +5,7 @@ certificates list and "continue learning" info.
 from datetime import datetime
 from flask import Blueprint, jsonify, session, request
 from extensions import db
-from core.tenancy import current_tenant_id, get_scoped
+from core.tenancy import current_tenant_id, get_scoped, role_no_tenant
 from models import (User, Course, Module, LessonProgress, UserPoints,
                      Achievement, UserAchievement, Certificate, Question,
                      StudySession)
@@ -29,7 +29,7 @@ def _require_aluno():
     user = _current_user()
     if not user:
         return None, (jsonify({'error': 'Não autenticado'}), 401)
-    if user.role != 'aluno':
+    if role_no_tenant(user) != 'aluno':
         return None, (jsonify({'error': 'Acesso negado'}), 403)
     return user, None
 

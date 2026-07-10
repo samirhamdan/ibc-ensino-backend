@@ -100,7 +100,22 @@ Referências: docs/02-ARQUITETURA.md §4–5 · docs/01-PRD.md TEN-01..05.
   nem escreve outro tenant; sem GUC → zero linhas; superuser bypassa (por
   isso a role importa).
 
+## Autenticação por tenant (Etapa 4.2 — AUTH-03 parcial / AUTH-01)
+
+- **Sessão presa ao tenant**: login grava o tenant na sessão; o middleware
+  rejeita com 403 sessão apresentada em outro tenant (regra dura do doc 02
+  §5.2 aplicada à sessão de cookie — o JWT com refresh rotativo entra com o
+  módulo auth/ da Release 1.0). Sessões antigas são religadas 1x
+  (grandfathering da virada).
+- **Papéis por tenant** (`core/tenancy/auth.py`): `role_no_tenant(user)` lê
+  tenant_users.papel (fallback User.role na transição); TODAS as checagens
+  de papel das rotas usam o helper. Privilégio NÃO é herdado entre tenants:
+  admin do ibc entra como aluno no demo (promoção é ato explícito).
+- Migração 0013: backfill de tenant_users no tenant padrão (papel = role
+  global) + FK tenant_users.user_id → users (pendente desde a 0001).
+- Vocabulário de papéis segue o legado (admin|tutor|aluno); mapeamento para
+  os nomes do PRD acontece na Release 1.0 junto com o frontend.
+
 ## Próximos passos no módulo
 
-- Etapa 4.2: JWT com claims de tenant; papéis migram para tenant_users.
 - Etapa 4.3: Redis (cache de tenant, rate limiting, base para RQ).

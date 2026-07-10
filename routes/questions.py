@@ -3,7 +3,7 @@ Questions/Q&A routes: students ask questions, tutors answer
 """
 from flask import Blueprint, request, jsonify, session
 from extensions import db
-from core.tenancy import current_tenant_id, get_scoped_or_404
+from core.tenancy import current_tenant_id, get_scoped_or_404, role_no_tenant
 from models import Question, Course, User, Progress, Notification, TutorCourse
 
 questions_bp = Blueprint('questions', __name__)
@@ -62,7 +62,7 @@ def answer_question(question_id):
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    if user.role not in ('admin', 'tutor'):
+    if role_no_tenant(user) not in ('admin', 'tutor'):
         return jsonify({'error': 'Apenas tutores podem responder perguntas'}), 403
 
     question = get_scoped_or_404(Question, question_id)
@@ -71,7 +71,7 @@ def answer_question(question_id):
     # ao curso via TutorCourse (admin /tutors/<id>/assign-course), OU a pergunta
     # foi atribuída a ele (admin /questions/<id>/assign). Antes só o tutor_id
     # do curso passava — o fluxo de atribuição do admin ficava inoperante (403).
-    if user.role == 'tutor':
+    if role_no_tenant(user) == 'tutor':
         is_course_tutor = bool(question.course and question.course.tutor_id == user.id)
         is_linked_tutor = bool(question.course and TutorCourse.query.filter_by(tenant_id=current_tenant_id(), 
             tutor_id=user.id, course_id=question.course_id).first())
@@ -137,11 +137,11 @@ def tutor_dashboard():
     user = _current_user()
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
-    if user.role not in ('admin', 'tutor'):
+    if role_no_tenant(user) not in ('admin', 'tutor'):
         return jsonify({'error': 'Acesso negado'}), 403
 
     query = Question.query.filter_by(tenant_id=current_tenant_id())
-    if user.role == 'tutor':
+    if role_no_tenant(user) == 'tutor':
         # mesmos critérios de answer_question: cursos onde é tutor principal,
         # cursos vinculados via TutorCourse e perguntas atribuídas diretamente
         course_ids = {c.id for c in Course.query.filter_by(tenant_id=current_tenant_id(), tutor_id=user.id).all()}
