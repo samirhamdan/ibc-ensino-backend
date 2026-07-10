@@ -70,3 +70,37 @@ def test_tokens_para_css_nao_vaza_meta():
     assert '--brand-primary: #008ea8;' in css
     assert '_meta' not in css
     assert 'nome_exibido' not in css
+
+
+def test_endpoint_theme_nao_quebra_com_cor_malformada_no_banco(app, seeded):
+    """Correção da 1ª revisão Fable 5 (H2): tema_json malformado (edição
+    manual, bug futuro no editor de admin) não pode derrubar /api/theme
+    com 500 — cai no default da plataforma e responde 200."""
+    with app.app_context():
+        from extensions import db
+        from core.tenancy import Tenant, default_tenant_id
+        from core.tenancy.cache import cache_clear
+        tenant = Tenant.query.get(default_tenant_id())
+        original = tenant.tema_json
+        tenant.tema_json = {'primary': 'não-é-cor'}
+        db.session.commit()
+    cache_clear()
+
+    try:
+        c = app.test_client()
+        r = c.get('/api/theme')
+        assert r.status_code == 200
+        assert '--brand-primary' in r.get_data(as_text=True)
+
+        r2 = c.get('/api/theme.json')
+        assert r2.status_code == 200
+        assert r2.get_json()['--brand-primary'] == '#008ea8'
+    finally:
+        with app.app_context():
+            from extensions import db
+            from core.tenancy import Tenant, default_tenant_id
+            from core.tenancy.cache import cache_clear as _clear
+            tenant = Tenant.query.get(default_tenant_id())
+            tenant.tema_json = original
+            db.session.commit()
+        cache_clear()

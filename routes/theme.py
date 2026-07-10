@@ -29,6 +29,19 @@ def _tema_e_nome_do_tenant_atual():
     return tenant.tema_json, tenant.nome
 
 
+def _tokens_do_tenant_atual():
+    """Nunca deixa um tema_json malformado (cor fora do formato #RRGGBB —
+    edição manual no banco, futuro editor de admin com bug) derrubar o
+    boot inteiro da SPA com 500: cai no default da plataforma e segue.
+    Diferente de um erro comum, aqui a falha é silenciosa de propósito —
+    é literalmente melhor tema errado do que dashboard não carregar."""
+    tema, nome = _tema_e_nome_do_tenant_atual()
+    try:
+        return construir_tokens(tema, nome)
+    except ValueError:
+        return construir_tokens(None, nome)
+
+
 @theme_bp.route('/theme', methods=['GET'])
 def get_theme():
     chave = f'theme:{current_tenant_id()}'
@@ -37,9 +50,7 @@ def get_theme():
     if cacheado is not None:
         return Response(cacheado['css'], mimetype='text/css')
 
-    tema, nome = _tema_e_nome_do_tenant_atual()
-    tokens = construir_tokens(tema, nome)
-    css = tokens_para_css(tokens)
+    css = tokens_para_css(_tokens_do_tenant_atual())
     cache_set(chave, {'css': css}, _TTL_SEGUNDOS)
     return Response(css, mimetype='text/css')
 
@@ -48,6 +59,4 @@ def get_theme():
 def get_theme_json():
     """Mesmos tokens em JSON — usado pelo painel admin (preview ao vivo,
     incluindo o aviso de cor ajustada por contraste) e por testes."""
-    tema, nome = _tema_e_nome_do_tenant_atual()
-    tokens = construir_tokens(tema, nome)
-    return jsonify(tokens), 200
+    return jsonify(_tokens_do_tenant_atual()), 200
