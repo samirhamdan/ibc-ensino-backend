@@ -4184,6 +4184,15 @@ async function renderAlunoDashboard(){
   catch(e){ console.error('[ERRO] renderAlunoDashboard:', e); _renderDashboardError(e, 'painel do aluno'); }
 }
 
+function _dashSaasEscAttr(s){
+  // Escapa para uso dentro de atributo HTML (aspas duplas) — content-context
+  // (innerHTML de texto) já segue a convenção existente no resto do arquivo,
+  // mas atributo é um contexto de escape DIFERENTE (aspas quebram o atributo
+  // mesmo sem `<`/`>`), então title="${...}" precisa do seu próprio escape.
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
 function _dashSaasSkeleton(){
   return `<div class="dash-saas-skeleton dash-saas-skeleton--linha" style="width:60%"></div>
           <div class="dash-saas-skeleton dash-saas-skeleton--bloco"></div>`;
@@ -4193,7 +4202,7 @@ function _dashSaasErro(retryFn){
   return `<div class="dash-saas-erro">
       <div>${icon('x-circle','24','icon--x-circle')}</div>
       <div class="dash-saas-erro-msg">Não foi possível carregar esta seção.</div>
-      <button class="btn btn-outline btn-sm" onclick="${retryFn}">${icon('search','14')} Tentar de novo</button>
+      <button class="btn btn-outline btn-sm" onclick="${retryFn}">${icon('target','14')} Tentar de novo</button>
     </div>`;
 }
 
@@ -4210,26 +4219,50 @@ async function _renderAlunoDashboardInner(){
         <div class="dash-saas-grupo" id="dash-saas-metas">${_dashSaasSkeleton()}</div>
       </div>
       <div class="dash-saas-grupo dash-saas-full" id="dash-saas-recomendacoes">${_dashSaasSkeleton()}</div>
-    </div>
-    <div id="activityFeedSection" class="dash-saas-full" style="margin-top:var(--space-lg)"></div>`;
+      <div class="dash-saas-full" id="activityFeedSection"></div>
+    </div>`;
 
   await _dashSaasCarregarTudo();
   renderActivityFeed();
 }
 
+const _DASH_SAAS_GRUPOS = ['dash-saas-saudacao','dash-saas-continuar','dash-saas-pontuacao','dash-saas-metas','dash-saas-recomendacoes'];
+
 async function _dashSaasCarregarTudo(){
-  const res = await api('GET','/aluno/dashboard');
+  // onclick="renderAlunoDashboard()" (não a função interna) no retry: passa
+  // pelo try/catch que já protege a carga inicial — um throw de rede aqui
+  // (não só um !res.ok) não pode deixar o botão de retry sem efeito nenhum.
+  let res;
+  try {
+    res = await api('GET','/aluno/dashboard');
+  } catch(e){
+    console.error('[ERRO] _dashSaasCarregarTudo:', e);
+    _DASH_SAAS_GRUPOS.forEach(id => { const elx=document.getElementById(id); if(elx) elx.innerHTML=_dashSaasErro('renderAlunoDashboard()'); });
+    return;
+  }
   if(!res.ok){
-    ['dash-saas-saudacao','dash-saas-continuar','dash-saas-pontuacao','dash-saas-metas','dash-saas-recomendacoes']
-      .forEach(id => { const elx=document.getElementById(id); if(elx) elx.innerHTML=_dashSaasErro('_dashSaasCarregarTudo()'); });
+    _DASH_SAAS_GRUPOS.forEach(id => { const elx=document.getElementById(id); if(elx) elx.innerHTML=_dashSaasErro('renderAlunoDashboard()'); });
     return;
   }
   const d = await res.json();
-  _dashSaasRenderSaudacao(d);
-  _dashSaasRenderContinuar(d);
-  _dashSaasRenderPontuacao(d);
-  _dashSaasRenderMetas(d);
-  _dashSaasRenderRecomendacoes(d);
+  // Cada grupo é isolado: um payload inesperado que derruba UM render não
+  // pode deixar os outros presos no skeleton para sempre (§4.4 — usuário
+  // nunca vê grupo travado em loading).
+  const renderizadores = {
+    'dash-saas-saudacao': _dashSaasRenderSaudacao,
+    'dash-saas-continuar': _dashSaasRenderContinuar,
+    'dash-saas-pontuacao': _dashSaasRenderPontuacao,
+    'dash-saas-metas': _dashSaasRenderMetas,
+    'dash-saas-recomendacoes': _dashSaasRenderRecomendacoes,
+  };
+  for(const [id, fn] of Object.entries(renderizadores)){
+    try { fn(d); }
+    catch(e){
+      console.error(`[ERRO] dashboard grupo ${id}:`, e);
+      const elx=document.getElementById(id);
+      if(elx) elx.innerHTML=_dashSaasErro('renderAlunoDashboard()');
+    }
+  }
 }
 
 function _dashSaasSaudacaoPorHorario(){
@@ -4309,13 +4342,13 @@ function _dashSaasRenderPontuacao(d){
     <div class="dash-saas-grupo-titulo">${icon('bar-chart','14')} Sua pontuação</div>
     <div class="dash-saas-pontuacao-linha1">
       <span class="dash-saas-pontuacao-total">${s.total_points||0}</span>
-      <span class="dash-saas-pontuacao-nivel">pts · Nível ${s.level||1} (${s.level_name||''})</span>
+      <span class="dash-saas-pontuacao-nivel">pts · Nível ${s.level||1}${s.level_name?` (${s.level_name})`:''}</span>
     </div>
     <div class="dash-saas-streak-chip" style="width:100%;justify-content:center" title="Streak chega na próxima etapa">
       ${icon('fire','16')} Streak — em breve
     </div>
     ${recentes.length ? `<div class="dash-saas-badges-recentes">${recentes.map(t=>`
-      <div class="dash-saas-badge-recente" title="${t.name}">
+      <div class="dash-saas-badge-recente" title="${_dashSaasEscAttr(t.name)}">
         <div class="emoji">${t.icon||'🏅'}</div>
         <span class="nome">${t.name}</span>
       </div>`).join('')}</div>` : `<div class="dash-saas-vazio" style="padding:var(--space-md) 0">
@@ -4411,39 +4444,6 @@ async function renderActivityFeed(){
       </div>`;
   }catch(e){
     el.innerHTML = '';
-  }
-}
-
-// ── Goals with how-to instructions (Sprint 2.1) ──
-async function loadGoalsSection(){
-  const el = document.getElementById('goalsSection');
-  if(!el) return;
-  try{
-    const res = await api('GET','/gamification/badges');
-    if(!res.ok){ el.innerHTML = '<span style="color:var(--gray);font-size:var(--text-sm)">Não foi possível carregar suas metas.</span>'; return; }
-    const badges = await res.json();
-    const locked = badges.filter(b=>!b.unlocked && b.progress).map(b=>{
-      const [cur, tgt] = b.progress.split('/').map(Number);
-      return {...b, cur: cur||0, tgt: tgt||1, ratio: (cur||0)/(tgt||1)};
-    }).sort((a,b)=>b.ratio - a.ratio).slice(0,3);
-    if(!locked.length){
-      el.innerHTML = `<span style="color:var(--gray);font-size:var(--text-sm)">${icon('achievements','14','icon--gold')} Você desbloqueou todas as conquistas!</span>`;
-      return;
-    }
-    el.innerHTML = locked.map(b=>`
-      <div class="goal-item">
-        <span class="goal-icon">${b.icon}</span>
-        <div class="goal-info">
-          <span class="goal-name">${b.name}</span>
-          <span class="goal-how">${b.description||''}</span>
-          <div class="goal-progress">
-            <div class="progress progress-sm"><div class="progress-bar" style="width:${Math.round(b.ratio*100)}%"></div></div>
-            <span class="goal-count">${b.cur}/${b.tgt}</span>
-          </div>
-        </div>
-      </div>`).join('');
-  } catch(e){
-    el.innerHTML = '<span style="color:var(--gray);font-size:var(--text-sm)">Não foi possível carregar suas metas.</span>';
   }
 }
 
@@ -4958,21 +4958,6 @@ function renderHero(userData, stats){
       <div class="hero-stat"><span class="hero-stat-value" data-target="${badgesCount}">${badgesCount}</span><span class="hero-stat-label">${icon('achievements','16','icon--gold')} Conquistas</span></div>
     </div>`}
   </div>`;
-}
-
-function animateHero(pct){
-  const circumference = 201;
-  const fill = document.getElementById('heroRingFill');
-  const xpFill = document.getElementById('heroXpFill');
-  if(fill){
-    requestAnimationFrame(()=>{
-      fill.style.transition = 'stroke-dashoffset 1s cubic-bezier(0.4,0,0.2,1)';
-      fill.style.strokeDashoffset = String(circumference - (circumference * pct / 100));
-    });
-  }
-  if(xpFill){
-    requestAnimationFrame(()=>{ xpFill.style.width = pct + '%'; });
-  }
 }
 
 // ── Trail helpers ──
