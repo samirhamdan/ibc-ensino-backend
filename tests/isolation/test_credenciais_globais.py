@@ -121,7 +121,10 @@ def test_usuario_removido_do_tenant_login_e_403_sem_recriar_vinculo(iso_app, see
 # ── TESTE 5: readicionar o usuário (convite) restaura o login ────────────
 
 def test_admin_readiciona_usuario_e_login_volta_a_funcionar(iso_app, seeded):
-    from extensions import db
+    """Reconvidar via POST /admin/users/invite (não inserção direta no
+    banco): a rota reconhece que já existe uma conta global com esse e-mail
+    e só cria o vínculo — a senha antiga continua valendo (convite nunca
+    grava credencial global, correção HIGH-1)."""
     from core.tenancy import Tenant, TenantUser
     uid = seeded['users']['aluno']
 
@@ -132,10 +135,18 @@ def test_admin_readiciona_usuario_e_login_volta_a_funcionar(iso_app, seeded):
     c = TenantClient(iso_app.test_client(), HOST_A)
     assert _login(c, HOST_A, 'aluno@test.com').status_code == 403
 
+    r = admin_c.post('/api/admin/users/invite',
+                     json={'name': 'Aluno', 'email': 'aluno@test.com',
+                           'role': 'aluno', 'password': 'irrelevante123'})
+    assert r.status_code == 201
+
     with iso_app.app_context():
         a_id = Tenant.query.filter_by(slug='ibc').first().id
-        db.session.add(TenantUser(tenant_id=a_id, user_id=uid, papel='aluno'))
-        db.session.commit()
+        assert TenantUser.query.filter_by(tenant_id=a_id, user_id=uid).first().papel == 'aluno'
+
+    c2 = TenantClient(iso_app.test_client(), HOST_A)
+    # senha ORIGINAL ('senha123') continua válida — o convite não a trocou
+    assert _login(c2, HOST_A, 'aluno@test.com').status_code == 200
 
     c2 = TenantClient(iso_app.test_client(), HOST_A)
     assert _login(c2, HOST_A, 'aluno@test.com').status_code == 200
@@ -168,6 +179,52 @@ def test_remocao_de_um_tenant_nao_afeta_outro(iso_app, seeded):
         b_id = Tenant.query.filter_by(slug='demo').first().id
         TenantUser.query.filter_by(tenant_id=b_id, user_id=uid).delete()
         db.session.add(TenantUser(tenant_id=a_id, user_id=uid, papel='aluno'))
+        db.session.commit()
+
+
+# ── TESTE extra (2ª rodada da Fable): sessão viva de admin removido ──────
+
+def test_sessao_viva_de_admin_removido_do_tenant_padrao_perde_privilegio(iso_app, seeded):
+    """Achado da 2ª revisão: DELETE /api/auth/users/<id> não revoga a sessão
+    já aberta do usuário removido; se role_no_tenant() ainda caísse no
+    fallback de User.role no tenant padrão, a PRÓXIMA requisição dessa
+    sessão devolveria o papel global de novo — um admin removido recuperava
+    admin sozinho, sem relogar. Como o fallback foi removido por completo,
+    a sessão sobrevive (não é a sessão que é revogada) mas o papel efetivo
+    cai para 'aluno' assim que o vínculo desaparece."""
+    from extensions import db
+    from core.tenancy import Tenant, TenantUser
+    from models import User
+
+    # Usuário DESCARTÁVEL (não o tutor/aluno/admin seedados, compartilhados
+    # por toda a suíte) — delete_user também desvincula referências
+    # possuídas noutro lugar (Course.tutor_id etc.), então reusar um usuário
+    # seedado aqui poluiria fixtures de OUTROS testes.
+    with iso_app.app_context():
+        a_id = Tenant.query.filter_by(slug='ibc').first().id
+        vitima_user = User(name='Vítima', email='vitima-high2@test.com', role='aluno')
+        vitima_user.set_password('senha123')
+        db.session.add(vitima_user)
+        db.session.flush()
+        uid = vitima_user.id
+        db.session.add(TenantUser(tenant_id=a_id, user_id=uid, papel='admin'))
+        db.session.commit()
+
+    vitima = TenantClient(iso_app.test_client(), HOST_A)
+    assert _login(vitima, HOST_A, 'vitima-high2@test.com').status_code == 200
+    assert vitima.get('/api/admin/users').status_code == 200   # é admin
+
+    # outro admin remove o vínculo do tenant padrão (sem derrubar a sessão)
+    admin_c = TenantClient(iso_app.test_client(), HOST_A)
+    assert _login(admin_c, HOST_A, 'admin@test.com').status_code == 200
+    assert admin_c.delete(f'/api/auth/users/{uid}').status_code == 200
+
+    # a MESMA sessão, na próxima requisição, não é mais admin
+    r = vitima.get('/api/admin/users')
+    assert r.status_code == 403
+
+    with iso_app.app_context():
+        db.session.delete(User.query.get(uid))
         db.session.commit()
 
 

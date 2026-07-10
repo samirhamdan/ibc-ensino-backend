@@ -171,7 +171,12 @@ def test_admin_update_user_nao_grava_role_global(admin_a, iso_app, seeded):
 
 # ── #2 (unitário): role_no_tenant não herda fora do tenant padrão ───────
 
-def test_role_no_tenant_fallback_restrito_ao_tenant_padrao(iso_app, seeded):
+def test_role_no_tenant_sem_vinculo_e_sempre_aluno_mesmo_no_padrao(iso_app, seeded):
+    """Correção HIGH-2 (continuidade): sem vínculo explícito, o papel é
+    SEMPRE 'aluno' — inclusive no tenant padrão. O fallback para User.role
+    no tenant padrão foi removido: ele sobrevivia como caminho residual para
+    uma sessão de admin recuperar o papel global depois de ter o vínculo
+    removido (DELETE /api/auth/users/<id> não revoga sessões já abertas)."""
     from core.tenancy import role_no_tenant, set_current_tenant, Tenant
     from core.tenancy.models import TenantUser
     from models import User
@@ -181,8 +186,8 @@ def test_role_no_tenant_fallback_restrito_ao_tenant_padrao(iso_app, seeded):
         a_id = Tenant.query.filter_by(slug='ibc').first().id
         b_id = Tenant.query.filter_by(slug='demo').first().id
         # remove TAMBÉM o vínculo do tenant padrão (o fixture `seeded` cria
-        # um, espelhando a migração 0013) para testar genuinamente o
-        # FALLBACK — não um papel já explícito em tenant_users.
+        # um, espelhando a migração 0013) para testar genuinamente a
+        # AUSÊNCIA de vínculo — não um papel já explícito em tenant_users.
         TenantUser.query.filter_by(user_id=admin_id).delete()
         from extensions import db
         db.session.commit()
@@ -198,8 +203,8 @@ def test_role_no_tenant_fallback_restrito_ao_tenant_padrao(iso_app, seeded):
 
     with iso_app.test_request_context('/'):
         user = User.query.get(admin_id)
-        set_current_tenant(Tenant.query.get(a_id))   # tenant PADRÃO, sem vínculo explícito
-        assert role_no_tenant(user) == 'admin'        # paridade mono-tenant preservada
+        set_current_tenant(Tenant.query.get(a_id))   # tenant PADRÃO, sem vínculo
+        assert role_no_tenant(user) == 'aluno'        # também NÃO herda — sem exceção
 
     # restaura o vínculo que o fixture `seeded` esperava
     with iso_app.app_context():

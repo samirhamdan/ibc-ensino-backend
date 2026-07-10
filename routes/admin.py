@@ -474,8 +474,19 @@ def invite_user():
     if len(password) < 6:
         return jsonify({'error': 'A senha deve ter ao menos 6 caracteres'}), 400
 
-    if User.query.filter_by(email=email).first():
-        return jsonify({'error': 'Email já cadastrado'}), 409
+    existente = User.query.filter_by(email=email).first()
+    if existente is not None:
+        # Conta global já existe (ex.: usuário removido deste tenant antes —
+        # DELETE /api/auth/users/<id> nunca apaga o User, só o vínculo local).
+        # "Convidar de novo" (semântica 2/3, correção HIGH-2) é só criar o
+        # vínculo aqui: a senha da conta global NÃO é alterada por convite —
+        # um admin de tenant nunca grava credencial global (correção HIGH-1).
+        if usuarios_do_tenant_query().filter(User.id == existente.id).first() is not None:
+            return jsonify({'error': 'Email já pertence a este tenant'}), 409
+        vincular_usuario_ao_tenant(existente, papel=role)
+        resposta = existente.to_dict()
+        resposta['role'] = role
+        return jsonify(resposta), 201
 
     # role global sempre 'aluno' — o papel elevado é concedido só neste
     # tenant (vincular_usuario_ao_tenant abaixo), nunca gravado globalmente.

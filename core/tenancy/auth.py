@@ -27,13 +27,18 @@ from core.tenancy.context import current_tenant_id
 def role_no_tenant(user):
     """Papel do usuário NO TENANT ATUAL (cacheado por request).
 
-    tenant_users.papel quando existe. Na AUSÊNCIA de vínculo, o fallback
-    para User.role só vale no tenant PADRÃO (onde o papel global ainda tem
-    sentido de paridade mono-tenant); em qualquer outro tenant, ausência de
-    vínculo é sempre 'aluno' — um admin global nunca deve herdar admin em um
-    tenant que não é o dele só porque a linha em tenant_users ainda não
-    existe. (Correção de segurança: antes o fallback usava user.role em
-    QUALQUER tenant, permitindo escalada de privilégio cruzada.)
+    tenant_users.papel quando existe; na ausência de vínculo, SEMPRE 'aluno'
+    — em QUALQUER tenant, inclusive o padrão. (Correção de segurança
+    original: o fallback usava user.role em qualquer tenant, permitindo
+    escalada de privilégio cruzada. Correção HIGH-2 de continuidade: o
+    fallback para User.role no tenant padrão foi removido de vez — desde que
+    login() passou a exigir um vínculo pré-existente e a migração 0013
+    garante vínculo para todo usuário legado, aquele fallback só continuava
+    ativo como um caminho residual: uma sessão de admin já aberta sobrevivia
+    à remoção do vínculo do tenant padrão — DELETE /api/auth/users/<id> não
+    revogava a sessão, e a próxima requisição, sem achar tenant_users,
+    devolvia o papel global de novo. Sem vínculo explícito, o papel é sempre
+    'aluno', ponto.)
 
     Vocabulário continua o legado (admin|tutor|aluno) — o mapeamento para os
     papéis do PRD (admin_tenant|instrutor|...) acontece na Release 1.0 junto
@@ -49,15 +54,9 @@ def role_no_tenant(user):
         return cache[key]
 
     from core.tenancy.models import TenantUser
-    from core.tenancy.context import default_tenant_id
     tid = current_tenant_id()
     tu = TenantUser.query.filter_by(tenant_id=tid, user_id=user.id).first()
-    if tu is not None:
-        papel = tu.papel
-    elif tid == default_tenant_id():
-        papel = user.role
-    else:
-        papel = 'aluno'
+    papel = tu.papel if tu is not None else 'aluno'
     cache[key] = papel
     return papel
 
