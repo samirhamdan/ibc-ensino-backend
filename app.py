@@ -113,6 +113,12 @@ def create_app(config_name='development'):
         # existentes) até o schema legado ser baselineado na Fase 3.
         from core.tenancy import Tenant, TenantUser, init_tenant_middleware
 
+        # Fase 6 do playbook: registrado ANTES de tudo — em manutenção,
+        # nenhuma rota (nem a resolução de tenant) deve rodar contra um
+        # schema potencialmente a meio caminho de `alembic upgrade head`.
+        from core.maintenance import init_maintenance_middleware
+        init_maintenance_middleware(app)
+
         # TEN-02: resolução de tenant por subdomínio. Sem TENANT_BASE_DOMAIN
         # configurado, nada muda para os hosts atuais (Railway/localhost);
         # o override X-Tenant-Slug só existe fora de produção.
