@@ -19,6 +19,30 @@
 <!-- App legacy styles (load first so design system can override) -->
 <link rel="stylesheet" href="css/app.css">
 
+<!-- Tema do tenant (UX_ALUNO_SAAS.md §2.2): XHR SÍNCRONO de propósito —
+     precisa terminar antes do <style id="tenant-theme"> existir e antes de
+     design-system.css ler --brand-primary, senão o primeiro paint usa o
+     fallback errado e pisca ao trocar (flash de tema errado). É pequeno
+     (poucas linhas de CSS) e roda uma vez no boot, então o bloqueio é
+     imperceptível; se a chamada falhar (rede, /api fora do ar), os
+     fallbacks fixos em design-system.css garantem que a página renderiza
+     igual — nunca quebra o boot por causa do tema. -->
+<script>
+(function () {
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/theme', false);
+    xhr.send(null);
+    if (xhr.status === 200 && xhr.responseText) {
+      var style = document.createElement('style');
+      style.id = 'tenant-theme';
+      style.textContent = xhr.responseText;
+      document.head.appendChild(style);
+    }
+  } catch (e) { /* sem tema resolvido — segue com os fallbacks fixos */ }
+})();
+</script>
+
 <!-- Design System CSS -->
 <link rel="stylesheet" href="css/design-system.css">
 <link rel="stylesheet" href="css/reset.css">

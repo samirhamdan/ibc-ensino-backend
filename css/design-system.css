@@ -12,8 +12,19 @@
   --primary-800: #045268;
   --primary-900: #093c4c;
 
-  --primary:         var(--primary-500);
-  --primary-dark:    var(--primary-700);
+  /* Identidade do tenant (UX_ALUNO_SAAS.md §2.1/§2.2) — injetados por
+     GET /api/theme em <style id="tenant-theme"> no boot (index.html),
+     ANTES deste arquivo carregar. Os valores abaixo são só o fallback:
+     tenant padrão (IBC) ou qualquer contexto sem tema resolvido (páginas
+     fora do SPA, /api indisponível) renderiza EXATAMENTE como hoje. */
+  --brand-primary:         #008ea8;
+  --brand-primary-hover:   #006b85;
+  --brand-primary-subtle:  rgba(0, 142, 168, 0.10);
+  --brand-gradient:        linear-gradient(120deg, #008ea8 0%, #7c3aed 100%);
+  --brand-on-primary:      #ffffff;
+
+  --primary:         var(--brand-primary, var(--primary-500));
+  --primary-dark:    var(--brand-primary-hover, var(--primary-700));
   --primary-light:   var(--primary-400);
   --primary-lighter: #e8f4f8;
 
