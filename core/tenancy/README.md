@@ -116,6 +116,19 @@ Referências: docs/02-ARQUITETURA.md §4–5 · docs/01-PRD.md TEN-01..05.
 - Vocabulário de papéis segue o legado (admin|tutor|aluno); mapeamento para
   os nomes do PRD acontece na Release 1.0 junto com o frontend.
 
+## Redis (Etapa 4.3 — fallback gracioso)
+
+- `core/tenancy/cache.py`: com `REDIS_URL`, o cache de resolução de tenant
+  é compartilhado entre workers/réplicas (invalidação global; chaves
+  prefixadas `xr:tenant:` — doc 02 §5.5); sem ela, memória por processo
+  (comportamento atual). Redis inacessível → aviso e fallback, nunca derruba.
+- `extensions.py`: storage do rate limiting usa o mesmo `REDIS_URL`
+  (resolve DEBITOS #10 quando provisionado; `memory://` explícito até lá).
+- Ativação: criar o serviço Redis no Railway e definir `REDIS_URL` no
+  serviço web — sem mudança de código.
+- Base para RQ (workers da Release 1.0) fica pronta pela mesma variável.
+
 ## Próximos passos no módulo
 
-- Etapa 4.3: Redis (cache de tenant, rate limiting, base para RQ).
+- Fase 5: ensaio geral em staging (scripts/rehearsal — exige backup/staging).
+- Release 1.0: JWT completo no módulo auth/, RQ workers, painel do operador.

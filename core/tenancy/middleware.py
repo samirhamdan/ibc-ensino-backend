@@ -15,6 +15,7 @@ invalidação explícita.
 """
 import os
 import time
+import uuid as uuid_mod
 
 from flask import session as flask_session
 from dataclasses import dataclass, field
@@ -25,7 +26,10 @@ from core.tenancy.context import set_current_tenant
 
 
 CACHE_TTL_SECONDS = 60
-_cache = {}   # subdominio -> (TenantContext|None, expira_em)
+# Cache plugável (Etapa 4.3): Redis quando REDIS_URL existe (compartilhado
+# entre workers, invalidação global), memória por processo caso contrário.
+from core.tenancy.cache import cache_get, cache_set, cache_clear
+_NEGATIVO = {'__negativo__': True}
 
 
 @dataclass
@@ -48,7 +52,7 @@ class TenantContext:
 
 def clear_tenant_cache():
     """Invalidação manual (testes e, futuramente, painel do operador)."""
-    _cache.clear()
+    cache_clear()
 
 
 def _to_context(tenant):
@@ -60,17 +64,20 @@ def _to_context(tenant):
 
 
 def _lookup_by(campo, valor):
-    """Busca com cache TTL. Cacheia também o resultado negativo (None) —
+    """Busca com cache TTL. Cacheia também o resultado negativo —
     senão um subdomínio inexistente martelado vira query a cada request."""
     from core.tenancy.models import Tenant
     key = f'{campo}:{valor}'
-    now = time.monotonic()
-    hit = _cache.get(key)
-    if hit and hit[1] > now:
-        return hit[0]
+    hit = cache_get(key)
+    if hit is not None:
+        if hit.get('__negativo__'):
+            return None
+        return TenantContext(id=uuid_mod.UUID(hit['id']), slug=hit['slug'], nome=hit['nome'],
+                             subdominio=hit['subdominio'], plano=hit['plano'],
+                             status=hit['status'], tema=hit.get('tema') or {})
     tenant = Tenant.query.filter_by(**{campo: valor}).first()
     ctx = _to_context(tenant)
-    _cache[key] = (ctx, now + CACHE_TTL_SECONDS)
+    cache_set(key, ctx.to_dict() if ctx else _NEGATIVO, CACHE_TTL_SECONDS)
     return ctx
 
 
