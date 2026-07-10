@@ -157,15 +157,27 @@ def init_tenant_middleware(app, allow_header_override=False):
     @app.before_request
     def enforce_sessao_do_tenant():
         """Regra dura (doc 02 §5.2): credencial emitida no tenant A não vale
-        no tenant B → 403. Sessões antigas (sem tenant gravado) são religadas
-        ao tenant atual uma única vez — grandfathering da virada."""
+        no tenant B → 403.
+
+        Sessões antigas (sem tenant gravado — só existem porque foram
+        emitidas ANTES desta etapa, todas no tenant padrão) são religadas
+        apenas ao tenant PADRÃO, nunca ao tenant onde o cookie é apresentado
+        pela primeira vez — senão um cookie legado roubado/replicado valeria
+        para sempre no tenant do atacante. Sessão legada apresentada em
+        outro tenant é limpa e tratada como não-autenticada (401/página de
+        login), não religada."""
         if 'user_id' not in flask_session:
             return None
-        from core.tenancy.context import current_tenant_id
+        from core.tenancy.context import current_tenant_id, default_tenant_id
         atual = str(current_tenant_id())
         da_sessao = flask_session.get('tenant_id')
         if da_sessao is None:
-            flask_session['tenant_id'] = atual
+            if atual == str(default_tenant_id()):
+                flask_session['tenant_id'] = atual
+                return None
+            flask_session.clear()
+            if _wants_json():
+                return jsonify({'error': 'Não autenticado'}), 401
             return None
         if da_sessao != atual:
             if _wants_json():

@@ -118,6 +118,12 @@ def test_papel_concedido_no_tenant_vale_so_la(iso_app, seeded):
 
     with iso_app.app_context():
         from extensions import db
-        from core.tenancy import TenantUser
+        from core.tenancy import TenantUser, Tenant
+        # Restaura o baseline do fixture `seeded` (vínculo 'aluno' no tenant
+        # padrão, espelhando a migração 0013) — só apagar deixaria o usuário
+        # sem NENHUM vínculo, quebrando outros testes que dependem dele
+        # (usuarios_do_tenant_query/get_user_scoped_or_404 são escopados).
+        a_id = Tenant.query.filter_by(slug='ibc').first().id
         TenantUser.query.filter_by(user_id=uid).delete()
+        db.session.add(TenantUser(tenant_id=a_id, user_id=uid, papel='aluno'))
         db.session.commit()

@@ -8,7 +8,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import Blueprint, request, jsonify, session
 from extensions import db, limiter
-from core.tenancy import current_tenant_id, role_no_tenant
+from core.tenancy import (current_tenant_id, role_no_tenant, vincular_usuario_ao_tenant,
+                          usuarios_do_tenant_query, get_user_scoped_or_404)
 from models import User, PasswordResetToken
 
 auth_bp = Blueprint('auth', __name__)
@@ -48,16 +49,22 @@ def signup():
     if User.query.filter_by(email=email).first():
         return jsonify({'error': 'Email já cadastrado'}), 409
 
-    user = User(name=name, email=email, role=role)
+    # User.role global NUNCA recebe o papel elevado escolhido aqui — só o
+    # vínculo em tenant_users (abaixo), restrito ao tenant atual. Gravar
+    # 'admin' em User.role permitiria que esse usuário herdasse admin em
+    # QUALQUER outro tenant onde ainda não tenha vínculo (escalada cruzada).
+    user = User(name=name, email=email, role='aluno')
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
 
     session['user_id'] = user.id
-    from core.tenancy import current_tenant_id, vincular_usuario_ao_tenant
     session['tenant_id'] = str(current_tenant_id())
-    vincular_usuario_ao_tenant(user)
-    return jsonify(user.to_dict()), 201
+    vincular_usuario_ao_tenant(user, papel=role)
+
+    resposta = user.to_dict()
+    resposta['role'] = role  # papel efetivo concedido NESTE tenant
+    return jsonify(resposta), 201
 
 
 @auth_bp.route('/login', methods=['POST'])
@@ -83,7 +90,6 @@ def login():
     session['user_id'] = user.id
     # Etapa 4.2: sessão presa ao tenant onde foi criada (middleware barra uso
     # cruzado com 403) + vínculo de papel por tenant garantido no login.
-    from core.tenancy import current_tenant_id, vincular_usuario_ao_tenant
     session['tenant_id'] = str(current_tenant_id())
     vincular_usuario_ao_tenant(user)
 
@@ -200,7 +206,9 @@ def list_users():
         return jsonify({'error': 'Não autenticado'}), 401
     if role_no_tenant(user) not in ('admin', 'tutor'):
         return jsonify({'error': 'Acesso negado'}), 403
-    users = User.query.order_by(User.created_at).all()
+    # Escopado ao tenant atual (usuarios_do_tenant_query) — antes listava
+    # TODOS os usuários de TODOS os tenants (User.query sem filtro).
+    users = usuarios_do_tenant_query().order_by(User.created_at).all()
     return jsonify([u.to_dict() for u in users]), 200
 
 
@@ -213,7 +221,11 @@ def delete_user(user_id):
         return jsonify({'error': 'Acesso negado'}), 403
     if user.id == user_id:
         return jsonify({'error': 'Não é possível remover a si mesmo'}), 400
-    target = User.query.get_or_404(user_id)
+    # 404 (nunca 403) se o usuário não pertence a este tenant — antes,
+    # User.query.get_or_404 alcançava usuários de QUALQUER tenant.
+    target = get_user_scoped_or_404(user_id)
+
+    from core.tenancy import TenantUser
 
     # Referências que apontam para o usuário mas não são "posse" dele: precisam
     # ser anuladas/removidas antes do delete, senão o Postgres viola FK → 500.
@@ -223,7 +235,17 @@ def delete_user(user_id):
     Notification.query.filter_by(tenant_id=current_tenant_id(), created_by=user_id).update({'created_by': None})
     TutorCourse.query.filter_by(tenant_id=current_tenant_id(), tutor_id=user_id).delete()
 
-    db.session.delete(target)
+    # Remove o vínculo com ESTE tenant. Só apaga a conta global (User) se o
+    # usuário não pertencer a nenhum outro tenant — caso contrário a conta
+    # (e os dados dela em outros tenants) precisa sobreviver.
+    TenantUser.query.filter_by(tenant_id=current_tenant_id(), user_id=user_id).delete()
+    db.session.flush()
+    # Conta vínculos em TODOS os tenants (não só o atual) para decidir se a
+    # conta User global pode ser apagada com segurança.
+    outros_vinculos = TenantUser.query.filter_by(user_id=user_id).count()  # tenant-scope: intencionalmente global
+    if outros_vinculos == 0:
+        db.session.delete(target)
+
     db.session.commit()
     return jsonify({'message': 'Usuário removido'}), 200
 
@@ -305,10 +327,16 @@ def forgot_password():
     if not email:
         return jsonify({'error': 'Email é obrigatório'}), 400
 
+    # Mesma mensagem e mesmo status para e-mail existente ou não (anti-
+    # enumeração). Antes disso já valia para o caso "não existe", mas o
+    # caso "existe, SMTP falhou" retornava 500 com o detalhe do erro —
+    # diferença de status (e de tempo, por causa do envio síncrono) permitia
+    # inferir quais e-mails têm conta. Falha de envio agora só é logada.
+    resposta_padrao = jsonify({'message': 'Se o email existir, você receberá as instruções.'})
+
     user = User.query.filter_by(email=email).first()
-    # Always return success to avoid email enumeration
     if not user:
-        return jsonify({'message': 'Se o email existir, você receberá as instruções.'}), 200
+        return resposta_padrao, 200
 
     # Invalidate old tokens
     PasswordResetToken.query.filter_by(user_id=user.id, used=False).update({'used': True})
@@ -322,9 +350,9 @@ def forgot_password():
 
     ok, msg = _send_reset_email(user.email, user.name, reset_url)
     if not ok:
-        return jsonify({'error': f'Erro ao enviar email: {msg}'}), 500
+        print(f'aviso: falha ao enviar e-mail de redefinição para {user.email}: {msg}')
 
-    return jsonify({'message': 'Se o email existir, você receberá as instruções.'}), 200
+    return resposta_padrao, 200
 
 
 @auth_bp.route('/reset-password-token', methods=['POST'])

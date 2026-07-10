@@ -26,9 +26,16 @@ depends_on = None
 FK = 'fk_tenant_users_user'
 
 
-def _tenant_ibc_id(bind):
-    row = bind.execute(sa.text("SELECT id FROM tenants WHERE slug = 'ibc'")).fetchone()
+def _tenant_padrao_id(bind):
+    """Lê DEFAULT_TENANT_SLUG (mesma env var do core.tenancy.context em
+    runtime) em vez de hardcodar 'ibc' — ver mesma correção em 0004/0007/0010."""
+    import os
+    slug = os.getenv('DEFAULT_TENANT_SLUG', 'ibc')
+    row = bind.execute(sa.text("SELECT id FROM tenants WHERE slug = :slug"),
+                       {'slug': slug}).fetchone()
     if row is None:
+        print(f"aviso: tenant padrão '{slug}' não existe — backfill de "
+              f"tenant_users pulado (rode as migrações 0001+ primeiro).")
         return None
     return row[0] if isinstance(row[0], uuid.UUID) else uuid.UUID(str(row[0]))
 
@@ -37,7 +44,7 @@ def upgrade():
     bind = op.get_bind()
     insp = sa.inspect(bind)
 
-    ibc = _tenant_ibc_id(bind)
+    ibc = _tenant_padrao_id(bind)
     if ibc is not None and insp.has_table('users'):
         bind.execute(sa.text(
             "INSERT INTO tenant_users (tenant_id, user_id, papel, criado_em) "

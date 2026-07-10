@@ -47,7 +47,7 @@ RE_OK = re.compile(r'tenant_id\s*=|\.tenant_id\s*==|get_scoped')
 # Exceções JUSTIFICADAS: lookup global de certificado por cert_code é design
 # (verificação pública por código único não-adivinhável — o código precisa
 # ser único globalmente, e a consulta retorna no máximo o certificado exato).
-RE_JUSTIFICADA = re.compile(r'cert_code\s*=')
+RE_JUSTIFICADA = re.compile(r'cert_code\s*=|tenant-scope: intencionalmente global')
 RE_RAW = re.compile(r'(db\.session\.execute|sa\.text|text\()')
 
 

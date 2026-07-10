@@ -58,6 +58,9 @@ def seeded(app):
         db.session.add(cat)
         db.session.flush()
 
+        from core.tenancy import Tenant, TenantUser, default_tenant_id
+        tenant_padrao = Tenant.query.get(default_tenant_id())
+
         users = {}
         for name, email, role in [('Admin', 'admin@test.com', 'admin'),
                                   ('Tutor', 'tutor@test.com', 'tutor'),
@@ -67,6 +70,12 @@ def seeded(app):
             db.session.add(u)
             db.session.flush()
             users[role] = u.id
+            # Espelha a migração 0013: todo usuário pré-existente ganha
+            # vínculo no tenant padrão com o papel global — sem isto, os
+            # helpers escopados (usuarios_do_tenant_query/
+            # get_user_scoped_or_404) não enxergam usuários criados
+            # diretamente no banco (só quem loga pelo menos uma vez).
+            db.session.add(TenantUser(tenant_id=tenant_padrao.id, user_id=u.id, papel=role))
 
         course = Course(name='Curso Caracterização', acesso='publico',
                         resumo='Curso usado pelos testes', category_id=cat.id,

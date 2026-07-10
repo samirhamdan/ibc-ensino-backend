@@ -31,8 +31,16 @@ def _uuid7():
     return uuid.UUID(bytes=bytes(raw))
 
 
-def _tenant_ibc_id(bind):
-    row = bind.execute(sa.text("SELECT id FROM tenants WHERE slug = 'ibc'")).fetchone()
+def _tenant_padrao_id(bind):
+    """Lê DEFAULT_TENANT_SLUG (mesma env var que core.tenancy.context usa em
+    runtime) em vez de hardcodar 'ibc' — sem isso, um ambiente com o slug
+    padrão diferente faria esta migração criar/usar um tenant 'ibc' que a
+    aplicação em runtime nunca enxerga (dado legado ficaria preso a um
+    tenant fantasma que ninguém resolve)."""
+    import os
+    slug = os.getenv('DEFAULT_TENANT_SLUG', 'ibc')
+    row = bind.execute(sa.text("SELECT id FROM tenants WHERE slug = :slug"),
+                       {'slug': slug}).fetchone()
     if row:
         # SQLite devolve o UUID como string hex — normaliza para uuid.UUID,
         # que é o que o bindparam tipado (sa.Uuid) espera.
@@ -40,14 +48,14 @@ def _tenant_ibc_id(bind):
     novo = _uuid7()
     bind.execute(sa.text(
         "INSERT INTO tenants (id, slug, nome, subdominio, plano, status, criado_em) "
-        "VALUES (:id, 'ibc', 'IBC Ensino', 'ibc', 'semente', 'active', CURRENT_TIMESTAMP)"
-    ).bindparams(sa.bindparam('id', type_=sa.Uuid())), {'id': novo})
+        "VALUES (:id, :slug, :slug, :slug, 'semente', 'active', CURRENT_TIMESTAMP)"
+    ).bindparams(sa.bindparam('id', type_=sa.Uuid())), {'id': novo, 'slug': slug})
     return novo
 
 
 def upgrade():
     bind = op.get_bind()
-    ibc_id = _tenant_ibc_id(bind)
+    ibc_id = _tenant_padrao_id(bind)
     for tabela in GRUPO:
         total = 0
         while True:

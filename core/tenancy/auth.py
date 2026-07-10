@@ -7,11 +7,18 @@ com refresh rotativo entra com o módulo auth/ da Release 1.0). A REGRA DURA
 do doc é a mesma: credencial emitida no tenant A não vale no tenant B
 (403) — aqui aplicada à sessão, no middleware.
 
-Papéis: a fonte passa a ser tenant_users.papel (AUTH-01: papéis diferentes
-por tenant). Fallback para User.role cobre sessões/linhas antigas durante a
-transição — a migração 0013 backfilla o tenant padrão.
+Papéis: a fonte é tenant_users.papel (AUTH-01: papéis diferentes por
+tenant). O fallback para User.role só se aplica DENTRO do tenant padrão —
+fora dele, ausência de vínculo é sempre 'aluno' (nunca herda privilégio
+global). Ver correção de segurança no docstring de role_no_tenant.
+
+users é GLOBAL por design (identidade única, e-mail único) — mas isso NUNCA
+deve significar que um admin de um tenant lista, edita ou remove usuários
+de outro tenant. Este módulo também fornece os helpers de escopo
+(usuarios_do_tenant_query, get_user_scoped_or_404) que TODA rota de gestão
+de usuário deve usar em vez de User.query direto.
 """
-from flask import g
+from flask import abort, g
 
 from extensions import db
 from core.tenancy.context import current_tenant_id
@@ -20,7 +27,14 @@ from core.tenancy.context import current_tenant_id
 def role_no_tenant(user):
     """Papel do usuário NO TENANT ATUAL (cacheado por request).
 
-    tenant_users.papel quando existe; senão User.role (legado/transição).
+    tenant_users.papel quando existe. Na AUSÊNCIA de vínculo, o fallback
+    para User.role só vale no tenant PADRÃO (onde o papel global ainda tem
+    sentido de paridade mono-tenant); em qualquer outro tenant, ausência de
+    vínculo é sempre 'aluno' — um admin global nunca deve herdar admin em um
+    tenant que não é o dele só porque a linha em tenant_users ainda não
+    existe. (Correção de segurança: antes o fallback usava user.role em
+    QUALQUER tenant, permitindo escalada de privilégio cruzada.)
+
     Vocabulário continua o legado (admin|tutor|aluno) — o mapeamento para os
     papéis do PRD (admin_tenant|instrutor|...) acontece na Release 1.0 junto
     com o frontend.
@@ -35,25 +49,88 @@ def role_no_tenant(user):
         return cache[key]
 
     from core.tenancy.models import TenantUser
-    tu = TenantUser.query.filter_by(tenant_id=current_tenant_id(),
-                                    user_id=user.id).first()
-    papel = tu.papel if tu else user.role
+    from core.tenancy.context import default_tenant_id
+    tid = current_tenant_id()
+    tu = TenantUser.query.filter_by(tenant_id=tid, user_id=user.id).first()
+    if tu is not None:
+        papel = tu.papel
+    elif tid == default_tenant_id():
+        papel = user.role
+    else:
+        papel = 'aluno'
     cache[key] = papel
     return papel
 
 
-def vincular_usuario_ao_tenant(user):
-    """Garante o vínculo tenant_users no login (idempotente).
+def vincular_usuario_ao_tenant(user, papel=None):
+    """Garante o vínculo tenant_users no tenant atual (idempotente, seguro
+    sob concorrência).
 
-    Papel inicial: no tenant PADRÃO o usuário herda o papel global (paridade
-    mono-tenant); em qualquer outro tenant entra como 'aluno' — privilégio em
-    outro tenant é concessão explícita do admin daquele tenant, nunca herança.
+    Papel: se `papel` não for informado, o padrão é o mesmo de sempre — no
+    tenant PADRÃO herda o papel global (paridade mono-tenant), em qualquer
+    outro tenant entra como 'aluno'. Quando `papel` É informado (ex.: um
+    admin criando um usuário via signup/convite), ele vale APENAS no tenant
+    atual — nunca é escrito em User.role (global).
+
+    Concorrência: dois logins simultâneos do mesmo usuário podem colidir no
+    INSERT (unique tenant_id+user_id) — tratado com savepoint + rollback,
+    sem propagar IntegrityError como 500.
     """
+    from sqlalchemy.exc import IntegrityError
     from core.tenancy.models import TenantUser
     from core.tenancy.context import default_tenant_id
+
     tid = current_tenant_id()
-    tu = TenantUser.query.filter_by(tenant_id=tid, user_id=user.id).first()
-    if tu is None:
+    if TenantUser.query.filter_by(tenant_id=tid, user_id=user.id).first() is not None:
+        return
+
+    if papel is None:
         papel = user.role if tid == default_tenant_id() else 'aluno'
-        db.session.add(TenantUser(tenant_id=tid, user_id=user.id, papel=papel))
-        db.session.commit()
+
+    try:
+        with db.session.begin_nested():
+            db.session.add(TenantUser(tenant_id=tid, user_id=user.id, papel=papel))
+            db.session.flush()
+    except IntegrityError:
+        # Corrida: outro request já criou o vínculo (unique tenant_id+user_id).
+        db.session.rollback()
+        return
+    db.session.commit()
+
+
+def definir_papel_no_tenant(user_id, papel):
+    """Concede/atualiza o papel de um usuário NO TENANT ATUAL (upsert em
+    tenant_users). Usado pelas rotas de admin ao criar/editar usuário — o
+    papel NUNCA é escrito em User.role (que ficaria visível/efetivo em
+    todos os tenants do usuário)."""
+    from core.tenancy.models import TenantUser
+    tid = current_tenant_id()
+    tu = TenantUser.query.filter_by(tenant_id=tid, user_id=user_id).first()
+    if tu is None:
+        db.session.add(TenantUser(tenant_id=tid, user_id=user_id, papel=papel))
+    else:
+        tu.papel = papel
+
+
+def usuarios_do_tenant_query():
+    """Query base de User restrita a quem tem vínculo no tenant atual —
+    substitui User.query em TODA rota de listagem/gestão de usuários.
+    (Sem isso, um admin de um tenant lista/gerencia usuários de todos os
+    outros — o vazamento mais grave encontrado na revisão de segurança.)"""
+    from core.tenancy.models import TenantUser
+    from models import User
+    return User.query.join(
+        TenantUser,
+        (TenantUser.user_id == User.id) & (TenantUser.tenant_id == current_tenant_id())
+    )
+
+
+def get_user_scoped_or_404(user_id):
+    """Busca um User garantindo vínculo no tenant atual — 404 (nunca 403)
+    se o usuário existe mas pertence a outro tenant, para não revelar
+    existência (mesmo padrão de core.tenancy.context.get_scoped_or_404)."""
+    from models import User
+    user = usuarios_do_tenant_query().filter(User.id == user_id).first()
+    if user is None:
+        abort(404)
+    return user

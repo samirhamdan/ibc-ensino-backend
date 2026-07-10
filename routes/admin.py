@@ -4,7 +4,9 @@ Admin-only routes: tutor management, user management, question assignment
 from datetime import datetime
 from flask import Blueprint, request, jsonify, session
 from extensions import db
-from core.tenancy import current_tenant_id, get_scoped, get_scoped_or_404, role_no_tenant
+from core.tenancy import (current_tenant_id, get_scoped, get_scoped_or_404, role_no_tenant,
+                          usuarios_do_tenant_query, get_user_scoped_or_404,
+                          definir_papel_no_tenant, vincular_usuario_ao_tenant)
 from models import (
     User, Course, Question, TutorCourse, UserTrail, UserPoints,
     Certificate, Progress, Trail, Notification, Announcement, AnnouncementDismissal,
@@ -31,7 +33,10 @@ def list_tutors():
     if err:
         return err
 
-    tutors = User.query.filter_by(role='tutor').order_by(User.name).all()
+    # Escopado ao tenant atual e ao papel EFETIVO no tenant (não ao role
+    # global) — antes listava tutores globais de qualquer tenant.
+    tutors = [u for u in usuarios_do_tenant_query().order_by(User.name).all()
+             if role_no_tenant(u) == 'tutor']
     result = []
     for t in tutors:
         assigned_courses = TutorCourse.query.filter_by(tenant_id=current_tenant_id(), tutor_id=t.id).all()
@@ -70,8 +75,8 @@ def assign_course_to_tutor(tutor_id):
     if err:
         return err
 
-    tutor = User.query.get_or_404(tutor_id)
-    if tutor.role not in ('tutor', 'admin'):
+    tutor = get_user_scoped_or_404(tutor_id)
+    if role_no_tenant(tutor) not in ('tutor', 'admin'):
         return jsonify({'error': 'Usuário não é tutor'}), 400
 
     data = request.get_json(silent=True) or {}
@@ -136,8 +141,8 @@ def assign_question(question_id):
     tutor_id = data.get('tutor_id')
 
     if tutor_id:
-        tutor = User.query.get_or_404(tutor_id)
-        if tutor.role not in ('tutor', 'admin'):
+        tutor = get_user_scoped_or_404(tutor_id)
+        if role_no_tenant(tutor) not in ('tutor', 'admin'):
             return jsonify({'error': 'Usuário não é tutor'}), 400
         q.assigned_tutor_id = tutor_id
     else:
@@ -169,10 +174,9 @@ def list_users():
     role_filter = request.args.get('role', '')
     trail_filter = request.args.get('trail', '')
 
-    query = User.query
-
-    if role_filter:
-        query = query.filter_by(role=role_filter)
+    # Escopado ao tenant atual — antes listava TODOS os usuários de TODOS
+    # os tenants (User.query sem filtro), o vazamento mais grave da revisão.
+    query = usuarios_do_tenant_query()
 
     if trail_filter:
         try:
@@ -188,6 +192,10 @@ def list_users():
 
     if search:
         users = [u for u in users if search in u.name.lower() or search in u.email.lower()]
+    if role_filter:
+        # Filtra pelo papel EFETIVO no tenant atual, não pelo role global —
+        # um usuário pode ser 'aluno' globalmente e 'tutor' só neste tenant.
+        users = [u for u in users if role_no_tenant(u) == role_filter]
 
     result = []
     for u in users:
@@ -215,7 +223,7 @@ def get_user_profile(user_id):
     if err:
         return err
 
-    u = User.query.get_or_404(user_id)
+    u = get_user_scoped_or_404(user_id)
     pts = UserPoints.query.filter_by(user_id=u.id, tenant_id=current_tenant_id()).first()
 
     trails = []
@@ -287,7 +295,7 @@ def reset_user_progress(user_id):
     if err:
         return err
 
-    u = User.query.get_or_404(user_id)
+    u = get_user_scoped_or_404(user_id)
 
     Progress.query.filter_by(user_id=u.id, tenant_id=current_tenant_id()).delete()
     LessonProgress.query.filter_by(user_id=u.id, tenant_id=current_tenant_id()).delete()
@@ -312,7 +320,7 @@ def change_user_active_trail(user_id):
     if err:
         return err
 
-    u = User.query.get_or_404(user_id)
+    u = get_user_scoped_or_404(user_id)
     data = request.get_json(silent=True) or {}
     trail_id = data.get('trail_id')
 
@@ -348,9 +356,11 @@ def bulk_action_users():
         if not trail_id:
             return jsonify({'error': 'trail_id obrigatório'}), 400
         get_scoped_or_404(Trail, trail_id)
-        # só ids que existem: um id fantasma na lista violava FK e derrubava
-        # a operação inteira com 500
-        valid_ids = {u.id for u in User.query.filter(User.id.in_(user_ids)).all()}
+        # só ids que existem E pertencem a este tenant: um id fantasma na
+        # lista violava FK e derrubava a operação com 500; um id de OUTRO
+        # tenant seria matriculado numa trilha que não é dele (vazamento).
+        valid_ids = {u.id for u in usuarios_do_tenant_query()
+                    .filter(User.id.in_(user_ids)).all()}
         for uid in valid_ids:
             existing = UserTrail.query.filter_by(user_id=uid, trail_id=trail_id, tenant_id=current_tenant_id()).first()
             if not existing:
@@ -375,7 +385,7 @@ def update_user(user_id):
     if err:
         return err
 
-    u = User.query.get_or_404(user_id)
+    u = get_user_scoped_or_404(user_id)
     data = request.get_json(silent=True) or {}
     name = (data.get('name') or '').strip()
     email = (data.get('email') or '').strip().lower()
@@ -392,14 +402,19 @@ def update_user(user_id):
     if existing:
         return jsonify({'error': 'Email já em uso por outro usuário'}), 409
 
-    if user_id == admin_user.id and role != 'admin':
+    if user_id == admin_user.id and role != role_no_tenant(admin_user):
         return jsonify({'error': 'Não é possível alterar o próprio papel de administrador'}), 400
 
     u.name = name
     u.email = email
-    u.role = role
+    # Papel gravado em tenant_users (escopado a ESTE tenant) — nunca em
+    # User.role global, que vazaria/escalaria o papel para outros tenants
+    # onde o usuário ainda não tem vínculo.
+    definir_papel_no_tenant(user_id, role)
     db.session.commit()
-    return jsonify(u.to_dict()), 200
+    resposta = u.to_dict()
+    resposta['role'] = role
+    return jsonify(resposta), 200
 
 
 @admin_bp.route('/users/<int:user_id>/toggle-active', methods=['POST'])
@@ -408,7 +423,7 @@ def toggle_user_active(user_id):
     if err:
         return err
 
-    u = User.query.get_or_404(user_id)
+    u = get_user_scoped_or_404(user_id)
     u.is_active = not u.is_active
     db.session.commit()
     return jsonify(u.to_dict()), 200
@@ -420,7 +435,7 @@ def admin_reset_user_password(user_id):
     if err:
         return err
 
-    u = User.query.get_or_404(user_id)
+    u = get_user_scoped_or_404(user_id)
     data = request.get_json(silent=True) or {}
     new_password = data.get('new_password') or ''
 
@@ -457,10 +472,12 @@ def invite_user():
     if User.query.filter_by(email=email).first():
         return jsonify({'error': 'Email já cadastrado'}), 409
 
+    # role global sempre 'aluno' — o papel elevado é concedido só neste
+    # tenant (vincular_usuario_ao_tenant abaixo), nunca gravado globalmente.
     u = User(
         name=name,
         email=email,
-        role=role,
+        role='aluno',
         is_active=True,
         onboarding_completed=True,
         created_at=datetime.utcnow(),
@@ -468,7 +485,13 @@ def invite_user():
     u.set_password(password)
     db.session.add(u)
     db.session.commit()
-    return jsonify(u.to_dict()), 201
+    # Sem isto, o usuário convidado não teria vínculo em NENHUM tenant —
+    # ficaria invisível para usuarios_do_tenant_query() (bug pré-existente:
+    # convites nunca criavam o vínculo tenant_users).
+    vincular_usuario_ao_tenant(u, papel=role)
+    resposta = u.to_dict()
+    resposta['role'] = role
+    return jsonify(resposta), 201
 
 
 @admin_bp.route('/users/<int:user_id>/message', methods=['POST'])
@@ -477,7 +500,7 @@ def send_user_message(user_id):
     if err:
         return err
 
-    target = User.query.get_or_404(user_id)
+    target = get_user_scoped_or_404(user_id)
     data = request.get_json(silent=True) or {}
     title = (data.get('title') or '').strip()
     message = (data.get('message') or '').strip()

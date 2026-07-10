@@ -67,7 +67,11 @@ def test_tenant_users_zero_linhas_cruzadas(iso_app, tenants_ab, seeded):
                                           TenantUser.papel == 'admin_tenant').count()
         assert vazadas == 0
 
+        # Restaura o baseline do fixture `seeded` (vínculo 'aluno' no
+        # tenant padrão) em vez de só apagar — outros testes dependem dele
+        # via usuarios_do_tenant_query/get_user_scoped_or_404.
         TenantUser.query.filter_by(user_id=uid).delete()
+        db.session.add(TenantUser(tenant_id=a_id, user_id=uid, papel='aluno'))
         db.session.commit()
 
 

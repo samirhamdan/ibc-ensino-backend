@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, session, request
 from extensions import db
 from core.tenancy import current_tenant_id, role_no_tenant
+from core.tenancy.models import TenantUser
 from models import (User, Course, Module, Question, LessonProgress,
                     Badge, UserBadge, UserPoints, ActivityFeed)
 
@@ -72,9 +73,16 @@ def admin_dashboard():
     if not user or role_no_tenant(user) != 'admin':
         return jsonify({'error': 'Acesso negado'}), 403
 
-    alunos = User.query.filter(User.role == 'aluno').count()
-    tutores = User.query.filter_by(role='tutor').count()
-    admins = User.query.filter_by(role='admin').count()
+    # Contagem por papel EFETIVO no tenant (tenant_users.papel), não por
+    # User.role global — antes contava usuários de TODOS os tenants juntos.
+    contagem_papeis = dict(
+        db.session.query(TenantUser.papel, db.func.count(TenantUser.user_id))
+        .filter_by(tenant_id=current_tenant_id())
+        .group_by(TenantUser.papel).all()
+    )
+    alunos = contagem_papeis.get('aluno', 0)
+    tutores = contagem_papeis.get('tutor', 0)
+    admins = contagem_papeis.get('admin', 0)
     total_users = alunos + tutores + admins
 
     total_courses = Course.query.filter_by(tenant_id=current_tenant_id()).count()
@@ -83,12 +91,18 @@ def admin_dashboard():
     completion_rate = round(sum(1 for p in all_progress if p.passed) / len(all_progress) * 100, 1) if all_progress else 0.0
 
     week_ago = datetime.utcnow() - timedelta(days=7)
-    new_users_7d = User.query.filter(User.created_at >= week_ago).count()
+    # Novos vínculos neste tenant nos últimos 7 dias (não novas contas
+    # globais — um usuário pode ser antigo em outro tenant e novo aqui).
+    new_users_7d = TenantUser.query.filter(
+        TenantUser.tenant_id == current_tenant_id(),
+        TenantUser.criado_em >= week_ago).count()
 
     weekly_stats = []
     for i in range(6, -1, -1):
         day = (datetime.utcnow() - timedelta(days=i)).date()
-        signups = User.query.filter(db.func.date(User.created_at) == day).count()
+        signups = TenantUser.query.filter(
+            TenantUser.tenant_id == current_tenant_id(),
+            db.func.date(TenantUser.criado_em) == day).count()
         weekly_stats.append({'day': day.strftime('%d/%m'), 'logins': signups, 'signups': signups})
 
     user_distribution = {
@@ -168,7 +182,12 @@ def tutor_dashboard():
     week_ago = datetime.utcnow() - timedelta(days=7)
     new_questions = Question.query.filter(Question.tenant_id == current_tenant_id(), Question.course_id.in_(course_ids), Question.created_at >= week_ago).count()
     answered = Question.query.filter(Question.tenant_id == current_tenant_id(), Question.course_id.in_(course_ids), Question.created_at >= week_ago, Question.resposta != '').count()
-    new_students = User.query.filter(User.created_at >= week_ago, User.role == 'aluno').count()
+    # Novos vínculos de aluno NESTE tenant — não contas globais criadas em
+    # qualquer tenant (antes vazava a contagem de todos os tenants juntos).
+    new_students = TenantUser.query.filter(
+        TenantUser.tenant_id == current_tenant_id(),
+        TenantUser.papel == 'aluno',
+        TenantUser.criado_em >= week_ago).count()
 
     return jsonify({
         'pending_questions': pending_questions,
@@ -283,7 +302,9 @@ def aluno_externo_dashboard():
             'rating': 4.8, 'review_count': 50 + c.id * 37, 'lessons': n_modules,
         })
 
-    total_users = User.query.count()
+    # "Comunidade" é a comunidade DESTE tenant — contagem global vazava o
+    # tamanho da base de outros tenants para qualquer aluno autenticado.
+    total_users = TenantUser.query.filter_by(tenant_id=current_tenant_id()).count()
     total_courses = Course.query.filter_by(tenant_id=current_tenant_id()).count()
     all_progress = LessonProgress.query.filter_by(tenant_id=current_tenant_id()).all()
     completion_rate = round(sum(1 for p in all_progress if p.passed) / len(all_progress) * 100) if all_progress else 0
