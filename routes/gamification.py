@@ -28,6 +28,10 @@ POINTS_PER_ACTION = {
     'daily_login': 5,
 }
 
+# GAM-02 (Etapa 3): bônus de pontos ao bater um marco de streak — chave é
+# o valor de current_streak que dispara o bônus.
+STREAK_MARCOS = {7: 50, 30: 200, 100: 500}
+
 
 def _current_user():
     uid = session.get('user_id')
@@ -170,7 +174,28 @@ def award_points(user_id, action, metadata=None):
 
     up = _get_or_create_points(user_id)
     old_level = up.current_level
-    up.total_points = (up.total_points or 0) + points
+
+    # GAM-02 (Etapa 3, UX_ALUNO_SAAS.md §3 Grupo 3): streak de dias
+    # consecutivos, calculado pela transição do last_activity_date ANTERIOR
+    # a este award — só no gatilho 'daily_login' (o mesmo hook que já
+    # limitava o bônus de login a 1x/dia, routes/auth.py::login).
+    streak_bonus = 0
+    marco_atingido = None
+    if action == 'daily_login':
+        hoje = datetime.utcnow().date()
+        ontem = hoje - timedelta(days=1)
+        if up.last_activity_date == hoje:
+            pass   # chamada duplicada no mesmo dia — não conta streak de novo
+        elif up.last_activity_date == ontem:
+            up.current_streak = (up.current_streak or 0) + 1
+        else:
+            up.current_streak = 1   # primeira atividade ou dia perdido — reinicia
+        up.longest_streak = max(up.longest_streak or 0, up.current_streak or 0)
+        if up.current_streak in STREAK_MARCOS:
+            streak_bonus = STREAK_MARCOS[up.current_streak]
+            marco_atingido = up.current_streak
+
+    up.total_points = (up.total_points or 0) + points + streak_bonus
     up.current_level, up.points_in_level = calculate_level(up.total_points)
     up.last_activity_date = datetime.utcnow().date()
     db.session.flush()
@@ -183,11 +208,14 @@ def award_points(user_id, action, metadata=None):
         db.session.rollback()
 
     return {
-        'points_awarded': points,
+        'points_awarded': points + streak_bonus,
         'total_points': up.total_points,
         'level_up': level_up,
         'new_level': up.current_level if level_up else None,
         'badge_unlocked': badges_unlocked[0] if badges_unlocked else None,
+        'current_streak': up.current_streak or 0,
+        'streak_marco_atingido': marco_atingido,
+        'streak_bonus': streak_bonus,
     }
 
 

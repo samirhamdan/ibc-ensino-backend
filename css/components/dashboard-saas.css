@@ -93,6 +93,34 @@
   font-weight: var(--fw-semibold);
   cursor: default;
 }
+.dash-saas-streak-chip--ativa { background: color-mix(in srgb, var(--streak-flame) 12%, transparent); color: var(--streak-flame); }
+.dash-saas-streak-chip--risco { background: var(--warning-100); color: var(--warning-700); }
+
+/* ── Chama de streak (GAM-02, §4.2) — SVG próprio, 3 estados ── */
+.dash-saas-flame { flex-shrink: 0; }
+.dash-saas-flame--ativa { color: var(--streak-flame); animation: dash-saas-flame-flicker 3s ease-in-out infinite; }
+.dash-saas-flame--risco { color: var(--warning-500); animation: dash-saas-flame-pulso 1.6s ease-in-out infinite; }
+.dash-saas-flame--quebrada { color: var(--gray); }
+
+@keyframes dash-saas-flame-flicker {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .85; transform: scale(.96); }
+}
+@keyframes dash-saas-flame-pulso {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .45; }
+}
+
+/* Badge "nova" (§4.2): entrada com bounce 1x — animation-iteration-count
+   padrão é 1, então mesmo recalculando "é nova?" a cada carregamento da
+   página (sem localStorage, ver decisão no commit), nunca vira loop. */
+@keyframes dash-saas-badge-bounce {
+  0% { transform: scale(0.3); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.dash-saas-badge-recente--nova .emoji { animation: dash-saas-badge-bounce 400ms ease-out; }
+.dash-saas-badge-recente--nova .nome { color: var(--brand-primary); font-weight: var(--fw-semibold); }
 
 /* ── Grupo 2: Continue seus estudos ── */
 .dash-saas-hero-card {
@@ -166,4 +194,7 @@
 @media (prefers-reduced-motion: reduce) {
   .dash-saas-skeleton { animation: none; }
   .dash-saas-secundario-card { transition: none; }
+  .dash-saas-flame--ativa,
+  .dash-saas-flame--risco { animation: none; }
+  .dash-saas-badge-recente--nova .emoji { animation: none; }
 }

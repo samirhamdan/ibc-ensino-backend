@@ -4193,6 +4193,38 @@ function _dashSaasEscAttr(s){
     .replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+// Chama de streak (GAM-02, §4.2) — SVG próprio (não emoji), 3 estados:
+// 'ativa' (flicker sutil), 'risco' (pulso — tem sequência mas não renovou
+// hoje), 'quebrada' (cinza, sem animação, ou nunca teve streak).
+function _dashSaasFlameSvg(estado, tamanho){
+  tamanho = tamanho || 18;
+  return `<svg class="dash-saas-flame dash-saas-flame--${estado}" width="${tamanho}" height="${tamanho}"
+      viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M12 2c1 3-2 4-2 7a3 3 0 0 0 6 0c0-1-.5-2-1-3 2 1 4 4 4 7a7 7 0 1 1-14 0c0-4 2-6 4-8 1-1 2-2 3-3z"/>
+  </svg>`;
+}
+
+function _dashSaasStreakEstado(stats){
+  if(!stats || !stats.current_streak) return 'quebrada';
+  if(stats.streak_em_risco) return 'risco';
+  return 'ativa';
+}
+
+function _dashSaasStreakChip(stats){
+  const estado = _dashSaasStreakEstado(stats);
+  const dias = (stats && stats.current_streak) || 0;
+  const svg = _dashSaasFlameSvg(estado, 16);
+  if(estado === 'quebrada'){
+    return `<span class="dash-saas-streak-chip" title="Comece hoje e construa sua sequência de dias de estudo">${svg} Sem streak</span>`;
+  }
+  const texto = dias === 1 ? '1 dia' : `${dias} dias`;
+  const titulo = estado === 'risco'
+    ? `Sua sequência de ${texto} está em risco — estude hoje para não perdê-la`
+    : `Sequência de ${texto} seguidos — continue assim!`;
+  const classeEstado = estado === 'risco' ? 'dash-saas-streak-chip--risco' : 'dash-saas-streak-chip--ativa';
+  return `<span class="dash-saas-streak-chip ${classeEstado}" title="${_dashSaasEscAttr(titulo)}">${svg} ${texto}</span>`;
+}
+
 function _dashSaasSkeleton(){
   return `<div class="dash-saas-skeleton dash-saas-skeleton--linha" style="width:60%"></div>
           <div class="dash-saas-skeleton dash-saas-skeleton--bloco"></div>`;
@@ -4277,12 +4309,19 @@ function _dashSaasRenderSaudacao(d){
   if(!elx) return;
   const nome = (currentUser && currentUser.name ? currentUser.name.split(' ')[0] : 'aluno');
   const ip = d.in_progress_course;
+  const stats = d.user_stats || {};
   // Prioridade da frase de contexto (§3 Grupo 1): (a) streak em risco —
-  // ainda não existe (Etapa 3); (b) revisões pendentes — LRN-02 real é
-  // Release 1.0; (c) progresso — sempre disponível hoje, é o fallback.
+  // GAM-02, Etapa 3; (b) revisões pendentes — LRN-02 real é Release 1.0;
+  // (c) progresso — sempre disponível hoje, é o fallback.
   let contexto = 'Pronto para continuar sua jornada de estudos?';
-  if(ip) contexto = `Você está a ${Math.max(0, ip.total_aulas - ip.aula_atual + 1)} aula(s) de concluir "${ip.name}".`;
-  else if(d.next_metas && d.next_metas.length) contexto = d.next_metas[0].description;
+  if(stats.streak_em_risco && stats.current_streak){
+    const dias = stats.current_streak === 1 ? '1 dia' : `${stats.current_streak} dias`;
+    contexto = `Sua sequência de ${dias} vence hoje — estude um pouco para mantê-la!`;
+  } else if(ip){
+    contexto = `Você está a ${Math.max(0, ip.total_aulas - ip.aula_atual + 1)} aula(s) de concluir "${ip.name}".`;
+  } else if(d.next_metas && d.next_metas.length){
+    contexto = d.next_metas[0].description;
+  }
 
   elx.innerHTML = `
     <div class="dash-saas-saudacao">
@@ -4290,7 +4329,7 @@ function _dashSaasRenderSaudacao(d){
         <h1>${_dashSaasSaudacaoPorHorario()}, ${nome}</h1>
         <div class="dash-saas-saudacao-contexto">${contexto}</div>
       </div>
-      <span class="dash-saas-streak-chip" title="Streak chega na próxima etapa">${icon('fire','16')} —</span>
+      ${_dashSaasStreakChip(stats)}
     </div>`;
 }
 
@@ -4332,6 +4371,19 @@ function _dashSaasRenderContinuar(d){
     </div>`;
 }
 
+// "Nova" (§4.2): sem localStorage (não introduzimos uso novo dele aqui),
+// então "nova" é calculado sem estado persistido — desbloqueada nas
+// últimas 24h. O bounce em si só toca 1x por carregamento de página de
+// qualquer forma (animation-iteration-count é 1 por padrão), então
+// recalcular isso a cada load nunca vira loop, só pode repetir o bounce
+// se a pessoa recarregar a página dentro da mesma janela de 24h — aceitável.
+function _dashSaasBadgeEhNova(isoDate){
+  if(!isoDate) return false;
+  const desbloqueada = new Date(isoDate).getTime();
+  if(Number.isNaN(desbloqueada)) return false;
+  return (Date.now() - desbloqueada) < 24*60*60*1000;
+}
+
 function _dashSaasRenderPontuacao(d){
   const elx = document.getElementById('dash-saas-pontuacao');
   if(!elx) return;
@@ -4344,11 +4396,10 @@ function _dashSaasRenderPontuacao(d){
       <span class="dash-saas-pontuacao-total">${s.total_points||0}</span>
       <span class="dash-saas-pontuacao-nivel">pts · Nível ${s.level||1}${s.level_name?` (${s.level_name})`:''}</span>
     </div>
-    <div class="dash-saas-streak-chip" style="width:100%;justify-content:center" title="Streak chega na próxima etapa">
-      ${icon('fire','16')} Streak — em breve
-    </div>
+    <div style="display:flex;justify-content:center;margin-bottom:var(--space-sm)">${_dashSaasStreakChip(s)}</div>
+    ${s.longest_streak ? `<div style="text-align:center;font-size:var(--text-xs);color:var(--gray);margin-bottom:var(--space-sm)">Recorde: ${s.longest_streak} dia(s)</div>` : ''}
     ${recentes.length ? `<div class="dash-saas-badges-recentes">${recentes.map(t=>`
-      <div class="dash-saas-badge-recente" title="${_dashSaasEscAttr(t.name)}">
+      <div class="dash-saas-badge-recente${_dashSaasBadgeEhNova(t.date)?' dash-saas-badge-recente--nova':''}" title="${_dashSaasEscAttr(t.name)}">
         <div class="emoji">${t.icon||'🏅'}</div>
         <span class="nome">${t.name}</span>
       </div>`).join('')}</div>` : `<div class="dash-saas-vazio" style="padding:var(--space-md) 0">

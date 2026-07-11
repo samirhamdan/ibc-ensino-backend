@@ -46,6 +46,12 @@
   /* Ciano elétrico — realce "neon" do próprio teal, só em brilhos/glow. */
   --neon-cyan: #22e3ee;
 
+  /* Streak (GAM-02, UX_ALUNO_SAAS.md §2.1/§2.3): cor FIXA da plataforma —
+     o tenant nunca configura isto. Igual em todo tenant de propósito
+     (vira reconhecível, é assinatura da marca da plataforma, não do
+     tenant, ao contrário de --brand-primary). */
+  --streak-flame: #f97316;
+
   /* Semantic — escalas com tint/shade para badges, alerts, ícones */
   --success-100: #d7f5e3; --success-500: #1fa96a; --success-700: #0f7a4a;
   --warning-100: #fdf0d5; --warning-500: #e8a13d; --warning-700: #b57519;
