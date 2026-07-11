@@ -8,17 +8,17 @@
 
 .dash-saas-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-lg);
 }
 
 @media (min-width: 768px) {
   .dash-saas-grid {
-    grid-template-columns: 8fr 4fr;
+    grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
     align-items: start;
   }
-  .dash-saas-col-principal { grid-column: 1; display: flex; flex-direction: column; gap: var(--space-lg); }
-  .dash-saas-col-lateral   { grid-column: 2; display: flex; flex-direction: column; gap: var(--space-lg); }
+  .dash-saas-col-principal { grid-column: 1; display: flex; flex-direction: column; gap: var(--space-lg); min-width: 0; }
+  .dash-saas-col-lateral   { grid-column: 2; display: flex; flex-direction: column; gap: var(--space-lg); min-width: 0; }
   .dash-saas-full          { grid-column: 1 / -1; }
 }
 
@@ -27,6 +27,12 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   padding: var(--space-lg);
+  /* Sem isto, um filho intrinsecamente largo (o carrossel horizontal do
+     Grupo 5, com N cards de 180px) força a TRACK do grid a crescer pra
+     caber o conteúdo em vez de deixar o próprio carrossel rolar — o
+     dashboard inteiro vazava pra fora do viewport no mobile (achado
+     visual real, pego no screenshot de verificação da Etapa 4). */
+  min-width: 0;
 }
 
 .dash-saas-grupo-titulo {
@@ -184,12 +190,80 @@
   margin-bottom: var(--space-sm);
 }
 
-/* ── Grupo 5: Recomendações (scaffold — carrossel Netflix vem na Etapa 4) ── */
-.dash-saas-recomendacoes-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+/* ── Grupo 5: Recomendações — carrossel Netflix (§3 Grupo 5, §4.1) ── */
+.dash-saas-carrossel {
+  display: flex;
   gap: var(--space-md);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  padding-bottom: var(--space-xs);
+  /* espaço extra pro scale(1.02) do hover não cortar o card vizinho */
+  margin: 0 calc(-1 * var(--space-xs));
+  padding-left: var(--space-xs);
+  padding-right: var(--space-xs);
 }
+
+.dash-saas-netflix-card {
+  flex: 0 0 180px;
+  scroll-snap-align: start;
+  border-radius: var(--radius-card, var(--radius-lg));
+  overflow: hidden;
+  background: var(--white);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.dash-saas-netflix-thumb {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  background: var(--brand-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  position: relative;
+}
+
+.dash-saas-netflix-progress {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 3px;
+  background: rgba(255,255,255,.35);
+}
+.dash-saas-netflix-progress > div { height: 100%; background: var(--brand-on-primary); }
+
+.dash-saas-netflix-body { padding: var(--space-sm) var(--space-md); }
+.dash-saas-netflix-eyebrow { font-size: var(--text-xs); color: var(--gray); text-transform: uppercase; letter-spacing: var(--tracking-wide); }
+.dash-saas-netflix-titulo {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-bold);
+  color: var(--dark);
+  margin: .15rem 0 .5rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Hover só em dispositivos que TÊM hover de verdade (mouse) — em touch,
+   :active cobre o feedback, evita "hover preso" pós-toque (§4.1). */
+@media (hover: hover) and (pointer: fine) {
+  .dash-saas-netflix-card {
+    transition: transform var(--transition-fast, 150ms) var(--ease-out, ease-out), box-shadow var(--transition-fast, 150ms) var(--ease-out, ease-out);
+    transition-duration: 180ms;
+  }
+  .dash-saas-netflix-card:hover {
+    transform: scale(1.02);
+    box-shadow: var(--shadow-lg);
+  }
+}
+.dash-saas-netflix-card:active { transform: scale(0.98); }
 
 @media (prefers-reduced-motion: reduce) {
   .dash-saas-skeleton { animation: none; }
@@ -197,4 +271,7 @@
   .dash-saas-flame--ativa,
   .dash-saas-flame--risco { animation: none; }
   .dash-saas-badge-recente--nova .emoji { animation: none; }
+  .dash-saas-netflix-card { transition: none; }
+  .dash-saas-netflix-card:hover,
+  .dash-saas-netflix-card:active { transform: none; }
 }

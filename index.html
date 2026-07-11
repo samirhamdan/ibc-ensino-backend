@@ -4441,11 +4441,20 @@ function _dashSaasRenderMetas(d){
       </div>`).join('')}`;
 }
 
+// Gradiente NUNCA cinza genérico para curso sem thumbnail (§4.1) — este
+// app não tem campo de thumbnail nenhum hoje, então TODO card usa
+// --brand-gradient (identidade do tenant) com uma pequena rotação de
+// matiz derivada de hash do título, pra dar variação visual entre cards
+// sem precisar de imagem nenhuma.
+function _dashSaasHashHue(texto){
+  let h = 0;
+  for(let i=0;i<texto.length;i++){ h = (h*31 + texto.charCodeAt(i)) >>> 0; }
+  return h % 40 - 20;   // -20..+19 graus — variação sutil, não descaracteriza a marca
+}
+
 function _dashSaasRenderRecomendacoes(d){
   const elx = document.getElementById('dash-saas-recomendacoes');
   if(!elx) return;
-  // Ordenação por popularidade (slot LRN-03) chega na Etapa 4; por ora,
-  // a ordem que o backend já devolve (sem inventar endpoint novo).
   const cursos = d.other_courses || [];
 
   if(!cursos.length){
@@ -4459,16 +4468,31 @@ function _dashSaasRenderRecomendacoes(d){
 
   elx.innerHTML = `
     <div class="dash-saas-grupo-titulo">${icon('catalog','14')} Recomendações</div>
-    <div class="dash-saas-recomendacoes-grid">${cursos.map(c=>`
-      <div class="card other-course-card" onclick="selectCourse(${c.id})" style="cursor:pointer">
-        <div class="other-course-icon">${c.icon||'📚'}</div>
-        <h3 style="font-size:var(--text-sm);font-weight:var(--fw-bold);color:var(--dark)">${c.name}</h3>
-        ${c.status==='concluido'
-          ? `<span style="color:var(--success);font-size:var(--text-xs)">${icon('checkmark-circle','12','icon--success')} Concluído</span>`
-          : c.status==='em_andamento'
-            ? `<span style="color:var(--brand-primary);font-size:var(--text-xs)">${c.percentage}% concluído</span>`
-            : `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();selectCourse(${c.id})">Começar</button>`}
-      </div>`).join('')}</div>`;
+    <div class="dash-saas-carrossel" role="list">${cursos.map(c=>{
+      const hue = _dashSaasHashHue(c.name || '');
+      const progresso = c.status==='em_andamento'
+        ? `<div class="dash-saas-netflix-progress"><div style="width:${c.percentage}%"></div></div>` : '';
+      const rotulo = c.status==='concluido' ? 'Concluído'
+        : c.status==='em_andamento' ? `${c.percentage}% concluído` : 'Começar';
+      return `
+      <button type="button" class="dash-saas-netflix-card" role="listitem"
+          aria-label="${_dashSaasEscAttr(c.name)} — ${_dashSaasEscAttr(rotulo)}"
+          onclick="selectCourse(${c.id})">
+        <div class="dash-saas-netflix-thumb" style="filter:hue-rotate(${hue}deg)">
+          <span aria-hidden="true">${c.icon||'📚'}</span>
+          ${progresso}
+        </div>
+        <div class="dash-saas-netflix-body">
+          <div class="dash-saas-netflix-eyebrow">Curso</div>
+          <div class="dash-saas-netflix-titulo">${c.name}</div>
+          ${c.status==='concluido'
+            ? `<span style="color:var(--success);font-size:var(--text-xs)">${icon('checkmark-circle','12','icon--success')} Concluído</span>`
+            : c.status==='em_andamento'
+              ? `<span style="color:var(--brand-primary);font-size:var(--text-xs)">${c.percentage}% concluído</span>`
+              : `<span style="color:var(--brand-primary);font-size:var(--text-xs);font-weight:var(--fw-semibold)">Começar →</span>`}
+        </div>
+      </button>`;
+    }).join('')}</div>`;
 }
 
 // ── Mural de Conclusões / "Comunidade em Ação" (Sprint 6.2) ───────────────

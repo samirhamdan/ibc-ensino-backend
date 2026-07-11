@@ -244,7 +244,17 @@ def aluno_dashboard():
     in_progress_course = next((c for c in enrolled_courses if c['status'] == 'em_andamento'), None)
     other_courses = [c for c in enrolled_courses if c is not in_progress_course]
     not_enrolled = [c for c in Course.query.filter_by(tenant_id=current_tenant_id()).all() if c.id not in {ec['id'] for ec in enrolled_courses}]
-    for c in not_enrolled[:4]:
+    # Etapa 4 (UX_ALUNO_SAAS.md §3 Grupo 5): ordena por popularidade no
+    # tenant — quantos alunos distintos têm QUALQUER progresso no curso.
+    # Slot pronto pra LRN-03 (recomendação por learner model, Release
+    # 1.0); até lá, popularidade real é melhor que a ordem do id.
+    popularidade = dict(
+        db.session.query(LessonProgress.course_id, db.func.count(db.func.distinct(LessonProgress.user_id)))
+        .filter_by(tenant_id=current_tenant_id())
+        .group_by(LessonProgress.course_id).all()
+    )
+    not_enrolled.sort(key=lambda c: popularidade.get(c.id, 0), reverse=True)
+    for c in not_enrolled[:8]:
         other_courses.append({'id': c.id, 'name': c.name, 'icon': c.icon, 'status': 'nao_iniciado'})
 
     next_metas = []

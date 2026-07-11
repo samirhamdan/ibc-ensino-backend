@@ -106,3 +106,64 @@ def test_dashboard_responsivo_sem_scroll_horizontal_no_mobile(servidor_vivo, bro
     assert largura_scroll <= largura_viewport + 1   # +1 tolerância de subpixel
 
     page.close()
+
+
+def test_carrossel_de_recomendacoes_nao_estoura_o_layout_no_mobile(app, servidor_vivo, browser, seeded):
+    """Etapa 4 (§4.1): achado real do próprio processo de verificação — um
+    carrossel horizontal com vários cards (flex/grid intrinsic sizing)
+    empurrava a LARGURA DE main-content para fora do viewport no mobile,
+    mesmo sem o <html> mostrar scroll horizontal (o overflow ficava preso
+    num container interno). Semeia vários cursos pra garantir carrossel
+    com conteúdo suficiente pra reproduzir o bug se ele voltar."""
+    with app.app_context():
+        from extensions import db
+        from models import Course, Category
+        from core.tenancy import default_tenant_id
+        cat = Category.query.filter_by(tenant_id=default_tenant_id()).first()
+        if cat is None:
+            cat = Category(name='Categoria E2E', tenant_id=default_tenant_id())
+            db.session.add(cat)
+            db.session.flush()
+        criados = []
+        for i in range(6):
+            c = Course(name=f'Curso Carrossel {i}', acesso='publico', status='published',
+                      category_id=cat.id, icon='📚')
+            db.session.add(c)
+            criados.append(c)
+        db.session.commit()
+        ids_criados = [c.id for c in criados]
+
+    try:
+        page = browser.new_page(viewport={'width': 375, 'height': 900})
+        page.goto(servidor_vivo + '/')
+        page.fill('#login-email', 'aluno@test.com')
+        page.fill('#login-pass', 'senha123')
+        page.press('#login-pass', 'Enter')
+        page.wait_for_selector('.dash-saas-carrossel .dash-saas-netflix-card', timeout=8000)
+
+        largura_scroll = page.evaluate('document.documentElement.scrollWidth')
+        largura_viewport = page.evaluate('document.documentElement.clientWidth')
+        assert largura_scroll <= largura_viewport + 1
+
+        main_content = page.evaluate("""
+          () => { const el = document.getElementById('main-content');
+                  return {scroll: el.scrollWidth, client: el.clientWidth}; }
+        """)
+        assert main_content['scroll'] <= main_content['client'] + 1, \
+            f'main-content vazou horizontalmente: {main_content}'
+
+        # o carrossel EM SI pode (e deve) rolar — só não pode vazar pro resto da página
+        carrossel = page.evaluate("""
+          () => { const el = document.querySelector('.dash-saas-carrossel');
+                  return {scroll: el.scrollWidth, client: el.clientWidth}; }
+        """)
+        assert carrossel['scroll'] > carrossel['client'], \
+            'carrossel com cards suficientes deveria precisar de scroll interno'
+
+        page.close()
+    finally:
+        with app.app_context():
+            from extensions import db
+            from models import Course
+            Course.query.filter(Course.id.in_(ids_criados)).delete(synchronize_session=False)
+            db.session.commit()
