@@ -105,15 +105,9 @@ def login():
     # +5 XP de login diário, no máximo 1x por dia (guard: last_activity_date).
     # Concedido aqui no servidor — a ação 'daily_login' não é mais aceita via
     # /gamification/add-points, onde podia ser repetida à vontade.
-    # lock=True: sem isto, dois logins quase simultâneos (duplo clique,
-    # retry) liam o mesmo last_activity_date "antigo" em transações
-    # separadas e passavam os DOIS pela checagem — streak +2 e até bônus
-    # de marco (até 500 pts) pago em dobro no mesmo dia (achado de revisão
-    # de segurança). SELECT ... FOR UPDATE serializa; a 2ª transação só
-    # lê a linha depois que a 1ª já comitou o novo last_activity_date.
-    from routes.gamification import check_and_grant_achievements, award_points, _get_or_create_points, hoje_streak
-    up = _get_or_create_points(user.id, lock=True)
-    if up.last_activity_date != hoje_streak():
+    from routes.gamification import check_and_grant_achievements, award_points, _get_or_create_points
+    up = _get_or_create_points(user.id)
+    if up.last_activity_date != datetime.utcnow().date():
         award_points(user.id, 'daily_login')
     else:
         db.session.commit()

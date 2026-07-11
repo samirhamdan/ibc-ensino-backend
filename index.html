@@ -19,30 +19,6 @@
 <!-- App legacy styles (load first so design system can override) -->
 <link rel="stylesheet" href="css/app.css">
 
-<!-- Tema do tenant (UX_ALUNO_SAAS.md §2.2): XHR SÍNCRONO de propósito —
-     precisa terminar antes do <style id="tenant-theme"> existir e antes de
-     design-system.css ler --brand-primary, senão o primeiro paint usa o
-     fallback errado e pisca ao trocar (flash de tema errado). É pequeno
-     (poucas linhas de CSS) e roda uma vez no boot, então o bloqueio é
-     imperceptível; se a chamada falhar (rede, /api fora do ar), os
-     fallbacks fixos em design-system.css garantem que a página renderiza
-     igual — nunca quebra o boot por causa do tema. -->
-<script>
-(function () {
-  try {
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', '/api/theme', false);
-    xhr.send(null);
-    if (xhr.status === 200 && xhr.responseText) {
-      var style = document.createElement('style');
-      style.id = 'tenant-theme';
-      style.textContent = xhr.responseText;
-      document.head.appendChild(style);
-    }
-  } catch (e) { /* sem tema resolvido — segue com os fallbacks fixos */ }
-})();
-</script>
-
 <!-- Design System CSS -->
 <link rel="stylesheet" href="css/design-system.css">
 <link rel="stylesheet" href="css/reset.css">
@@ -56,7 +32,6 @@
 <link rel="stylesheet" href="css/components/progress.css">
 <link rel="stylesheet" href="css/components/navigation.css">
 <link rel="stylesheet" href="css/components/dashboard-cards.css">
-<link rel="stylesheet" href="css/components/dashboard-saas.css">
 <link rel="stylesheet" href="css/components/course-cards.css">
 <link rel="stylesheet" href="css/components/utilities.css">
 <link rel="stylesheet" href="css/components/login.css">
@@ -4215,328 +4190,46 @@ async function _renderTutorPanelDashboardInner(){
     </div>`;
 }
 
-// ── Dashboard do aluno — UX_ALUNO_SAAS.md §3/§6 Etapa 2 ───────────────────
-// Estrutura fixa de 5 grupos (§3), grid responsivo (coluna única <768px,
-// 8/4 no desktop). Slots da Release 1.0 (tutor, revisão real, IA) ficam
-// como estado vazio elegante atrás de flags — DASH_SAAS_FLAGS é um
-// placeholder local (default tudo desligado) até existir a fonte real
-// por tenant (tema/tenant table); trocar a leitura aqui não muda o layout.
-const DASH_SAAS_FLAGS = { tutor_enabled: false, revisao_ia_enabled: false, recomendacoes_ia_enabled: false };
-
 async function renderAlunoDashboard(){
   try { return await _renderAlunoDashboardInner(); }
   catch(e){ console.error('[ERRO] renderAlunoDashboard:', e); _renderDashboardError(e, 'painel do aluno'); }
 }
-
-function _dashSaasEscAttr(s){
-  // Escapa para uso dentro de atributo HTML (aspas duplas) — content-context
-  // (innerHTML de texto) já segue a convenção existente no resto do arquivo,
-  // mas atributo é um contexto de escape DIFERENTE (aspas quebram o atributo
-  // mesmo sem `<`/`>`), então title="${...}" precisa do seu próprio escape.
-  return String(s == null ? '' : s)
-    .replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-// Chama de streak (GAM-02, §4.2) — SVG próprio (não emoji), 3 estados:
-// 'ativa' (flicker sutil), 'risco' (pulso — tem sequência mas não renovou
-// hoje), 'quebrada' (cinza, sem animação, ou nunca teve streak).
-function _dashSaasFlameSvg(estado, tamanho){
-  tamanho = tamanho || 18;
-  return `<svg class="dash-saas-flame dash-saas-flame--${estado}" width="${tamanho}" height="${tamanho}"
-      viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-    <path d="M12 2c1 3-2 4-2 7a3 3 0 0 0 6 0c0-1-.5-2-1-3 2 1 4 4 4 7a7 7 0 1 1-14 0c0-4 2-6 4-8 1-1 2-2 3-3z"/>
-  </svg>`;
-}
-
-function _dashSaasStreakEstado(stats){
-  if(!stats || !stats.current_streak) return 'quebrada';
-  if(stats.streak_em_risco) return 'risco';
-  return 'ativa';
-}
-
-function _dashSaasStreakChip(stats){
-  const estado = _dashSaasStreakEstado(stats);
-  const dias = (stats && stats.current_streak) || 0;
-  const svg = _dashSaasFlameSvg(estado, 16);
-  if(estado === 'quebrada'){
-    return `<span class="dash-saas-streak-chip" title="Comece hoje e construa sua sequência de dias de estudo">${svg} Sem streak</span>`;
-  }
-  const texto = dias === 1 ? '1 dia' : `${dias} dias`;
-  const titulo = estado === 'risco'
-    ? `Sua sequência de ${texto} está em risco — estude hoje para não perdê-la`
-    : `Sequência de ${texto} seguidos — continue assim!`;
-  const classeEstado = estado === 'risco' ? 'dash-saas-streak-chip--risco' : 'dash-saas-streak-chip--ativa';
-  return `<span class="dash-saas-streak-chip ${classeEstado}" title="${_dashSaasEscAttr(titulo)}">${svg} ${texto}</span>`;
-}
-
-function _dashSaasSkeleton(){
-  return `<div class="dash-saas-skeleton dash-saas-skeleton--linha" style="width:60%"></div>
-          <div class="dash-saas-skeleton dash-saas-skeleton--bloco"></div>`;
-}
-
-function _dashSaasErro(retryFn){
-  return `<div class="dash-saas-erro">
-      <div>${icon('x-circle','24','icon--x-circle')}</div>
-      <div class="dash-saas-erro-msg">Não foi possível carregar esta seção.</div>
-      <button class="btn btn-outline btn-sm" onclick="${retryFn}">${icon('target','14')} Tentar de novo</button>
-    </div>`;
-}
-
 async function _renderAlunoDashboardInner(){
   const el=document.getElementById('main-content');
-  el.innerHTML=`
-    <div class="dash-saas-grid">
-      <div class="dash-saas-col-principal">
-        <div class="dash-saas-grupo" id="dash-saas-saudacao">${_dashSaasSkeleton()}</div>
-        <div class="dash-saas-grupo" id="dash-saas-continuar">${_dashSaasSkeleton()}</div>
+  el.innerHTML=`<div id="aluno-dash-body"><div class="alert alert-info"><span class="alert-icon">⏳</span><div class="alert-body">Carregando...</div></div></div>`;
+  const res=await api('GET','/aluno/dashboard');
+  if(!res.ok){ document.getElementById('aluno-dash-body').innerHTML='<div class="alert alert-danger"><span class="alert-icon">'+icon('x-circle','16','icon--x-circle')+'</span><div class="alert-body">Não foi possível carregar.</div></div>'; return; }
+  const d=await res.json();
+  const body=document.getElementById('aluno-dash-body');
+  const s=d.user_stats;
+  const target=s.level>=7?(s.points_in_level||1):100;
+  const pct=Math.min(100,Math.round(s.points_in_level/target*100));
+  const ip=d.in_progress_course;
+  const heroStats={level:s.level,level_name:s.level_name,points_in_level:s.points_in_level,total_points:s.total_points||0,courses_completed:d.trofeus_count||0,badges_count:d.trofeus_count||0};
+  body.innerHTML=`
+    ${renderHero(currentUser, heroStats)}
+    <div id="activityFeedSection"></div>
+    <div id="trailSection"></div>
+    ${ip?`<div class="card" style="border-left:4px solid var(--primary);margin-bottom:var(--space-xl)"><div class="card-body"><h3 class="card-title">${icon('target','16')} Continue de Onde Parou</h3><div style="margin:var(--space-md) 0"><div style="font-size:var(--text-sm);font-weight:var(--fw-semibold);color:var(--dark);margin-bottom:var(--space-sm)">${ip.icon} ${ip.name} — Aula ${ip.aula_atual}/${ip.total_aulas}</div><div class="progress progress-sm" style="margin-bottom:var(--space-xs)"><div class="progress-bar" style="width:${ip.percentage}%"></div></div><div style="font-size:var(--text-xs);color:var(--gray);text-align:right">${ip.percentage}% concluído</div></div><div class="status-grid"><div class="status-item"><span class="status-label">Material</span><span class="status-value">${ip.material_read?icon('checkmark-circle','14','icon--success')+' Lido':icon('clock','14')+' Pendente'}</span></div><div class="status-item"><span class="status-label">Quiz</span><span class="status-value">${ip.quiz_done?icon('checkmark-circle','14','icon--success')+' Concluído':icon('clock','14')+' Pendente'}</span></div></div><button class="btn btn-primary btn-full" style="margin-top:var(--space-md)" onclick="selectCourse(${ip.id})">${icon('arrow-right','16')} CONTINUAR AULA</button></div></div>`:''}
+    <div class="card" style="margin-bottom:var(--space-xl)">
+      <div class="card-body">
+        <h3 class="card-title">${icon('lightbulb','16','icon--lightbulb')} Próximas Metas</h3>
+        <div id="goalsSection"><span style="color:var(--gray);font-size:var(--text-sm)">Carregando...</span></div>
       </div>
-      <div class="dash-saas-col-lateral">
-        <div class="dash-saas-grupo" id="dash-saas-pontuacao">${_dashSaasSkeleton()}</div>
-        <div class="dash-saas-grupo" id="dash-saas-metas">${_dashSaasSkeleton()}</div>
-      </div>
-      <div class="dash-saas-grupo dash-saas-full" id="dash-saas-recomendacoes">${_dashSaasSkeleton()}</div>
-      <div class="dash-saas-full" id="activityFeedSection"></div>
+    </div>
+    ${d.recent_trofeus.length?`<div class="card" style="margin-bottom:var(--space-xl)"><div class="card-body"><h3 class="card-title">${icon('achievements','16','icon--gold')} Últimas Conquistas</h3><div style="margin-top:var(--space-md)">${d.recent_trofeus.map(t=>`<div class="achievement-item"><span class="achievement-icon">${t.icon}</span><div><div class="achievement-name">${t.name}</div><div class="achievement-desc">${t.description||''}</div><div class="achievement-date">${new Date(t.date).toLocaleDateString('pt-BR')}</div></div></div>`).join('')}</div></div></div>`:''}
+    <div class="dash-section">
+      <div class="dash-section-title">${icon('catalog','16')} Outros Cursos</div>
+      <div class="grid grid-cols-2 gap-lg">${d.other_courses.map(c=>`<div class="card other-course-card" onclick="selectCourse(${c.id})" style="cursor:pointer"><div class="other-course-icon">${c.icon||'📚'}</div><h3 style="font-size:var(--text-sm);font-weight:var(--fw-bold);color:var(--dark)">${c.name}</h3>${c.status==='concluido'?`<span style="color:var(--success);font-size:var(--text-xs)">${icon('checkmark-circle','12','icon--success')} Concluído</span><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();selectCourse(${c.id})">${icon('certificates','14')} Certificado</button>`:c.status==='em_andamento'?`<span style="color:var(--primary);font-size:var(--text-xs)">${c.percentage}% concluído</span><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();selectCourse(${c.id})">Continuar</button>`:`<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();selectCourse(${c.id})">Começar</button>`}</div>`).join('')}</div>
     </div>`;
-
-  await _dashSaasCarregarTudo();
+  // Animate hero ring
+  animateHero(pct);
+  animateStatValues(body);
+  // Load trail section
+  const trailSection = document.getElementById('trailSection');
+  if(trailSection) await loadTrailsSection(trailSection);
+  loadGoalsSection();
   renderActivityFeed();
-}
-
-const _DASH_SAAS_GRUPOS = ['dash-saas-saudacao','dash-saas-continuar','dash-saas-pontuacao','dash-saas-metas','dash-saas-recomendacoes'];
-
-async function _dashSaasCarregarTudo(){
-  // onclick="renderAlunoDashboard()" (não a função interna) no retry: passa
-  // pelo try/catch que já protege a carga inicial — um throw de rede aqui
-  // (não só um !res.ok) não pode deixar o botão de retry sem efeito nenhum.
-  let res;
-  try {
-    res = await api('GET','/aluno/dashboard');
-  } catch(e){
-    console.error('[ERRO] _dashSaasCarregarTudo:', e);
-    _DASH_SAAS_GRUPOS.forEach(id => { const elx=document.getElementById(id); if(elx) elx.innerHTML=_dashSaasErro('renderAlunoDashboard()'); });
-    return;
-  }
-  if(!res.ok){
-    _DASH_SAAS_GRUPOS.forEach(id => { const elx=document.getElementById(id); if(elx) elx.innerHTML=_dashSaasErro('renderAlunoDashboard()'); });
-    return;
-  }
-  const d = await res.json();
-  // Cada grupo é isolado: um payload inesperado que derruba UM render não
-  // pode deixar os outros presos no skeleton para sempre (§4.4 — usuário
-  // nunca vê grupo travado em loading).
-  const renderizadores = {
-    'dash-saas-saudacao': _dashSaasRenderSaudacao,
-    'dash-saas-continuar': _dashSaasRenderContinuar,
-    'dash-saas-pontuacao': _dashSaasRenderPontuacao,
-    'dash-saas-metas': _dashSaasRenderMetas,
-    'dash-saas-recomendacoes': _dashSaasRenderRecomendacoes,
-  };
-  for(const [id, fn] of Object.entries(renderizadores)){
-    try { fn(d); }
-    catch(e){
-      console.error(`[ERRO] dashboard grupo ${id}:`, e);
-      const elx=document.getElementById(id);
-      if(elx) elx.innerHTML=_dashSaasErro('renderAlunoDashboard()');
-    }
-  }
-}
-
-function _dashSaasSaudacaoPorHorario(){
-  const h = new Date().getHours();
-  if(h < 12) return 'Bom dia';
-  if(h < 18) return 'Boa tarde';
-  return 'Boa noite';
-}
-
-function _dashSaasRenderSaudacao(d){
-  const elx = document.getElementById('dash-saas-saudacao');
-  if(!elx) return;
-  const nome = (currentUser && currentUser.name ? currentUser.name.split(' ')[0] : 'aluno');
-  const ip = d.in_progress_course;
-  const stats = d.user_stats || {};
-  // Prioridade da frase de contexto (§3 Grupo 1): (a) streak em risco —
-  // GAM-02, Etapa 3; (b) revisões pendentes — LRN-02 real é Release 1.0;
-  // (c) progresso — sempre disponível hoje, é o fallback.
-  let contexto = 'Pronto para continuar sua jornada de estudos?';
-  if(stats.streak_em_risco && stats.current_streak){
-    const dias = stats.current_streak === 1 ? '1 dia' : `${stats.current_streak} dias`;
-    contexto = `Sua sequência de ${dias} vence hoje — estude um pouco para mantê-la!`;
-  } else if(ip){
-    contexto = `Você está a ${Math.max(0, ip.total_aulas - ip.aula_atual + 1)} aula(s) de concluir "${escapeHtml(ip.name)}".`;
-  } else if(d.next_metas && d.next_metas.length){
-    contexto = d.next_metas[0].description;
-  }
-
-  elx.innerHTML = `
-    <div class="dash-saas-saudacao">
-      <div class="dash-saas-saudacao-texto">
-        <h1>${_dashSaasSaudacaoPorHorario()}, ${nome}</h1>
-        <div class="dash-saas-saudacao-contexto">${contexto}</div>
-      </div>
-      ${_dashSaasStreakChip(stats)}
-    </div>`;
-}
-
-function _dashSaasRenderContinuar(d){
-  const elx = document.getElementById('dash-saas-continuar');
-  if(!elx) return;
-  const ip = d.in_progress_course;
-  const secundarios = (d.other_courses||[]).filter(c=>c.status==='em_andamento').slice(0,2);
-
-  if(!ip){
-    elx.innerHTML = `
-      <div class="dash-saas-grupo-titulo">${icon('target','14')} Continue seus estudos</div>
-      <div class="dash-saas-vazio">
-        <div class="dash-saas-vazio-icone">${icon('book','28')}</div>
-        <div class="dash-saas-vazio-msg">Você ainda não começou nenhum curso.</div>
-        <button class="btn btn-primary btn-sm" onclick="showPanel('courses')">${icon('catalog','14')} Ver catálogo</button>
-      </div>`;
-    return;
-  }
-
-  elx.innerHTML = `
-    <div class="dash-saas-grupo-titulo">${icon('target','14')} Continue seus estudos</div>
-    <div class="dash-saas-hero-card">
-      <div class="dash-saas-hero-curso">${ip.icon||''} ${escapeHtml(ip.name)}</div>
-      <h3>Aula ${ip.aula_atual}/${ip.total_aulas}</h3>
-      <div class="dash-saas-hero-progress"><div style="width:${ip.percentage}%"></div></div>
-      <div style="font-size:var(--text-xs);opacity:.85">${ip.percentage}% concluído</div>
-      <button class="btn btn-full" style="background:var(--brand-on-primary);color:var(--brand-primary)" onclick="selectCourse(${ip.id})">${icon('arrow-right','16')} Continuar lição</button>
-    </div>
-    ${secundarios.length ? `<div class="dash-saas-secundarios">${secundarios.map(c=>`
-      <div class="dash-saas-secundario-card" onclick="selectCourse(${c.id})">
-        <div class="nome">${c.icon||''} ${escapeHtml(c.name)}</div>
-        <div class="meta">${c.percentage}% concluído</div>
-      </div>`).join('')}</div>` : ''}
-    <div class="dash-saas-slot-tutor">
-      ${DASH_SAAS_FLAGS.tutor_enabled
-        ? `<button class="btn btn-outline btn-sm">${icon('chat','14')} Tirar dúvida com o tutor</button>`
-        : `${icon('chat','14')} Tutor de IA chega em breve`}
-    </div>`;
-}
-
-// "Nova" (§4.2): sem localStorage (não introduzimos uso novo dele aqui),
-// então "nova" é calculado sem estado persistido — desbloqueada nas
-// últimas 24h. O bounce em si só toca 1x por carregamento de página de
-// qualquer forma (animation-iteration-count é 1 por padrão), então
-// recalcular isso a cada load nunca vira loop, só pode repetir o bounce
-// se a pessoa recarregar a página dentro da mesma janela de 24h — aceitável.
-function _dashSaasBadgeEhNova(isoDate){
-  if(!isoDate) return false;
-  const desbloqueada = new Date(isoDate).getTime();
-  if(Number.isNaN(desbloqueada)) return false;
-  const diffMs = Date.now() - desbloqueada;
-  // diffMs negativo (desbloqueio "no futuro" por clock skew cliente/servidor)
-  // não conta como "nova" — só a janela real de até 24h à frente.
-  return diffMs >= 0 && diffMs < 24*60*60*1000;
-}
-
-function _dashSaasRenderPontuacao(d){
-  const elx = document.getElementById('dash-saas-pontuacao');
-  if(!elx) return;
-  const s = d.user_stats || {};
-  const recentes = (d.recent_trofeus||[]).slice(0,3);
-
-  elx.innerHTML = `
-    <div class="dash-saas-grupo-titulo">${icon('bar-chart','14')} Sua pontuação</div>
-    <div class="dash-saas-pontuacao-linha1">
-      <span class="dash-saas-pontuacao-total">${s.total_points||0}</span>
-      <span class="dash-saas-pontuacao-nivel">pts · Nível ${s.level||1}${s.level_name?` (${s.level_name})`:''}</span>
-    </div>
-    <div style="display:flex;justify-content:center;margin-bottom:var(--space-sm)">${_dashSaasStreakChip(s)}</div>
-    ${s.longest_streak ? `<div style="text-align:center;font-size:var(--text-xs);color:var(--gray);margin-bottom:var(--space-sm)">Recorde: ${s.longest_streak} dia(s)</div>` : ''}
-    ${recentes.length ? `<div class="dash-saas-badges-recentes">${recentes.map(t=>`
-      <div class="dash-saas-badge-recente${_dashSaasBadgeEhNova(t.date)?' dash-saas-badge-recente--nova':''}" title="${_dashSaasEscAttr(t.name)}">
-        <div class="emoji">${t.icon||'🏅'}</div>
-        <span class="nome">${escapeHtml(t.name)}</span>
-      </div>`).join('')}</div>` : `<div class="dash-saas-vazio" style="padding:var(--space-md) 0">
-        <div class="dash-saas-vazio-msg">Suas conquistas aparecem aqui.</div>
-      </div>`}`;
-}
-
-function _dashSaasRenderMetas(d){
-  const elx = document.getElementById('dash-saas-metas');
-  if(!elx) return;
-  const metas = d.next_metas || [];
-
-  const revisaoHtml = DASH_SAAS_FLAGS.revisao_ia_enabled
-    ? '' // Release 1.0: card real de revisão do dia (LRN-02)
-    : `<div class="dash-saas-meta-revisao">
-         <div style="font-weight:var(--fw-semibold);font-size:var(--text-sm)">${icon('lightbulb','14')} Revisão do dia</div>
-         <div style="font-size:var(--text-xs);color:var(--gray)">Chega na Release 1.0 — vai te ajudar a fixar o que você já aprendeu.</div>
-       </div>`;
-
-  if(!metas.length){
-    elx.innerHTML = `
-      <div class="dash-saas-grupo-titulo">${icon('lightbulb','14','icon--lightbulb')} Próximas metas</div>
-      ${revisaoHtml}
-      <div class="dash-saas-vazio">
-        <div class="dash-saas-vazio-msg">Nenhuma meta pendente — explore as recomendações abaixo.</div>
-      </div>`;
-    return;
-  }
-
-  elx.innerHTML = `
-    <div class="dash-saas-grupo-titulo">${icon('lightbulb','14','icon--lightbulb')} Próximas metas</div>
-    ${revisaoHtml}
-    ${metas.map(m=>`<div class="dash-saas-meta-item">
-        <span>${icon(m.type==='xp'?'points':m.type==='trofeu'?'achievements':m.type==='duvida'?'chat':'book','16')}</span>
-        <span style="font-size:var(--text-sm)">${escapeHtml(m.description)}</span>
-      </div>`).join('')}`;
-}
-
-// Gradiente NUNCA cinza genérico para curso sem thumbnail (§4.1) — este
-// app não tem campo de thumbnail nenhum hoje, então TODO card usa
-// --brand-gradient (identidade do tenant) com uma pequena rotação de
-// matiz derivada de hash do título, pra dar variação visual entre cards
-// sem precisar de imagem nenhuma.
-function _dashSaasHashHue(texto){
-  let h = 0;
-  for(let i=0;i<texto.length;i++){ h = (h*31 + texto.charCodeAt(i)) >>> 0; }
-  return h % 40 - 20;   // -20..+19 graus — variação sutil, não descaracteriza a marca
-}
-
-function _dashSaasRenderRecomendacoes(d){
-  const elx = document.getElementById('dash-saas-recomendacoes');
-  if(!elx) return;
-  const cursos = d.other_courses || [];
-
-  if(!cursos.length){
-    elx.innerHTML = `
-      <div class="dash-saas-grupo-titulo">${icon('catalog','14')} Recomendações</div>
-      <div class="dash-saas-vazio">
-        <div class="dash-saas-vazio-msg">Novos cursos aparecem aqui assim que forem publicados.</div>
-      </div>`;
-    return;
-  }
-
-  elx.innerHTML = `
-    <div class="dash-saas-grupo-titulo">${icon('catalog','14')} Recomendações</div>
-    <div class="dash-saas-carrossel">${cursos.map(c=>{
-      const hue = _dashSaasHashHue(c.name || '');
-      const progresso = c.status==='em_andamento'
-        ? `<div class="dash-saas-netflix-progress"><div style="width:${c.percentage}%"></div></div>` : '';
-      const rotulo = c.status==='concluido' ? 'Concluído'
-        : c.status==='em_andamento' ? `${c.percentage}% concluído` : 'Começar';
-      return `
-      <button type="button" class="dash-saas-netflix-card"
-          aria-label="${_dashSaasEscAttr(c.name)} — ${_dashSaasEscAttr(rotulo)}"
-          onclick="selectCourse(${c.id})">
-        <div class="dash-saas-netflix-thumb" style="filter:hue-rotate(${hue}deg)">
-          <span aria-hidden="true">${_dashSaasEscAttr(c.icon)||'📚'}</span>
-          ${progresso}
-        </div>
-        <div class="dash-saas-netflix-body">
-          <div class="dash-saas-netflix-eyebrow">Curso</div>
-          <div class="dash-saas-netflix-titulo">${_dashSaasEscAttr(c.name)}</div>
-          ${c.status==='concluido'
-            ? `<span style="color:var(--success);font-size:var(--text-xs)">${icon('checkmark-circle','12','icon--success')} Concluído</span>`
-            : c.status==='em_andamento'
-              ? `<span style="color:var(--brand-primary);font-size:var(--text-xs)">${c.percentage}% concluído</span>`
-              : `<span style="color:var(--brand-primary);font-size:var(--text-xs);font-weight:var(--fw-semibold)">Começar →</span>`}
-        </div>
-      </button>`;
-    }).join('')}</div>`;
 }
 
 // ── Mural de Conclusões / "Comunidade em Ação" (Sprint 6.2) ───────────────
@@ -4566,6 +4259,39 @@ async function renderActivityFeed(){
       </div>`;
   }catch(e){
     el.innerHTML = '';
+  }
+}
+
+// ── Goals with how-to instructions (Sprint 2.1) ──
+async function loadGoalsSection(){
+  const el = document.getElementById('goalsSection');
+  if(!el) return;
+  try{
+    const res = await api('GET','/gamification/badges');
+    if(!res.ok){ el.innerHTML = '<span style="color:var(--gray);font-size:var(--text-sm)">Não foi possível carregar suas metas.</span>'; return; }
+    const badges = await res.json();
+    const locked = badges.filter(b=>!b.unlocked && b.progress).map(b=>{
+      const [cur, tgt] = b.progress.split('/').map(Number);
+      return {...b, cur: cur||0, tgt: tgt||1, ratio: (cur||0)/(tgt||1)};
+    }).sort((a,b)=>b.ratio - a.ratio).slice(0,3);
+    if(!locked.length){
+      el.innerHTML = `<span style="color:var(--gray);font-size:var(--text-sm)">${icon('achievements','14','icon--gold')} Você desbloqueou todas as conquistas!</span>`;
+      return;
+    }
+    el.innerHTML = locked.map(b=>`
+      <div class="goal-item">
+        <span class="goal-icon">${b.icon}</span>
+        <div class="goal-info">
+          <span class="goal-name">${b.name}</span>
+          <span class="goal-how">${b.description||''}</span>
+          <div class="goal-progress">
+            <div class="progress progress-sm"><div class="progress-bar" style="width:${Math.round(b.ratio*100)}%"></div></div>
+            <span class="goal-count">${b.cur}/${b.tgt}</span>
+          </div>
+        </div>
+      </div>`).join('');
+  } catch(e){
+    el.innerHTML = '<span style="color:var(--gray);font-size:var(--text-sm)">Não foi possível carregar suas metas.</span>';
   }
 }
 
@@ -5080,6 +4806,21 @@ function renderHero(userData, stats){
       <div class="hero-stat"><span class="hero-stat-value" data-target="${badgesCount}">${badgesCount}</span><span class="hero-stat-label">${icon('achievements','16','icon--gold')} Conquistas</span></div>
     </div>`}
   </div>`;
+}
+
+function animateHero(pct){
+  const circumference = 201;
+  const fill = document.getElementById('heroRingFill');
+  const xpFill = document.getElementById('heroXpFill');
+  if(fill){
+    requestAnimationFrame(()=>{
+      fill.style.transition = 'stroke-dashoffset 1s cubic-bezier(0.4,0,0.2,1)';
+      fill.style.strokeDashoffset = String(circumference - (circumference * pct / 100));
+    });
+  }
+  if(xpFill){
+    requestAnimationFrame(()=>{ xpFill.style.width = pct + '%'; });
+  }
 }
 
 // ── Trail helpers ──
@@ -5804,8 +5545,8 @@ function closeOnboardingModal(){
 
 // ── Guided Tour ──
 const TOUR_STEPS = [
-  { selector: '#dash-saas-continuar', title: 'Continue seus estudos', body: 'Aqui fica a aula onde você parou. Continue de onde parou para não perder o ritmo!', arrow: 'top' },
-  { selector: '#dash-saas-pontuacao', title: 'Sua Pontuação', body: 'Acompanhe seus pontos, nível e conquistas mais recentes. Continue estudando para subir de nível!', arrow: 'top' },
+  { selector: '#trailSection', title: 'Sua Trilha', body: 'Aqui fica sua trilha de aprendizado. Siga os cursos na ordem para ganhar pontos de bônus!', arrow: 'top' },
+  { selector: '.dashboard-hero', title: 'Seu Progresso', body: 'O anel dourado mostra seu progresso de pontos no nível atual. Continue estudando para subir de nível!', arrow: 'top' },
   { selector: '#nav-questions', title: 'Tire Dúvidas', body: 'Tem alguma dúvida sobre o conteúdo? Envie sua pergunta e um tutor vai responder!', arrow: 'left' },
 ];
 let _tourStep = 0;

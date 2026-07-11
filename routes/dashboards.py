@@ -205,26 +205,16 @@ def aluno_dashboard():
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
-    from routes.gamification import streak_efetivo
-
     up = UserPoints.query.filter_by(user_id=user.id, tenant_id=current_tenant_id()).first()
-    # streak_efetivo reinterpreta current_streak na LEITURA: a linha só é
-    # zerada de verdade no próximo login (lazy reset) — sem isto, um
-    # streak morto há semanas ainda aparecia "vencendo hoje".
-    streak_exibido, streak_em_risco = streak_efetivo(up)
     user_stats = {
         'level': up.current_level if up else 1,
         'level_name': LEVEL_NAMES.get(up.current_level if up else 1, ''),
         'total_points': up.total_points if up else 0,
         'points_in_level': up.points_in_level if up else 0,
-        'current_streak': streak_exibido,
-        'longest_streak': up.longest_streak if up else 0,
-        'streak_em_risco': streak_em_risco,
     }
 
     user_badges = UserBadge.query.filter_by(user_id=user.id, tenant_id=current_tenant_id()).order_by(UserBadge.unlocked_at.desc()).all()
-    trofeus_unlocked = [{'icon': ub.badge.icon, 'name': ub.badge.name,
-                         'date': ub.unlocked_at.isoformat() + 'Z'} for ub in user_badges]
+    trofeus_unlocked = [{'icon': ub.badge.icon, 'name': ub.badge.name, 'date': ub.unlocked_at.isoformat()} for ub in user_badges]
 
     enrolled_courses = []
     for c in Course.query.filter_by(tenant_id=current_tenant_id()).all():
@@ -243,23 +233,8 @@ def aluno_dashboard():
 
     in_progress_course = next((c for c in enrolled_courses if c['status'] == 'em_andamento'), None)
     other_courses = [c for c in enrolled_courses if c is not in_progress_course]
-    # status='published': mesmo filtro que list_courses() já aplica pra
-    # quem não é admin/tutor — sem isto, um curso em rascunho aparecia no
-    # carrossel de recomendações de todo aluno (a fatia cresceu de 4 pra
-    # 8 nesta etapa, achado de revisão de segurança).
-    not_enrolled = [c for c in Course.query.filter_by(tenant_id=current_tenant_id(), status='published').all()
-                    if c.id not in {ec['id'] for ec in enrolled_courses}]
-    # Etapa 4 (UX_ALUNO_SAAS.md §3 Grupo 5): ordena por popularidade no
-    # tenant — quantos alunos distintos têm QUALQUER progresso no curso.
-    # Slot pronto pra LRN-03 (recomendação por learner model, Release
-    # 1.0); até lá, popularidade real é melhor que a ordem do id.
-    popularidade = dict(
-        db.session.query(LessonProgress.course_id, db.func.count(db.func.distinct(LessonProgress.user_id)))
-        .filter_by(tenant_id=current_tenant_id())
-        .group_by(LessonProgress.course_id).all()
-    )
-    not_enrolled.sort(key=lambda c: popularidade.get(c.id, 0), reverse=True)
-    for c in not_enrolled[:8]:
+    not_enrolled = [c for c in Course.query.filter_by(tenant_id=current_tenant_id()).all() if c.id not in {ec['id'] for ec in enrolled_courses}]
+    for c in not_enrolled[:4]:
         other_courses.append({'id': c.id, 'name': c.name, 'icon': c.icon, 'status': 'nao_iniciado'})
 
     next_metas = []

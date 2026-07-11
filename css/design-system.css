@@ -12,26 +12,7 @@
   --primary-800: #045268;
   --primary-900: #093c4c;
 
-  /* Identidade do tenant (UX_ALUNO_SAAS.md §2.1/§2.2) — injetados por
-     GET /api/theme em <style id="tenant-theme"> no boot (index.html),
-     ANTES deste arquivo carregar. Os valores abaixo são só o fallback:
-     tenant padrão (IBC) ou qualquer contexto sem tema resolvido (páginas
-     fora do SPA, /api indisponível) renderiza EXATAMENTE como hoje — e
-     batem com o que core.theming realmente calcula para a cor do IBC
-     (#008ea8), então o fallback e o valor injetado nunca divergem. */
-  --brand-primary:         #008ea8;
-  --brand-primary-hover:   #00839b;   /* escurecer(#008ea8, 8%) — ver core/theming.py */
-  --brand-primary-subtle:  rgba(0, 142, 168, 0.10);
-  --brand-gradient:        linear-gradient(120deg, #008ea8 0%, #0056a8 100%);   /* +20° de matiz */
-  --brand-on-primary:      #0a0f1e;
-
-  --primary:         var(--brand-primary, var(--primary-500));
-  /* --primary-dark NÃO segue --brand-primary-hover: é usado hoje em ~10
-     componentes (hero, trails, badges, onboarding) com o tom --primary-700
-     desenhado manualmente — a fórmula genérica de hover (escurecer 8%)
-     produz um teal visivelmente diferente. Componentes NOVOS que queiram
-     hover reagindo ao tema do tenant usam --brand-primary-hover
-     diretamente; --primary-dark fica como está até um design pass dedicado. */
+  --primary:         var(--primary-500);
   --primary-dark:    var(--primary-700);
   --primary-light:   var(--primary-400);
   --primary-lighter: #e8f4f8;
@@ -45,12 +26,6 @@
 
   /* Ciano elétrico — realce "neon" do próprio teal, só em brilhos/glow. */
   --neon-cyan: #22e3ee;
-
-  /* Streak (GAM-02, UX_ALUNO_SAAS.md §2.1/§2.3): cor FIXA da plataforma —
-     o tenant nunca configura isto. Igual em todo tenant de propósito
-     (vira reconhecível, é assinatura da marca da plataforma, não do
-     tenant, ao contrário de --brand-primary). */
-  --streak-flame: #f97316;
 
   /* Semantic — escalas com tint/shade para badges, alerts, ícones */
   --success-100: #d7f5e3; --success-500: #1fa96a; --success-700: #0f7a4a;

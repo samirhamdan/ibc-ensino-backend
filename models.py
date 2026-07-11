@@ -495,13 +495,6 @@ class UserPoints(TenantScopedModel, db.Model):
     current_level = db.Column(db.Integer, default=1)
     points_in_level = db.Column(db.Integer, default=0)
     last_activity_date = db.Column(db.Date)
-    # GAM-02 (Etapa 3, UX_ALUNO_SAAS.md §3 Grupo 3): streak de dias
-    # consecutivos com login — calculado a partir da transição de
-    # last_activity_date em award_points('daily_login'), migrations/
-    # versions/0014_streak_columns.py. current_streak zera quando um dia é
-    # perdido; longest_streak nunca diminui (recorde histórico do aluno).
-    current_streak = db.Column(db.Integer, default=0, nullable=False)
-    longest_streak = db.Column(db.Integer, default=0, nullable=False)
 
     # __table_args__ próprio sobrepõe o do mixin → índice composto manual.
     # Unique por tenant: o mesmo usuário tem pontuação separada em cada tenant.
@@ -513,8 +506,6 @@ class UserPoints(TenantScopedModel, db.Model):
             'total_points': self.total_points,
             'current_level': self.current_level,
             'points_in_level': self.points_in_level,
-            'current_streak': self.current_streak or 0,
-            'longest_streak': self.longest_streak or 0,
         }
 
 
