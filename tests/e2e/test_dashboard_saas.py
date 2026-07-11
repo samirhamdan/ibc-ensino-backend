@@ -167,3 +167,53 @@ def test_carrossel_de_recomendacoes_nao_estoura_o_layout_no_mobile(app, servidor
             from models import Course
             Course.query.filter(Course.id.in_(ids_criados)).delete(synchronize_session=False)
             db.session.commit()
+
+
+def test_nome_de_curso_malicioso_nao_executa_no_dashboard(app, servidor_vivo, browser, seeded):
+    """XSS armazenado (achado H1 da revisão Fable 5): _dashSaasRenderContinuar,
+    _dashSaasRenderSaudacao, _dashSaasRenderMetas e _dashSaasRenderPontuacao
+    injetavam nome de curso/badge/meta direto em innerHTML sem escape — um
+    tutor/admin criando um curso com esse nome executava JS pra QUALQUER
+    aluno do tenant que abrisse o dashboard (roubo de sessão, escalada
+    tutor→aluno). Prova end-to-end: nenhum dialog dispara e o payload
+    aparece como TEXTO na página, nunca como markup interpretado."""
+    payload = '<img src=x onerror="window.__xss_fired=true">'
+    with app.app_context():
+        from extensions import db
+        from models import Course, LessonProgress
+        course = Course.query.get(seeded['course_id'])
+        course.name = payload
+        db.session.add(LessonProgress(user_id=seeded['users']['aluno'], course_id=seeded['course_id'],
+                                       module_id=seeded['module1_id'], passed=True, score=2, total=2))
+        db.session.commit()
+
+    try:
+        page = browser.new_page(viewport={'width': 1280, 'height': 900})
+        disparou_dialog = []
+        page.on('dialog', lambda d: (disparou_dialog.append(d.message), d.dismiss()))
+
+        page.goto(servidor_vivo + '/')
+        page.fill('#login-email', 'aluno@test.com')
+        page.fill('#login-pass', 'senha123')
+        page.press('#login-pass', 'Enter')
+        page.wait_for_selector('#dash-saas-continuar', timeout=8000)
+
+        # dá tempo pro onerror disparar se o markup tiver sido interpretado
+        page.wait_for_timeout(500)
+
+        assert not disparou_dialog, f'JS malicioso disparou dialog: {disparou_dialog}'
+        assert page.evaluate('window.__xss_fired') is None, \
+            'onerror do payload executou — innerHTML não estava escapado'
+
+        # nenhum elemento <img src="x"> real foi criado no DOM
+        assert page.locator('#dash-saas-continuar img[src="x"]').count() == 0
+
+        page.close()
+    finally:
+        with app.app_context():
+            from extensions import db
+            from models import Course, LessonProgress
+            Course.query.get(seeded['course_id']).name = 'Curso Caracterização'
+            LessonProgress.query.filter_by(user_id=seeded['users']['aluno'],
+                                           course_id=seeded['course_id']).delete()
+            db.session.commit()

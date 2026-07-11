@@ -4318,15 +4318,19 @@ function _dashSaasRenderSaudacao(d){
     const dias = stats.current_streak === 1 ? '1 dia' : `${stats.current_streak} dias`;
     contexto = `Sua sequência de ${dias} vence hoje — estude um pouco para mantê-la!`;
   } else if(ip){
-    contexto = `Você está a ${Math.max(0, ip.total_aulas - ip.aula_atual + 1)} aula(s) de concluir "${ip.name}".`;
+    contexto = `Você está a ${Math.max(0, ip.total_aulas - ip.aula_atual + 1)} aula(s) de concluir "${_dashSaasEscAttr(ip.name)}".`;
   } else if(d.next_metas && d.next_metas.length){
-    contexto = d.next_metas[0].description;
+    contexto = _dashSaasEscAttr(d.next_metas[0].description);
   }
 
+  // XSS (achado H1 da revisão Fable 5): nome/contexto acabam em innerHTML
+  // (não em atributo) — mas _dashSaasEscAttr também escapa &/</>, então
+  // serve pros dois contextos; `nome` vem de currentUser.name (próprio
+  // usuário logado, mas escapado por defesa em profundidade mesmo assim).
   elx.innerHTML = `
     <div class="dash-saas-saudacao">
       <div class="dash-saas-saudacao-texto">
-        <h1>${_dashSaasSaudacaoPorHorario()}, ${nome}</h1>
+        <h1>${_dashSaasSaudacaoPorHorario()}, ${_dashSaasEscAttr(nome)}</h1>
         <div class="dash-saas-saudacao-contexto">${contexto}</div>
       </div>
       ${_dashSaasStreakChip(stats)}
@@ -4353,7 +4357,7 @@ function _dashSaasRenderContinuar(d){
   elx.innerHTML = `
     <div class="dash-saas-grupo-titulo">${icon('target','14')} Continue seus estudos</div>
     <div class="dash-saas-hero-card">
-      <div class="dash-saas-hero-curso">${ip.icon||''} ${ip.name}</div>
+      <div class="dash-saas-hero-curso">${_dashSaasEscAttr(ip.icon)||''} ${_dashSaasEscAttr(ip.name)}</div>
       <h3>Aula ${ip.aula_atual}/${ip.total_aulas}</h3>
       <div class="dash-saas-hero-progress"><div style="width:${ip.percentage}%"></div></div>
       <div style="font-size:var(--text-xs);opacity:.85">${ip.percentage}% concluído</div>
@@ -4361,7 +4365,7 @@ function _dashSaasRenderContinuar(d){
     </div>
     ${secundarios.length ? `<div class="dash-saas-secundarios">${secundarios.map(c=>`
       <div class="dash-saas-secundario-card" onclick="selectCourse(${c.id})">
-        <div class="nome">${c.icon||''} ${c.name}</div>
+        <div class="nome">${_dashSaasEscAttr(c.icon)||''} ${_dashSaasEscAttr(c.name)}</div>
         <div class="meta">${c.percentage}% concluído</div>
       </div>`).join('')}</div>` : ''}
     <div class="dash-saas-slot-tutor">
@@ -4403,8 +4407,8 @@ function _dashSaasRenderPontuacao(d){
     ${s.longest_streak ? `<div style="text-align:center;font-size:var(--text-xs);color:var(--gray);margin-bottom:var(--space-sm)">Recorde: ${s.longest_streak} dia(s)</div>` : ''}
     ${recentes.length ? `<div class="dash-saas-badges-recentes">${recentes.map(t=>`
       <div class="dash-saas-badge-recente${_dashSaasBadgeEhNova(t.date)?' dash-saas-badge-recente--nova':''}" title="${_dashSaasEscAttr(t.name)}">
-        <div class="emoji">${t.icon||'🏅'}</div>
-        <span class="nome">${t.name}</span>
+        <div class="emoji">${_dashSaasEscAttr(t.icon)||'🏅'}</div>
+        <span class="nome">${_dashSaasEscAttr(t.name)}</span>
       </div>`).join('')}</div>` : `<div class="dash-saas-vazio" style="padding:var(--space-md) 0">
         <div class="dash-saas-vazio-msg">Suas conquistas aparecem aqui.</div>
       </div>`}`;
@@ -4437,7 +4441,7 @@ function _dashSaasRenderMetas(d){
     ${revisaoHtml}
     ${metas.map(m=>`<div class="dash-saas-meta-item">
         <span>${icon(m.type==='xp'?'points':m.type==='trofeu'?'achievements':m.type==='duvida'?'chat':'book','16')}</span>
-        <span style="font-size:var(--text-sm)">${m.description}</span>
+        <span style="font-size:var(--text-sm)">${_dashSaasEscAttr(m.description)}</span>
       </div>`).join('')}`;
 }
 
