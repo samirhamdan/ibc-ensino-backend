@@ -1,7 +1,9 @@
-"""GAM-02 (Etapa 3, UX_ALUNO_SAAS.md §3 Grupo 3/§6): streak de dias
-consecutivos, calculado em routes/gamification.py::award_points no
-gatilho 'daily_login' — mesmo hook que já limitava o bônus de login a
-1x/dia. Testes diretos da função (não via HTTP): controlar
+"""GAM-02 (Etapa 3, UX_ALUNO_SAAS.md §3 Grupo 3/§4 Grupo 4/§6): streak de
+dias consecutivos, calculado em routes/gamification.py::award_points —
+QUALQUER ação real de estudo conta como "esteve ativo hoje" (correção da
+auditoria de release, achado H2: a versão anterior só contava
+'daily_login', contradizendo a UI/doc, que prometem que estudar mantém o
+streak). Testes diretos da função (não via HTTP): controlar
 last_activity_date em transições de dia exigiria "viajar no tempo" pelo
 login real; chamar award_points direto com o estado montado é mais
 simples e testa exatamente a lógica nova.
@@ -168,7 +170,32 @@ def test_dia_normal_sem_marco_nao_da_bonus(app, uid):
         assert r['streak_bonus'] == 0
 
 
-def test_outras_acoes_nao_mexem_no_streak(app, uid):
+def test_estudar_sem_logar_de_novo_mantem_o_streak(app, uid):
+    """Correção da auditoria de release (achado H2/Etapa 3): a versão
+    anterior só contava 'daily_login' — um aluno que estuda todo dia sem
+    reenviar o form de login (sessão continua viva) perdia o streak
+    silenciosamente, contradizendo a UI ("estude hoje para não perdê-la")
+    e a doc (UX_ALUNO_SAAS.md §3 Grupo 4: "completar a revisão mantém o
+    streak"). Agora qualquer ação real de estudo conta como "esteve ativo
+    hoje" — não só o login."""
+    ontem = hoje_streak() - timedelta(days=1)
+    _set_last_activity(app, uid, ontem)
+    with app.app_context():
+        from extensions import db
+        from models import UserPoints
+        from core.tenancy import default_tenant_id
+        up = UserPoints.query.filter_by(user_id=uid, tenant_id=default_tenant_id()).first()
+        up.current_streak = 5
+        db.session.commit()
+
+        award_points(uid, 'material_read')   # dia de estudo, SEM login
+
+        up = UserPoints.query.filter_by(user_id=uid, tenant_id=default_tenant_id()).first()
+        assert up.current_streak == 6   # estendeu, igual um login teria feito
+        assert up.last_activity_date == hoje_streak()
+
+
+def test_duas_acoes_no_mesmo_dia_nao_incrementam_streak_duas_vezes(app, uid):
     ontem = hoje_streak() - timedelta(days=1)
     _set_last_activity(app, uid, ontem)
     with app.app_context():
@@ -180,17 +207,16 @@ def test_outras_acoes_nao_mexem_no_streak(app, uid):
         db.session.commit()
 
         award_points(uid, 'material_read')
+        award_points(uid, 'quiz_attempted')
+        r = award_points(uid, 'daily_login')
 
-        up = UserPoints.query.filter_by(user_id=uid, tenant_id=default_tenant_id()).first()
-        assert up.current_streak == 5   # inalterado — só daily_login mexe
+        assert r['current_streak'] == 6   # só incrementou uma vez, na primeira ação do dia
 
 
-def test_outra_acao_nao_toca_last_activity_date(app, uid):
-    """Correção de revisão (H1): a versão anterior atualizava
-    last_activity_date em TODA ação — um material_read num dia sem login
-    "consertava" um streak que devia estar quebrado. Agora só daily_login
-    lê/escreve esse campo."""
-    ontem = hoje_streak() - timedelta(days=1)
+def test_streak_morto_nao_se_salva_por_acao_de_dia_muito_antigo(app, uid):
+    """Uma ação de estudo só ESTENDE um streak que ainda vale (ontem) ou
+    reinicia um streak morto (mais de 1 dia sem atividade) — nunca finge
+    que os dias perdidos no meio não aconteceram."""
     tres_dias_atras = hoje_streak() - timedelta(days=3)
     _set_last_activity(app, uid, tres_dias_atras)
     with app.app_context():
@@ -201,16 +227,9 @@ def test_outra_acao_nao_toca_last_activity_date(app, uid):
         up.current_streak = 10
         db.session.commit()
 
-        award_points(uid, 'material_read')   # dia de estudo, SEM login
+        r = award_points(uid, 'material_read')
 
-        up = UserPoints.query.filter_by(user_id=uid, tenant_id=default_tenant_id()).first()
-        assert up.last_activity_date == tres_dias_atras   # não mudou
-        assert up.current_streak == 10   # streak "morto" continua intacto na linha
-
-        # login no dia seguinte àquele activity (não ao material_read de
-        # hoje) reinicia — o material_read de hoje não "salvou" o streak
-        r = award_points(uid, 'daily_login')
-        assert r['current_streak'] == 1
+        assert r['current_streak'] == 1   # reiniciou, não "consertou" os 10 antigos
 
 
 def test_retry_no_mesmo_dia_nao_paga_marco_duas_vezes(app, uid):
@@ -235,6 +254,53 @@ def test_retry_no_mesmo_dia_nao_paga_marco_duas_vezes(app, uid):
         assert r2['streak_bonus'] == 0
         assert r2['streak_marco_atingido'] is None
         assert r2['current_streak'] == 7   # não incrementou de novo
+
+
+def test_duas_acoes_de_estudo_concorrentes_nao_dobram_o_marco(app, uid):
+    """Achado da auditoria de release: generalizar o streak de
+    'daily_login' pra "qualquer ação" reabre a corrida que o lock do login
+    já existia pra evitar — se duas ações reais (não só login) rodarem "ao
+    mesmo tempo" (duas abas, dois quizzes seguidos rápido demais),
+    _get_or_create_points(lock=True) tem que serializar as duas, senão dá
+    streak +2 / bônus de marco em dobro no mesmo dia."""
+    import threading
+
+    ontem = hoje_streak() - timedelta(days=1)
+    _set_last_activity(app, uid, ontem)
+    with app.app_context():
+        from extensions import db
+        from models import UserPoints
+        from core.tenancy import default_tenant_id
+        up = UserPoints.query.filter_by(user_id=uid, tenant_id=default_tenant_id()).first()
+        up.current_streak = 6   # vira 7 (marco) na próxima ação
+        db.session.commit()
+
+    resultados = []
+    erros = []
+
+    def _agir(acao):
+        try:
+            with app.app_context():
+                resultados.append(award_points(uid, acao))
+        except Exception as e:   # noqa: BLE001 — quer capturar QUALQUER erro pra reportar
+            erros.append(e)
+
+    threads = [threading.Thread(target=_agir, args=(acao,))
+               for acao in ('material_read', 'quiz_attempted')]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=10)
+
+    assert not erros, f'erro inesperado numa das chamadas concorrentes: {erros}'
+    with app.app_context():
+        from models import UserPoints
+        from core.tenancy import default_tenant_id
+        up = UserPoints.query.filter_by(user_id=uid, tenant_id=default_tenant_id()).first()
+        assert up.current_streak == 7, f'esperado incrementar 1x só (6→7), veio {up.current_streak}'
+
+    bonus_pagos = [r['streak_bonus'] for r in resultados if r['streak_bonus']]
+    assert len(bonus_pagos) == 1, f'bônus de marco pago mais de uma vez: {resultados}'
 
 
 class TestStreakEfetivo:

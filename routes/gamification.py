@@ -69,6 +69,16 @@ POINTS_PER_ACTION = {
 # o valor de current_streak que dispara o bônus.
 STREAK_MARCOS = {7: 50, 30: 200, 100: 500}
 
+# Todas as ações que award_points aceita (routes/lessons.py, routes/auth.py,
+# routes/questions.py, routes/materials.py, routes/certificates.py) contam
+# como "esteve ativo hoje" pro streak — nota que 'quiz_passed' não é chave
+# de POINTS_PER_ACTION (o valor de pontos dela é calculado à parte, por
+# tentativa), por isso não dá pra usar POINTS_PER_ACTION.keys() aqui.
+_ACOES_QUE_CONTAM_STREAK = {
+    'material_read', 'quiz_attempted', 'quiz_passed', 'question_asked',
+    'question_answered', 'course_completed', 'daily_login',
+}
+
 
 def _current_user():
     uid = session.get('user_id')
@@ -229,31 +239,65 @@ def award_points(user_id, action, metadata=None):
     up = _get_or_create_points(user_id)
     old_level = up.current_level
 
-    # GAM-02 (Etapa 3, UX_ALUNO_SAAS.md §3 Grupo 3): streak de dias
-    # consecutivos de LOGIN — deliberadamente só o gatilho 'daily_login'
-    # LÊ E ESCREVE last_activity_date agora (correção de um bug real: a
-    # versão anterior atualizava last_activity_date em TODA ação, então
-    # um material_read num dia sem login "consertava" um streak quebrado,
-    # e um dia de estudo sem reenviar o form de login não incrementava
-    # nada — o contador não media nem "dias de login" nem "dias de
-    # atividade" de forma coerente. Outras ações não tocam mais este campo.
+    # GAM-02 (Etapa 3, UX_ALUNO_SAAS.md §3 Grupo 3 / §4 Grupo 4): streak de
+    # dias consecutivos de ATIVIDADE — corrigido na auditoria de release
+    # (achado H2/Etapa 3): a versão anterior só contava 'daily_login', mas
+    # a UI e a própria doc prometem "estude hoje para manter seu streak" /
+    # "completar a revisão mantém o streak" — um aluno que estuda todo dia
+    # sem reenviar o form de login (sessão continua viva) perdia o streak
+    # silenciosamente, e o CTA "em risco" não era acionável pela ação que
+    # ele recomendava. Agora QUALQUER ação real de award_points conta como
+    # "esteve ativo hoje" — todas as chamadas a award_points já são
+    # engajamento real do usuário (quiz, material, curso, pergunta, login),
+    # nunca eventos passivos/automáticos, então generalizar de 'daily_login'
+    # para "qualquer ação" é seguro.
+    #
+    # UPDATE...WHERE guardado (não SELECT...FOR UPDATE): generalizar pra
+    # "qualquer ação" multiplica os pontos de entrada que podem disparar o
+    # streak concorrentemente (duas abas, dois quizzes seguidos), e
+    # with_for_update() não serializa em SQLite (documentado em
+    # _get_or_create_points — a suíte roda nele). Mesmo padrão já usado em
+    # routes/trails.py::claim_trail_if_complete (correção H2 da revisão de
+    # release de trilhas): o UPDATE só afeta a linha se last_activity_date
+    # ainda for o valor que acabamos de ler — se outra ação concorrente já
+    # tiver vencido a corrida e comitado "hoje" primeiro, rowcount vem 0 e
+    # esta chamada não mexe em streak nem paga bônus, só relê o estado
+    # atual. Chamada duplicada no mesmo dia (last_activity_date == hoje)
+    # nem tenta o UPDATE — não conta streak de novo.
     streak_bonus = 0
     marco_atingido = None
-    if action == 'daily_login':
+    if action in _ACOES_QUE_CONTAM_STREAK:
         hoje = hoje_streak()
         ontem = hoje - timedelta(days=1)
-        if up.last_activity_date == hoje:
-            pass   # chamada duplicada no mesmo dia — não conta streak de novo
-        else:
-            if up.last_activity_date == ontem:
-                up.current_streak = (up.current_streak or 0) + 1
-                if up.current_streak in STREAK_MARCOS:
-                    streak_bonus = STREAK_MARCOS[up.current_streak]
-                    marco_atingido = up.current_streak
+        last_activity_antigo = up.last_activity_date
+        if last_activity_antigo != hoje:
+            if last_activity_antigo == ontem:
+                novo_streak = (up.current_streak or 0) + 1
             else:
-                up.current_streak = 1   # primeira atividade ou dia perdido — reinicia
-            up.longest_streak = max(up.longest_streak or 0, up.current_streak or 0)
-            up.last_activity_date = hoje
+                novo_streak = 1   # primeira atividade ou dia perdido — reinicia
+            novo_longest = max(up.longest_streak or 0, novo_streak)
+
+            from sqlalchemy import update
+            filtro_last_activity = (UserPoints.last_activity_date == last_activity_antigo
+                                    if last_activity_antigo is not None
+                                    else UserPoints.last_activity_date.is_(None))
+            resultado = db.session.execute(
+                update(UserPoints)
+                .where(UserPoints.id == up.id, filtro_last_activity)
+                .values(current_streak=novo_streak, longest_streak=novo_longest, last_activity_date=hoje)
+            )
+            if resultado.rowcount == 1:
+                up.current_streak = novo_streak
+                up.longest_streak = novo_longest
+                up.last_activity_date = hoje
+                if novo_streak in STREAK_MARCOS:
+                    streak_bonus = STREAK_MARCOS[novo_streak]
+                    marco_atingido = novo_streak
+            else:
+                # Perdeu a corrida — outra ação concorrente já contou hoje
+                # (ou já reiniciou o streak) entre a leitura e este UPDATE.
+                # Não paga bônus, não mexe no streak; só relê o estado real.
+                db.session.refresh(up)
 
     up.total_points = (up.total_points or 0) + points + streak_bonus
     up.current_level, up.points_in_level = calculate_level(up.total_points)
