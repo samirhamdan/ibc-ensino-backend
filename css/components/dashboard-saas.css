@@ -1,0 +1,278 @@
+/* ─── Dashboard do Aluno (UX_ALUNO_SAAS.md §3) — Etapa 2 ───────────────
+   Grid dos 5 grupos verticais + os 4 estados obrigatórios de cada grupo
+   (§4.4: loading/vazio/erro/conteúdo). Usa só os tokens do design system
+   atual (claro) — --brand-* entram como acento de identidade (CTAs,
+   gradiente do hero), não como reskin geral (decisão registrada no PR:
+   a Etapa 1 já deixou explícito que o tema do tenant é aditivo, não uma
+   reescrita visual da plataforma). Zero hex hardcoded aqui. */
+
+.dash-saas-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-lg);
+}
+
+@media (min-width: 768px) {
+  .dash-saas-grid {
+    grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+    align-items: start;
+  }
+  .dash-saas-col-principal { grid-column: 1; display: flex; flex-direction: column; gap: var(--space-lg); min-width: 0; }
+  .dash-saas-col-lateral   { grid-column: 2; display: flex; flex-direction: column; gap: var(--space-lg); min-width: 0; }
+  .dash-saas-full          { grid-column: 1 / -1; }
+}
+
+.dash-saas-grupo {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-lg);
+  /* Sem isto, um filho intrinsecamente largo (o carrossel horizontal do
+     Grupo 5, com N cards de 180px) força a TRACK do grid a crescer pra
+     caber o conteúdo em vez de deixar o próprio carrossel rolar — o
+     dashboard inteiro vazava pra fora do viewport no mobile (achado
+     visual real, pego no screenshot de verificação da Etapa 4). */
+  min-width: 0;
+}
+
+.dash-saas-grupo-titulo {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--gray);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  margin-bottom: var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* ── Estados obrigatórios (§4.4) — cada grupo usa um destes 4 ── */
+
+.dash-saas-skeleton {
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg, var(--gray-lighter) 25%, var(--gray-light) 37%, var(--gray-lighter) 63%);
+  background-size: 400% 100%;
+  animation: dash-saas-shimmer 1.4s ease infinite;
+}
+@keyframes dash-saas-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+.dash-saas-skeleton--linha { height: 1rem; margin-bottom: var(--space-sm); }
+.dash-saas-skeleton--bloco { height: 6rem; }
+
+.dash-saas-vazio {
+  text-align: center;
+  padding: var(--space-lg) var(--space-md);
+  color: var(--gray);
+}
+.dash-saas-vazio-icone { opacity: .5; margin-bottom: var(--space-sm); }
+.dash-saas-vazio-msg { font-size: var(--text-sm); margin-bottom: var(--space-md); }
+
+.dash-saas-erro {
+  text-align: center;
+  padding: var(--space-lg) var(--space-md);
+  color: var(--danger-700);
+}
+.dash-saas-erro-msg { font-size: var(--text-sm); margin-bottom: var(--space-md); }
+
+/* ── Grupo 1: Saudação ── */
+.dash-saas-saudacao {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+.dash-saas-saudacao-texto h1 { font-size: var(--text-h4); margin: 0 0 .25rem; color: var(--dark); }
+.dash-saas-saudacao-contexto { font-size: var(--text-sm); color: var(--gray); }
+.dash-saas-streak-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .4rem .75rem;
+  border-radius: var(--radius-full);
+  background: var(--gray-lighter);
+  color: var(--gray);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-semibold);
+  cursor: default;
+}
+.dash-saas-streak-chip--ativa { background: color-mix(in srgb, var(--streak-flame) 12%, transparent); color: var(--streak-flame); }
+.dash-saas-streak-chip--risco { background: var(--warning-100); color: var(--warning-700); }
+
+/* ── Chama de streak (GAM-02, §4.2) — SVG próprio, 3 estados ── */
+.dash-saas-flame { flex-shrink: 0; }
+.dash-saas-flame--ativa { color: var(--streak-flame); animation: dash-saas-flame-flicker 3s ease-in-out infinite; }
+.dash-saas-flame--risco { color: var(--warning-500); animation: dash-saas-flame-pulso 1.6s ease-in-out infinite; }
+.dash-saas-flame--quebrada { color: var(--gray); }
+
+@keyframes dash-saas-flame-flicker {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .85; transform: scale(.96); }
+}
+@keyframes dash-saas-flame-pulso {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .45; }
+}
+
+/* Badge "nova" (§4.2): entrada com bounce 1x — animation-iteration-count
+   padrão é 1, então mesmo recalculando "é nova?" a cada carregamento da
+   página (sem localStorage, ver decisão no commit), nunca vira loop. */
+@keyframes dash-saas-badge-bounce {
+  0% { transform: scale(0.3); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.dash-saas-badge-recente--nova .emoji { animation: dash-saas-badge-bounce 400ms ease-out; }
+.dash-saas-badge-recente--nova .nome { color: var(--brand-primary); font-weight: var(--fw-semibold); }
+
+/* ── Grupo 2: Continue seus estudos ── */
+.dash-saas-hero-card {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--brand-gradient);
+  color: var(--brand-on-primary);
+  padding: var(--space-lg);
+}
+.dash-saas-hero-card .dash-saas-hero-curso { font-size: var(--text-xs); opacity: .85; text-transform: uppercase; letter-spacing: var(--tracking-wide); }
+.dash-saas-hero-card h3 { margin: .25rem 0 var(--space-md); font-size: var(--text-h4); }
+.dash-saas-hero-progress { background: rgba(255,255,255,.3); border-radius: var(--radius-full); height: 6px; overflow: hidden; margin-bottom: var(--space-sm); }
+.dash-saas-hero-progress > div { height: 100%; background: var(--brand-on-primary); border-radius: var(--radius-full); }
+.dash-saas-hero-card .btn { margin-top: var(--space-md); }
+
+.dash-saas-secundarios { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-sm); margin-top: var(--space-md); }
+.dash-saas-secundario-card {
+  border-radius: var(--radius-md);
+  background: var(--gray-lighter);
+  padding: var(--space-sm) var(--space-md);
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+.dash-saas-secundario-card:hover { transform: translateY(-2px); }
+.dash-saas-secundario-card .nome { font-size: var(--text-sm); font-weight: var(--fw-semibold); color: var(--dark); }
+.dash-saas-secundario-card .meta { font-size: var(--text-xs); color: var(--gray); }
+
+.dash-saas-slot-tutor {
+  margin-top: var(--space-md);
+  border: 1px dashed var(--gray-light);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-xs);
+  color: var(--gray);
+  text-align: center;
+}
+
+/* ── Grupo 3: Sua pontuação ── */
+.dash-saas-pontuacao-linha1 { display: flex; align-items: baseline; gap: var(--space-sm); margin-bottom: var(--space-md); }
+.dash-saas-pontuacao-total { font-size: var(--text-h3); font-weight: var(--fw-bold); color: var(--dark); }
+.dash-saas-pontuacao-nivel { font-size: var(--text-sm); color: var(--gray); }
+
+.dash-saas-badges-recentes { display: flex; gap: var(--space-sm); flex-wrap: wrap; margin-top: var(--space-md); }
+.dash-saas-badge-recente { text-align: center; width: 3.5rem; }
+.dash-saas-badge-recente .emoji { font-size: 1.6rem; }
+.dash-saas-badge-recente .nome { font-size: .65rem; color: var(--gray); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Grupo 4: Próximas metas ── */
+.dash-saas-meta-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--gray-lighter);
+}
+.dash-saas-meta-item:last-child { border-bottom: none; }
+.dash-saas-meta-revisao {
+  background: var(--brand-primary-subtle, var(--primary-lighter));
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+/* ── Grupo 5: Recomendações — carrossel Netflix (§3 Grupo 5, §4.1) ── */
+.dash-saas-carrossel {
+  display: flex;
+  gap: var(--space-md);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  padding-bottom: var(--space-xs);
+  /* espaço extra pro scale(1.02) do hover não cortar o card vizinho */
+  margin: 0 calc(-1 * var(--space-xs));
+  padding-left: var(--space-xs);
+  padding-right: var(--space-xs);
+}
+
+.dash-saas-netflix-card {
+  flex: 0 0 180px;
+  scroll-snap-align: start;
+  border-radius: var(--radius-card, var(--radius-lg));
+  overflow: hidden;
+  background: var(--white);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.dash-saas-netflix-thumb {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  background: var(--brand-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  position: relative;
+}
+
+.dash-saas-netflix-progress {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 3px;
+  background: rgba(255,255,255,.35);
+}
+.dash-saas-netflix-progress > div { height: 100%; background: var(--brand-on-primary); }
+
+.dash-saas-netflix-body { padding: var(--space-sm) var(--space-md); }
+.dash-saas-netflix-eyebrow { font-size: var(--text-xs); color: var(--gray); text-transform: uppercase; letter-spacing: var(--tracking-wide); }
+.dash-saas-netflix-titulo {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-bold);
+  color: var(--dark);
+  margin: .15rem 0 .5rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Hover só em dispositivos que TÊM hover de verdade (mouse) — em touch,
+   :active cobre o feedback, evita "hover preso" pós-toque (§4.1). */
+@media (hover: hover) and (pointer: fine) {
+  .dash-saas-netflix-card {
+    transition: transform var(--transition-fast, 150ms) var(--ease-out, ease-out), box-shadow var(--transition-fast, 150ms) var(--ease-out, ease-out);
+    transition-duration: 180ms;
+  }
+  .dash-saas-netflix-card:hover {
+    transform: scale(1.02);
+    box-shadow: var(--shadow-lg);
+  }
+}
+.dash-saas-netflix-card:active { transform: scale(0.98); }
+.dash-saas-netflix-card:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: -2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-saas-skeleton { animation: none; }
+  .dash-saas-secundario-card { transition: none; }
+  .dash-saas-flame--ativa,
+  .dash-saas-flame--risco { animation: none; }
+  .dash-saas-badge-recente--nova .emoji { animation: none; }
+  .dash-saas-netflix-card { transition: none; }
+  .dash-saas-netflix-card:hover,
+  .dash-saas-netflix-card:active { transform: none; }
+}

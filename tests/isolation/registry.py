@@ -21,6 +21,8 @@ Classificações:
 # endpoint → teste que prova o isolamento
 TENANT_SCOPED = {
     'tenant_current': 'test_tenant_isolation.py::test_tenant_current_nao_vaza_outro_tenant',
+    'theme.get_theme': 'test_tenant_isolation.py::test_theme_por_tenant_nao_vaza',
+    'theme.get_theme_json': 'test_tenant_isolation.py::test_theme_por_tenant_nao_vaza',
     # grupo 1 — gamificação (Fase 3)
     'gamification.user_stats': 'test_gamification_isolation.py::test_pontos_independentes_por_tenant',
     'gamification.list_badges': 'test_gamification_isolation.py::test_badges_desbloqueados_nao_vazam',

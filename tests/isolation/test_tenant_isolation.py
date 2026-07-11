@@ -24,6 +24,48 @@ def test_tenant_current_nao_vaza_outro_tenant(tenant_a, tenant_b):
     assert 'demo' not in str(da)
 
 
+def test_theme_por_tenant_nao_vaza(iso_app, tenant_a, tenant_b, tenants_ab):
+    """GET /api/theme e /api/theme.json (Etapa 1, UX_ALUNO_SAAS.md §2.2)
+    derivam da cor do tenant do subdomínio — tenant B nunca vê os tokens
+    calculados a partir da cor de A, e vice-versa."""
+    from extensions import db
+    from core.tenancy import Tenant
+    from core.tenancy.cache import cache_clear
+
+    with iso_app.app_context():
+        a = Tenant.query.get(tenants_ab['a_id'])
+        b = Tenant.query.get(tenants_ab['b_id'])
+        a.tema_json = {'primary': '#008ea8'}
+        b.tema_json = {'primary': '#f0a500'}
+        db.session.commit()
+    cache_clear()
+
+    try:
+        ja = tenant_a.get('/api/theme.json').get_json()
+        jb = tenant_b.get('/api/theme.json').get_json()
+        assert ja['--brand-primary'] == '#008ea8'
+        assert jb['--brand-primary'] == '#f0a500'
+        assert ja['--brand-primary'] != jb['--brand-primary']
+
+        css_a = tenant_a.get('/api/theme').get_data(as_text=True)
+        css_b = tenant_b.get('/api/theme').get_data(as_text=True)
+        assert '#008ea8' in css_a and '#f0a500' not in css_a
+        assert '#f0a500' in css_b and '#008ea8' not in css_b
+    finally:
+        # try/finally, não sequencial: uma asserção falhando no meio não
+        # pode deixar o tenant `demo` com a cor de teste — o app/db da
+        # suíte de isolamento é compartilhado (session-scoped) entre TODOS
+        # os testes do módulo, então um estado não restaurado vaza para
+        # testes seguintes e mascara a falha real com erros confusos.
+        with iso_app.app_context():
+            a = Tenant.query.get(tenants_ab['a_id'])
+            b = Tenant.query.get(tenants_ab['b_id'])
+            a.tema_json = {'cor_primaria': '#008ea8'}
+            b.tema_json = {'cor_primaria': '#008ea8'}
+            db.session.commit()
+        cache_clear()
+
+
 def test_contexto_nao_aceita_id_de_tenant_via_request(tenant_a, tenants_ab):
     """Tentativas de apontar para B a partir de A via query/header não têm
     efeito: o contexto é derivado exclusivamente do subdomínio."""
