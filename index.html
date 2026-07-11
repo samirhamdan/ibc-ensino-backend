@@ -532,6 +532,50 @@ function setupUI(){
     .catch(()=>{});
 })();
 
+// ── Escape de HTML (XSS) ──────────────────────────────────────────────────
+// Toda string vinda de dado de usuário (nome, texto de pergunta, resposta,
+// comentário, etc.) que for interpolada em innerHTML/template literal como
+// CONTEÚDO de elemento (ou atributo comum: title="...", aria-label="...")
+// precisa passar por aqui primeiro — sem isto, um aluno/tutor/admin com um
+// nome ou texto tipo "<img src=x onerror=...>" executa script na sessão de
+// QUALQUER OUTRO usuário que veja aquele dado renderizado (achado do
+// ROADMAP.md 2.1, histórico do projeto).
+//
+// NÃO usar escapeHtml() sozinho dentro de onclick="fn('${...}')" — o
+// parser HTML decodifica entidades (&#39; → ') no atributo ANTES do JS
+// rodar, então um nome como `x'); fetch('//evil')//` ainda quebra pra
+// fora da string JS mesmo escapado. Pra esse caso, use jsAttr() abaixo.
+function escapeHtml(s){
+  if(s == null) return '';
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+// Valor seguro pra embutir dentro de onclick="fn(JSATTR)" (SEM aspas
+// próprias ao redor — o literal JS já vem entre aspas duplas do próprio
+// JSON.stringify). JSON.stringify escapa aspas/backslash/controle
+// corretamente para um literal JS; escapeHtml() por cima neutraliza
+// qualquer '/&/</> que sobre pro contexto HTML do atributo. Use SEMPRE
+// com o atributo delimitado por aspas SIMPLES: onclick='fn(${jsAttr(x)})'.
+function jsAttr(v){
+  return escapeHtml(JSON.stringify(v == null ? '' : v));
+}
+
+// URL de material é dado do tutor/admin (Material.url) — usada crua em
+// href="${...}" era um `javascript:alert(1)` de distância de executar no
+// clique de qualquer aluno (entity-escaping não neutraliza esquema de
+// URL). Só http(s):// e caminhos relativos passam; qualquer outra coisa
+// (javascript:, data:, vbscript:) vira '#'.
+function safeUrl(u){
+  const s = String(u || '').trim();
+  if(/^(https?:)?\/\//i.test(s) || /^[.#/]/.test(s)) return escapeHtml(s);
+  return '#';
+}
+
 // ── Login / Logout ──
 function icon(name, size='20', extra=''){
   return `<svg class="icon icon-${name}${extra?' '+extra:''}" width="${size}" height="${size}" viewBox="0 0 24 24"><use href="#icon-${name}"></use></svg>`;
@@ -803,7 +847,7 @@ function renderCourseList(){
       div.id='course-nav-'+c.id;
       div.innerHTML=`<span class="ci-icon">${c.icon||'📚'}</span>
         <div class="ci-text">
-          <div class="ci-name">${c.name}</div>
+          <div class="ci-name">${escapeHtml(c.name)}</div>
           <div class="ci-progress">—</div>
           <div class="mini-bar"><div class="mini-bar-fill" style="width:0%"></div></div>
         </div>`;
@@ -916,8 +960,8 @@ async function renderCourseResume(){
 
   document.getElementById('main-content').innerHTML=`
     <div class="course-header">
-      <span class="course-tag">${c.tag}</span>
-      <h1 class="course-title">${c.icon} ${c.name}</h1>
+      <span class="course-tag">${escapeHtml(c.tag)}</span>
+      <h1 class="course-title">${c.icon} ${escapeHtml(c.name)}</h1>
       <div class="course-meta">
         <span>${icon('user-check','14')} ${c.tutor_id&&currentCourse.tutor_name?currentCourse.tutor_name:'Professor IBC'}</span>
         ${c.duracao?`<span>${icon('clock','14')} ${c.duracao}</span>`:''}
@@ -939,7 +983,7 @@ async function renderCourseResume(){
       ${currentAulas.map((a,i)=>`
         <div class="modulo-item" style="${a.unlocked?'cursor:pointer':'opacity:.6'}" ${a.unlocked?`onclick="loadAula(${c.id},${i+1})"`:''}>
           <div class="modulo-num">${a.progress&&a.progress.passed?icon('check','14'):(i+1)}</div>
-          <div class="modulo-name">${a.nome}</div>
+          <div class="modulo-name">${escapeHtml(a.nome)}</div>
           ${a.dur?`<div class="modulo-dur">${icon('clock','12')} ${a.dur}</div>`:''}
           ${!a.unlocked?`<span style="font-size:.8rem">${icon('lock','14')}</span>`:''}
         </div>`).join('')}
@@ -1018,13 +1062,13 @@ function renderAulaPage(){
       <div class="material-item-info">
         <span class="material-item-icon">${m.tipo==='pdf'?icon('file','16'):icon('share','16')}</span>
         <div>
-          <div class="material-item-name">${m.name}</div>
+          <div class="material-item-name">${escapeHtml(m.name)}</div>
           <div class="material-item-type">${m.tipo==='pdf'?'PDF':'Link'}</div>
         </div>
       </div>
       <div class="material-item-actions">
         ${m.tipo==='pdf'?`<button class="btn btn-outline" onclick="openPdfViewer(${m.id},'${m.name.replace(/'/g,"\\'")}')">${icon('book','14')} Abrir Viewer</button>`:''}
-        <a class="btn btn-outline" href="${m.url}" target="_blank" rel="noopener">${m.tipo==='pdf'?icon('download','14')+' Baixar':icon('share','14')+' Abrir'}</a>
+        <a class="btn btn-outline" href="${safeUrl(m.url)}" target="_blank" rel="noopener">${m.tipo==='pdf'?icon('download','14')+' Baixar':icon('share','14')+' Abrir'}</a>
       </div>
     </div>`).join('');
 
@@ -1077,12 +1121,12 @@ function renderAulaPage(){
     const reviewHtml = fb.feedback ? fb.feedback.map((f,i)=>`
       <div class="question-card ${f.is_correct?'correct':'wrong'}">
         <div class="q-num">Questão ${i+1}</div>
-        <div class="q-text">${f.question}</div>
+        <div class="q-text">${escapeHtml(f.question)}</div>
         <div class="options">
           ${a.quiz[i]&&a.quiz[i].opts?a.quiz[i].opts.map((o,j)=>`<div class="option ${j===f.correct_answer?'correct-ans':(f.selected===j&&!f.is_correct?'wrong-ans':'')}">
-            <input type="radio" disabled ${f.selected===j?'checked':''}><span>${o}</span></div>`).join(''):''}
+            <input type="radio" disabled ${f.selected===j?'checked':''}><span>${escapeHtml(o)}</span></div>`).join(''):''}
         </div>
-        <div class="q-feedback ${f.is_correct?'ok':'err'}">${f.is_correct?icon('check','14')+' Correto!':icon('x','14')+' Incorreto — '+f.explanation}</div>
+        <div class="q-feedback ${f.is_correct?'ok':'err'}">${f.is_correct?icon('check','14')+' Correto!':icon('x','14')+' Incorreto — '+escapeHtml(f.explanation)}</div>
       </div>`).join('') : '';
     exerciseBody = `
       <div class="quiz-body">
@@ -1102,10 +1146,10 @@ function renderAulaPage(){
         ${a.quiz.map((q,i)=>`
           <div class="question-card" id="aqcard-${i}">
             <div class="q-num">Questão ${i+1} de ${a.quiz.length}</div>
-            <div class="q-text">${q.q}</div>
+            <div class="q-text">${escapeHtml(q.q)}</div>
             <div class="options">
               ${q.opts.map((o,j)=>`<div class="option ${aulaQuizAnswers[i]===j?'selected':''}" onclick="selectAulaOpt(${i},${j})">
-                <input type="radio" name="aq${i}" ${aulaQuizAnswers[i]===j?'checked':''} readonly><span>${o}</span></div>`).join('')}
+                <input type="radio" name="aq${i}" ${aulaQuizAnswers[i]===j?'checked':''} readonly><span>${escapeHtml(o)}</span></div>`).join('')}
             </div>
           </div>`).join('')}
         <div class="quiz-actions"><button class="btn btn-primary" onclick="submitAulaQuiz()">Enviar respostas →</button></div>
@@ -1154,7 +1198,7 @@ function renderAulaPage(){
       <span class="breadcrumb-current">Aula ${num} de ${total}</span>
     </nav>
     <div class="course-header">
-      <h1 class="course-title">Aula ${num}: ${a.nome}</h1>
+      <h1 class="course-title">Aula ${num}: ${escapeHtml(a.nome)}</h1>
       <div class="course-meta">${a.dur?`<span>${icon('clock','14')} ${a.dur}</span>`:''}</div>
     </div>
     ${stepperHtml}
@@ -1388,7 +1432,7 @@ function showLessonCompletedPanel(nextLesson){
       <p class="lesson-completed-msg">Parabéns, você avançou para a próxima etapa.</p>
       <div class="lesson-completed-next">
         <span class="lcn-label">Próxima aula</span>
-        <span class="lcn-title">${nextLesson.title}</span>
+        <span class="lcn-title">${escapeHtml(nextLesson.title)}</span>
       </div>
       <div class="lesson-completed-actions">
         <button class="btn btn-primary" onclick="openLesson(${nextLesson.course_id},${nextLesson.id})">Continuar para próxima aula →</button>
@@ -1429,7 +1473,7 @@ async function renderConclusion(){
       const d = await r.json();
       certCode = d.cert && d.cert.cert_code;
       if(d.certificate_issued){
-        setTimeout(()=>showTrophyModal('🎓','Certificado conquistado!',`Seu certificado de "${c.name}" está disponível!`), 600);
+        setTimeout(()=>showTrophyModal('🎓','Certificado conquistado!',`Seu certificado de "${escapeHtml(c.name)}" está disponível!`), 600);
       }
       if(d.new_achievements && d.new_achievements.length){
         setTimeout(()=>showAchievementPopups(d.new_achievements), d.certificate_issued ? 1500 : 600);
@@ -1441,7 +1485,7 @@ async function renderConclusion(){
     <div style="text-align:center;padding:2.5rem 1rem">
       <div style="font-size:3.5rem">🎉</div>
       <h1 class="course-title" style="margin-top:.5rem">Parabéns, ${currentUser.name.split(' ')[0]}!</h1>
-      <p style="color:var(--muted);margin-top:.4rem">Você concluiu o curso <strong>${c.name}</strong></p>
+      <p style="color:var(--muted);margin-top:.4rem">Você concluiu o curso <strong>${escapeHtml(c.name)}</strong></p>
       <div class="result-score" style="margin-top:1rem">${pct}%</div>
       <div class="result-label">aproveitamento médio</div>
       ${certCode?`<div style="margin:.8rem 0;font-size:.85rem;color:var(--muted)">Código: <strong>${certCode}</strong></div>`:''}
@@ -1506,8 +1550,8 @@ function renderCourse(){
   const nPendente=currentQuestions.filter(q=>!q.resposta).length;
   document.getElementById('main-content').innerHTML=`
     <div class="course-header">
-      <span class="course-tag">${c.tag}</span>
-      <h1 class="course-title">${c.icon} ${c.name}</h1>
+      <span class="course-tag">${escapeHtml(c.tag)}</span>
+      <h1 class="course-title">${c.icon} ${escapeHtml(c.name)}</h1>
       <div class="course-meta">
         <span>📋 ${(c.modules||[]).length} módulos</span>
         ${c.duracao?`<span>⏱ ${c.duracao}</span>`:''}
@@ -1627,7 +1671,7 @@ function renderModulos(){
   const modList=mods.map((m,i)=>`
     <div class="modulo-item">
       <div class="modulo-num">${i+1}</div>
-      <div class="modulo-name">${m.nome}</div>
+      <div class="modulo-name">${escapeHtml(m.nome)}</div>
       ${m.dur?`<div class="modulo-dur">⏱ ${m.dur}</div>`:''}
       ${canEdit?`<button class="btn-sm btn-danger-sm" onclick="removeModulo(${m.id})">✕</button>`:''}
     </div>`).join('');
@@ -1681,7 +1725,7 @@ function renderMaterial(){
     const isViewing=viewingPDF===i;
     let actions='';
     if(isLink){
-      actions=`<a href="${m.url}" target="_blank" class="btn-view" style="text-decoration:none">Abrir</a>`;
+      actions=`<a href="${safeUrl(m.url)}" target="_blank" class="btn-view" style="text-decoration:none">Abrir</a>`;
     } else if(m.url){
       actions=`<button class="btn-view" onclick="event.stopPropagation();viewPDF(${i})">Ver</button>`;
     }
@@ -1689,7 +1733,7 @@ function renderMaterial(){
     return `<div class="material-item ${isViewing?'mat-viewing':''}" onclick="${isLink?'':('viewPDF('+i+')')}">
       <span class="mat-icon">${isLink?'🔗':'📄'}</span>
       <div class="mat-info">
-        <div class="mat-name">${m.name}</div>
+        <div class="mat-name">${escapeHtml(m.name)}</div>
         <div class="mat-meta">${isLink?m.url:(m.size||'—')}</div>
       </div>
       <span class="mat-type ${isLink?'mat-link':'mat-pdf'}">${isLink?'LINK':'PDF'}</span>
@@ -1841,16 +1885,16 @@ function renderQuiz(){
     const reviewHtml=feedback.map((f,i)=>`
       <div class="question-card ${f.is_correct?'correct':'wrong'}">
         <div class="q-num">Questão ${i+1}</div>
-        <div class="q-text">${f.question}</div>
+        <div class="q-text">${escapeHtml(f.question)}</div>
         <div class="options">
           ${quiz[i]&&quiz[i].opts?quiz[i].opts.map((o,j)=>`<div class="option ${j===f.correct_answer?'correct-ans':(f.selected===j&&!f.is_correct?'wrong-ans':'')}">
-            <input type="radio" disabled ${f.selected===j?'checked':''}><span>${o}</span>
+            <input type="radio" disabled ${f.selected===j?'checked':''}><span>${escapeHtml(o)}</span>
           </div>`).join(''):''}
         </div>
-        <div class="q-feedback ${f.is_correct?'ok':'err'}">${f.is_correct?'✓ Correto!':'✗ Incorreto — '+f.explanation}</div>
+        <div class="q-feedback ${f.is_correct?'ok':'err'}">${f.is_correct?'✓ Correto!':'✗ Incorreto — '+escapeHtml(f.explanation)}</div>
       </div>`).join('');
     return `<div class="quiz-wrap">
-      <div class="quiz-header"><div class="quiz-title">Resultado</div><div class="quiz-desc">${c.name}</div></div>
+      <div class="quiz-header"><div class="quiz-title">Resultado</div><div class="quiz-desc">${escapeHtml(c.name)}</div></div>
       <div class="quiz-body">
         <div class="quiz-result">
           <div class="result-score">${score}/${total}</div>
@@ -1868,7 +1912,7 @@ function renderQuiz(){
     const pct=Math.round((prog.quiz_score/prog.quiz_total)*100);
     const pass=pct>=60;
     return `<div class="quiz-wrap">
-      <div class="quiz-header"><div class="quiz-title">Resultado Anterior</div><div class="quiz-desc">${c.name}</div></div>
+      <div class="quiz-header"><div class="quiz-title">Resultado Anterior</div><div class="quiz-desc">${escapeHtml(c.name)}</div></div>
       <div class="quiz-body">
         <div class="quiz-result">
           <div class="result-score">${prog.quiz_score}/${prog.quiz_total}</div>
@@ -1885,15 +1929,15 @@ function renderQuiz(){
   const questionsHtml=quiz.map((q,i)=>`
     <div class="question-card" id="qcard-${i}">
       <div class="q-num">Questão ${i+1} de ${quiz.length}</div>
-      <div class="q-text">${q.q}</div>
+      <div class="q-text">${escapeHtml(q.q)}</div>
       <div class="options">
         ${q.opts.map((o,j)=>`<div class="option ${quizAnswers[i]===j?'selected':''}" onclick="selectOpt(${i},${j})">
-          <input type="radio" name="q${i}" ${quizAnswers[i]===j?'checked':''} readonly><span>${o}</span>
+          <input type="radio" name="q${i}" ${quizAnswers[i]===j?'checked':''} readonly><span>${escapeHtml(o)}</span>
         </div>`).join('')}
       </div>
     </div>`).join('');
   return `<div class="quiz-wrap">
-    <div class="quiz-header"><div class="quiz-title">Exercícios — ${c.name}</div><div class="quiz-desc">${quiz.length} questões · Mínimo 60% para aprovação</div></div>
+    <div class="quiz-header"><div class="quiz-title">Exercícios — ${escapeHtml(c.name)}</div><div class="quiz-desc">${quiz.length} questões · Mínimo 60% para aprovação</div></div>
     <div class="quiz-body">${questionsHtml}
       <div class="quiz-actions"><button class="btn-gold" onclick="submitQuiz()">Enviar respostas →</button></div>
     </div>
@@ -1938,7 +1982,7 @@ function renderPerguntas(){
     const respostaHtml=p.resposta
       ?`<div class="resposta-area">
           <div class="resposta-avatar">T</div>
-          <div class="resposta-texto"><strong>${p.respondido_por||'Tutor'}:</strong> ${p.resposta}</div>
+          <div class="resposta-texto"><strong>${escapeHtml(p.respondido_por||'Tutor')}:</strong> ${escapeHtml(p.resposta)}</div>
         </div>`
       :(canEdit?`<div class="resposta-form">
           <div style="font-size:.75rem;font-weight:600;color:var(--navy);margin-bottom:.4rem">Responder como tutor:</div>
@@ -1958,7 +2002,7 @@ function renderPerguntas(){
         </div>
         <span class="badge-${p.resposta?'respondida':'pendente'}">${p.resposta?'Respondida':'Pendente'}</span>
       </div>
-      <div class="pergunta-texto">${p.texto}</div>
+      <div class="pergunta-texto">${escapeHtml(p.texto)}</div>
       ${respostaHtml}
     </div>`;
   }).join('');
@@ -2033,8 +2077,8 @@ async function renderAdminUsers(){
         <div style="display:flex;align-items:center;gap:.5rem">
           <span style="font-size:1rem">${roleIcon(u.role)}</span>
           <div>
-            <div style="font-weight:500;font-size:.85rem;color:var(--navy)">${u.name}</div>
-            <div style="font-size:.72rem;color:var(--muted)">${u.email}</div>
+            <div style="font-weight:500;font-size:.85rem;color:var(--navy)">${escapeHtml(u.name)}</div>
+            <div style="font-size:.72rem;color:var(--muted)">${escapeHtml(u.email)}</div>
           </div>
         </div>
       </td>
@@ -2152,7 +2196,7 @@ function renderAdminTrailGrid() {
       <div class="admin-trail-card-icon">
         ${icon(t.icon || 'trails', '28')}
       </div>
-      <h3 class="admin-trail-card-name">${t.name}</h3>
+      <h3 class="admin-trail-card-name">${escapeHtml(t.name)}</h3>
       <div class="admin-trail-card-stats">
         <span>${icon('books','14')} ${t.total_courses} cursos</span>
         <span>${icon('users','14')} ${t.enrolled_users} alunos</span>
@@ -2205,7 +2249,7 @@ async function openTrailEditor(trailId) {
             <li class="sortable-course-item" data-course-id="${c.id}">
               <span class="drag-handle">${icon('drag-handle','18')}</span>
               <span class="course-order-num">${i + 1}</span>
-              <span class="course-name-item">${c.name}</span>
+              <span class="course-name-item">${escapeHtml(c.name)}</span>
               <button class="btn-icon-only" onclick="removeCourseFromTrail(${c.id})" title="Remover">${icon('x-circle','18')}</button>
             </li>
           `).join('')}
@@ -2268,7 +2312,7 @@ function updateTrailPreview() {
           <div class="trail-step-marker">${i === 0 ? '▶' : icon('lock','12','icon--disabled')}</div>
           <div class="trail-step-content">
             <span class="trail-step-num">Passo ${c.order}</span>
-            <span class="trail-step-name">${c.name}</span>
+            <span class="trail-step-name">${escapeHtml(c.name)}</span>
             ${i === 0 ? '<span class="trail-step-status">VOCÊ ESTÁ AQUI</span>' : ''}
           </div>
         </div>
@@ -2365,9 +2409,9 @@ async function renderAdminCourses() {
         ${icon('books','28','icon--white')}
       </div>
       <div class="admin-course-card-info">
-        <h3 class="admin-course-card-name">${c.name}</h3>
+        <h3 class="admin-course-card-name">${escapeHtml(c.name)}</h3>
         <p class="admin-course-card-meta">
-          ${c.category} · ${c.total_lessons} aulas · ${c.enrolled_users} alunos
+          ${escapeHtml(c.category)} · ${c.total_lessons} aulas · ${c.enrolled_users} alunos
           ${c.trail_name ? ' · Trilha: ' + c.trail_name : ''}
         </p>
         <div class="admin-course-card-flags">
@@ -2411,7 +2455,7 @@ async function duplicateCourse(courseId){
   const res = await api('POST', `/admin/courses/${courseId}/duplicate`);
   if(res.ok){
     const data = await res.json();
-    showToast(`Curso duplicado: ${data.name}`, 'success');
+    showToast(`Curso duplicado: ${escapeHtml(data.name)}`, 'success');
     await loadCourses();
     renderAdminCourses();
   } else {
@@ -2613,7 +2657,7 @@ function renderLessonAccordionItem(l, i) {
             <div class="material-list-edit" id="matList_${l.id}">
               ${(l.materials||[]).map(m => `
                 <div class="material-edit-item" id="matItem_${m.id}">
-                  <span class="material-info">${icon(m.tipo==='pdf'?'file':'document-text','14')} ${m.name}</span>
+                  <span class="material-info">${icon(m.tipo==='pdf'?'file':'document-text','14')} ${escapeHtml(m.name)}</span>
                   <button class="btn-icon-only" onclick="adminRemoveMaterial(${m.id},${l.id})" title="Remover">${icon('x-circle','16')}</button>
                 </div>`).join('')}
             </div>
@@ -2941,23 +2985,23 @@ async function renderAdminTutors() {
 }
 
 function _renderTutorsContent(tutors, courses, unassignedQs) {
-  const tutorOptions = tutors.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+  const tutorOptions = tutors.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
 
   const tutorCards = tutors.length === 0
     ? '<div class="admin-section"><div class="admin-section-body" style="text-align:center;color:var(--muted);padding:2rem">Nenhum tutor cadastrado. Promova um usuário ao perfil Tutor na gestão de Usuários.</div></div>'
     : '<div class="admin-tutors-grid">' + tutors.map(t => {
         const availableCourses = courses.filter(c => !t.assigned_courses.find(ac => ac.id === c.id));
-        const courseOptions = availableCourses.map(c => `<option value="${c.id}">${c.icon||'📘'} ${c.name}</option>`).join('');
+        const courseOptions = availableCourses.map(c => `<option value="${c.id}">${c.icon||'📘'} ${escapeHtml(c.name)}</option>`).join('');
         const chips = t.assigned_courses.map(c =>
-          `<span class="tutor-course-chip">${c.icon||'📘'} ${c.name}<button onclick="adminUnassignCourse(${t.id},${c.id})" title="Remover">×</button></span>`
+          `<span class="tutor-course-chip">${c.icon||'📘'} ${escapeHtml(c.name)}<button onclick="adminUnassignCourse(${t.id},${c.id})" title="Remover">×</button></span>`
         ).join('') || '<span style="font-size:.78rem;color:var(--muted)">Nenhum curso atribuído</span>';
 
         return `<div class="admin-tutor-card" id="tutor-card-${t.id}">
           <div class="admin-tutor-card-header">
             <div class="admin-tutor-avatar">${t.name.charAt(0).toUpperCase()}</div>
             <div>
-              <div style="font-weight:600;font-size:.95rem">${t.name}</div>
-              <div style="font-size:.75rem;color:var(--muted)">${t.email}</div>
+              <div style="font-weight:600;font-size:.95rem">${escapeHtml(t.name)}</div>
+              <div style="font-size:.75rem;color:var(--muted)">${escapeHtml(t.email)}</div>
             </div>
           </div>
           <div class="admin-tutor-stats">
@@ -2981,9 +3025,9 @@ function _renderTutorsContent(tutors, courses, unassignedQs) {
     : '<div class="questions-queue">' + unassignedQs.map(q =>
         `<div class="question-queue-item" id="qqueue-${q.id}">
           <div class="question-queue-meta">
-            <div class="q-course">${q.course_name}</div>
-            <div class="q-text">${q.texto}</div>
-            <div class="q-author">por ${q.student_name || q.autor}</div>
+            <div class="q-course">${escapeHtml(q.course_name)}</div>
+            <div class="q-text">${escapeHtml(q.texto)}</div>
+            <div class="q-author">por ${escapeHtml(q.student_name || q.autor)}</div>
           </div>
           <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
             <select class="question-assign-select" id="qsel-${q.id}">
@@ -3044,8 +3088,8 @@ async function renderAdminUsersV2() {
   const trailsRes = await api('GET', '/trails');
   const trails = trailsRes.ok ? await trailsRes.json() : [];
 
-  const trailOpts = trails.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
-  const trailSelectBulk = trails.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+  const trailOpts = trails.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+  const trailSelectBulk = trails.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
 
   document.getElementById('main-content').innerHTML =
     `<div class="admin-page-header">
@@ -3133,8 +3177,8 @@ function _renderUsersTable() {
         <div class="user-name-cell">
           <div class="user-avatar-sm">${initials}</div>
           <div>
-            <div style="font-weight:500;font-size:.85rem">${u.name}</div>
-            <div style="font-size:.72rem;color:var(--muted)">${u.email}</div>
+            <div style="font-weight:500;font-size:.85rem">${escapeHtml(u.name)}</div>
+            <div style="font-size:.72rem;color:var(--muted)">${escapeHtml(u.email)}</div>
           </div>
         </div>
       </td>
@@ -3222,7 +3266,7 @@ async function openUserProfile(userId) {
     : u.trails.map(t => `<div class="profile-trail-item">
         <span style="font-size:1.2rem">${t.icon||'📚'}</span>
         <div style="flex:1">
-          <div style="font-size:.85rem;font-weight:500">${t.name}</div>
+          <div style="font-size:.85rem;font-weight:500">${escapeHtml(t.name)}</div>
           <div style="font-size:.75rem;color:var(--muted)">${t.completed_courses}/${t.total_courses} cursos${t.completed_at ? ' · Concluída' : ''}</div>
         </div>
         ${!t.completed_at ? `<button class="btn-link" style="font-size:.72rem" onclick="adminSetActiveTrail(${userId},${t.id})">Ativar</button>` : ''}
@@ -3230,7 +3274,7 @@ async function openUserProfile(userId) {
 
   const certItems = u.certificates.length === 0
     ? '<p style="font-size:.82rem;color:var(--muted)">Nenhum certificado emitido.</p>'
-    : u.certificates.map(c => `<div class="profile-cert-item">${icon('certificates','14')} ${c.course_name}<span style="margin-left:auto;font-size:.72rem;color:var(--muted)">${(c.issued_at||'').slice(0,10)}</span></div>`).join('');
+    : u.certificates.map(c => `<div class="profile-cert-item">${icon('certificates','14')} ${escapeHtml(c.course_name)}<span style="margin-left:auto;font-size:.72rem;color:var(--muted)">${(c.issued_at||'').slice(0,10)}</span></div>`).join('');
 
   const statusBadge = u.is_active
     ? '<span class="user-status-badge active">Ativo</span>'
@@ -3257,10 +3301,10 @@ async function openUserProfile(userId) {
     </div>
     <div class="profile-actions">
       <div class="profile-section-title">Ações</div>
-      <button class="btn" style="background:#eee" onclick="openEditUserModal(${userId},'${(u.name||'').replace(/'/g,"\\'")}','${(u.email||'').replace(/'/g,"\\'")}','${u.role}')">${icon('pencil','14')} Editar</button>
+      <button class="btn" style="background:#eee" onclick='openEditUserModal(${userId},${jsAttr(u.name)},${jsAttr(u.email)},${jsAttr(u.role)})'>${icon('pencil','14')} Editar</button>
       <button class="btn" style="background:#eee" onclick="openResetPasswordModal(${userId})">${icon('key','14')} Resetar Senha</button>
       <button class="btn ${u.is_active ? 'btn-danger' : ''}" onclick="toggleUserActive(${userId})">${u.is_active ? 'Desativar' : 'Reativar'}</button>
-      <button class="btn btn-danger" onclick="adminResetUserProgress(${userId},'${u.name}')">Zerar progresso (mantém certificados)</button>
+      <button class="btn btn-danger" onclick='adminResetUserProgress(${userId},${jsAttr(u.name)})'>Zerar progresso (mantém certificados)</button>
     </div>`;
 }
 
@@ -3459,8 +3503,8 @@ function _renderNotificationsList(notifications){
   }
   list.innerHTML = notifications.map(n => `
     <div class="notification-item ${n.is_read ? '' : 'unread'}" onclick="readNotification(${n.id}${n.link ? ",'"+n.link.replace(/'/g,"\\'")+"'" : ''})">
-      <div class="notification-title">${n.title}</div>
-      <div class="notification-message">${n.message}</div>
+      <div class="notification-title">${escapeHtml(n.title)}</div>
+      <div class="notification-message">${escapeHtml(n.message)}</div>
       <div class="notification-time">${formatRelativeTime(n.created_at)}</div>
     </div>
   `).join('');
@@ -3523,8 +3567,8 @@ async function renderAnnouncementsBanner(){
     area.innerHTML = announcements.map(a => `
       <div class="announcement-banner ${a.severity}" id="announcement-banner-${a.id}">
         <div class="announcement-banner-content">
-          <div class="announcement-banner-title">${a.title}</div>
-          <div class="announcement-banner-message">${a.message}</div>
+          <div class="announcement-banner-title">${escapeHtml(a.title)}</div>
+          <div class="announcement-banner-message">${escapeHtml(a.message)}</div>
         </div>
         <button class="announcement-banner-close" onclick="dismissAnnouncement(${a.id})" title="Dispensar">&times;</button>
       </div>
@@ -3566,8 +3610,8 @@ async function _loadAdminAnnouncements(){
   container.innerHTML = announcements.map(a => `
     <div class="announcement-admin-row">
       <div style="flex:1">
-        <div style="font-weight:600;font-size:.9rem">${a.title} ${a.is_active ? '' : '<span style="color:#c0392b;font-size:.72rem">(arquivado)</span>'}</div>
-        <div style="font-size:.82rem;color:var(--muted)">${a.message}</div>
+        <div style="font-weight:600;font-size:.9rem">${escapeHtml(a.title)} ${a.is_active ? '' : '<span style="color:#c0392b;font-size:.72rem">(arquivado)</span>'}</div>
+        <div style="font-size:.82rem;color:var(--muted)">${escapeHtml(a.message)}</div>
         <div class="announcement-admin-meta">
           ${severityLabels[a.severity]||a.severity} · Público: ${roleLabels[a.target_role]||a.target_role} ·
           Dispensado por ${a.dismissed_count} usuário(s)
@@ -3868,8 +3912,8 @@ async function renderStudentDashboard(){
       <div class="course-card stagger-item" onclick="selectCourse(${c.id})">
         <div class="course-card-banner">${c.icon||'📚'}</div>
         <div class="course-card-body">
-          <div class="course-card-tag">${c.tag}</div>
-          <div class="course-card-name">${c.name}</div>
+          <div class="course-card-tag">${escapeHtml(c.tag)}</div>
+          <div class="course-card-name">${escapeHtml(c.name)}</div>
           <div class="course-card-meta"><span>📋 ${c._total} aula(s)</span></div>
           <div class="course-card-progress">
             <div class="cc-bar"><div class="cc-bar-fill" style="width:${c._pct}%"></div></div>
@@ -3904,8 +3948,8 @@ async function renderStudentDashboard(){
         </div>
         <span class="badge-${q.resposta?'respondida':'pendente'}">${q.resposta?'Respondida':'Pendente'}</span>
       </div>
-      <div class="pergunta-texto">${q.texto}</div>
-      ${q.resposta?`<div class="resposta-area"><div class="resposta-avatar">T</div><div class="resposta-texto"><strong>${q.respondido_por||'Tutor'}:</strong> ${q.resposta}</div></div>`:''}
+      <div class="pergunta-texto">${escapeHtml(q.texto)}</div>
+      ${q.resposta?`<div class="resposta-area"><div class="resposta-avatar">T</div><div class="resposta-texto"><strong>${escapeHtml(q.respondido_por||'Tutor')}:</strong> ${escapeHtml(q.resposta)}</div></div>`:''}
     </div>`;
     let html='';
     if(!myQuestions.length){
@@ -3942,7 +3986,7 @@ async function renderGamiWidget(){
   const pct = Math.min(100, Math.round((s.points_in_level/target)*100));
   const filled = Math.round(pct/10);
   const bar = '▓'.repeat(filled)+'░'.repeat(10-filled);
-  const icons = s.badges_unlocked.slice(0,8).map(b=>`<span title="${b.name}" style="font-size:1.3rem">${b.icon}</span>`).join(' ');
+  const icons = s.badges_unlocked.slice(0,8).map(b=>`<span title="${escapeHtml(b.name)}" style="font-size:1.3rem">${b.icon}</span>`).join(' ');
   el.innerHTML = `
     <div style="background:white;border:1px solid #e8e0d4;border-radius:var(--radius);padding:1rem 1.2rem;margin-bottom:1rem">
       <div style="font-family:var(--font-display);color:var(--navy);font-weight:700;margin-bottom:.5rem">🎮 Seu Progresso</div>
@@ -4005,8 +4049,8 @@ async function showBadgesPage(){
     <div style="background:white;border:1px solid #e8e0d4;border-radius:8px;padding:.8rem 1rem;display:flex;gap:.8rem;align-items:flex-start;margin-bottom:.6rem;${b.unlocked?'':'opacity:.6'}">
       <div style="font-size:1.8rem">${b.unlocked?'✅':'❌'} ${b.icon}</div>
       <div>
-        <div style="font-weight:700;color:var(--navy);font-family:var(--font-display)">${b.name}</div>
-        <div style="font-size:.78rem;color:var(--muted)">${b.description||''}</div>
+        <div style="font-weight:700;color:var(--navy);font-family:var(--font-display)">${escapeHtml(b.name)}</div>
+        <div style="font-size:.78rem;color:var(--muted)">${escapeHtml(b.description||'')}</div>
         <div style="font-size:.75rem;color:${b.unlocked?'var(--gold)':'var(--muted)'};margin-top:.2rem">${b.unlocked?'Conquistada: '+new Date(b.unlocked_at).toLocaleDateString('pt-BR'):'Progresso: '+b.progress}</div>
       </div>
     </div>`;
@@ -4096,7 +4140,7 @@ async function _renderAdminDashboardInner(){
     </div>
     <div class="dash-section">
       <div class="dash-section-title">${icon('bell','16')} Alertas</div>
-      ${alerts.length?alerts.map(a=>`<div class="alert ${a.severity==='high'?'alert-danger':a.severity==='warn'?'alert-warning':'alert-info'}"><span class="alert-icon">${a.severity==='high'?icon('x-circle','16'):a.severity==='warn'?icon('lightbulb','16'):icon('checkmark-circle','16')}</span><div class="alert-body">${a.message}</div></div>`).join(''):`<div class="alert alert-success"><span class="alert-icon">${icon('checkmark-circle','16')}</span><div class="alert-body">Nenhum alerta no momento.</div></div>`}
+      ${alerts.length?alerts.map(a=>`<div class="alert ${a.severity==='high'?'alert-danger':a.severity==='warn'?'alert-warning':'alert-info'}"><span class="alert-icon">${a.severity==='high'?icon('x-circle','16'):a.severity==='warn'?icon('lightbulb','16'):icon('checkmark-circle','16')}</span><div class="alert-body">${escapeHtml(a.message)}</div></div>`).join(''):`<div class="alert alert-success"><span class="alert-icon">${icon('checkmark-circle','16')}</span><div class="alert-body">Nenhum alerta no momento.</div></div>`}
     </div>
     <div class="card" style="margin-bottom:var(--space-xl)">
       <div class="card-header"><h3 class="card-title">${icon('clock','16')} Atividades Recentes</h3></div>
@@ -4141,12 +4185,12 @@ async function _renderTutorPanelDashboardInner(){
     ${pend.length?`
     <div class="pending-questions-alert">
       <div class="pending-questions-title">${icon('message','16')} ${pend.length} dúvida(s) sem resposta — responda agora!</div>
-      ${pend.map(q=>`<div class="question-item"><div class="question-item-header"><span><strong>${q.author}:</strong> "${q.text}"</span><span class="time-badge">${new Date(q.timestamp).toLocaleString('pt-BR')}</span></div><div class="question-course-tag">${icon('book','12')} ${q.course}</div><div><button class="btn btn-primary btn-sm" onclick="setTutorDashTab('duvidas');showTutorDashboard()">Responder Agora</button></div></div>`).join('')}
+      ${pend.map(q=>`<div class="question-item"><div class="question-item-header"><span><strong>${escapeHtml(q.author)}:</strong> "${escapeHtml(q.text)}"</span><span class="time-badge">${new Date(q.timestamp).toLocaleString('pt-BR')}</span></div><div class="question-course-tag">${icon('book','12')} ${escapeHtml(q.course)}</div><div><button class="btn btn-primary btn-sm" onclick="setTutorDashTab('duvidas');showTutorDashboard()">Responder Agora</button></div></div>`).join('')}
     </div>`:`<div class="alert alert-success"><span class="alert-icon">${icon('checkmark-circle','16')}</span><div class="alert-body">Nenhuma dúvida pendente — tudo em dia!</div></div>`}
     <div class="dash-section">
       <div class="dash-section-title">${icon('catalog','16')} Meus Cursos</div>
       <div class="grid grid-cols-2 gap-lg">
-        ${d.my_courses.map(c=>`<div class="card"><div class="card-body"><h3 class="card-title">${c.icon||'📚'} ${c.name}</h3><div class="stat-row"><span>${icon('users','14')} ${c.students} aluno(s)</span><span style="color:var(--primary);font-weight:var(--fw-bold)">${c.completion_rate}% conclusão</span></div><div class="progress progress-sm" style="margin:var(--space-sm) 0"><div class="progress-bar" style="width:${c.completion_rate}%"></div></div><div style="font-size:var(--text-xs);color:var(--gray);margin-bottom:var(--space-md)">${c.completed}/${c.students} concluíram</div>${c.alerts.length?`<div class="alert alert-sm alert-warning" style="margin-bottom:var(--space-md)"><span>${icon('lightbulb','14')} ${c.alerts[0]}</span></div>`:`<div class="alert alert-sm alert-success" style="margin-bottom:var(--space-md)"><span>${icon('checkmark-circle','14')} Curso rodando bem</span></div>`}<button class="btn btn-outline btn-sm btn-full" onclick="selectCourse(${c.id})">Ver Alunos</button></div></div>`).join('')}
+        ${d.my_courses.map(c=>`<div class="card"><div class="card-body"><h3 class="card-title">${c.icon||'📚'} ${escapeHtml(c.name)}</h3><div class="stat-row"><span>${icon('users','14')} ${c.students} aluno(s)</span><span style="color:var(--primary);font-weight:var(--fw-bold)">${c.completion_rate}% conclusão</span></div><div class="progress progress-sm" style="margin:var(--space-sm) 0"><div class="progress-bar" style="width:${c.completion_rate}%"></div></div><div style="font-size:var(--text-xs);color:var(--gray);margin-bottom:var(--space-md)">${c.completed}/${c.students} concluíram</div>${c.alerts.length?`<div class="alert alert-sm alert-warning" style="margin-bottom:var(--space-md)"><span>${icon('lightbulb','14')} ${c.alerts[0]}</span></div>`:`<div class="alert alert-sm alert-success" style="margin-bottom:var(--space-md)"><span>${icon('checkmark-circle','14')} Curso rodando bem</span></div>`}<button class="btn btn-outline btn-sm btn-full" onclick="selectCourse(${c.id})">Ver Alunos</button></div></div>`).join('')}
       </div>
     </div>
     <div class="card" style="margin-bottom:var(--space-xl)">
@@ -4318,7 +4362,7 @@ function _dashSaasRenderSaudacao(d){
     const dias = stats.current_streak === 1 ? '1 dia' : `${stats.current_streak} dias`;
     contexto = `Sua sequência de ${dias} vence hoje — estude um pouco para mantê-la!`;
   } else if(ip){
-    contexto = `Você está a ${Math.max(0, ip.total_aulas - ip.aula_atual + 1)} aula(s) de concluir "${ip.name}".`;
+    contexto = `Você está a ${Math.max(0, ip.total_aulas - ip.aula_atual + 1)} aula(s) de concluir "${escapeHtml(ip.name)}".`;
   } else if(d.next_metas && d.next_metas.length){
     contexto = d.next_metas[0].description;
   }
@@ -4353,7 +4397,7 @@ function _dashSaasRenderContinuar(d){
   elx.innerHTML = `
     <div class="dash-saas-grupo-titulo">${icon('target','14')} Continue seus estudos</div>
     <div class="dash-saas-hero-card">
-      <div class="dash-saas-hero-curso">${ip.icon||''} ${ip.name}</div>
+      <div class="dash-saas-hero-curso">${ip.icon||''} ${escapeHtml(ip.name)}</div>
       <h3>Aula ${ip.aula_atual}/${ip.total_aulas}</h3>
       <div class="dash-saas-hero-progress"><div style="width:${ip.percentage}%"></div></div>
       <div style="font-size:var(--text-xs);opacity:.85">${ip.percentage}% concluído</div>
@@ -4361,7 +4405,7 @@ function _dashSaasRenderContinuar(d){
     </div>
     ${secundarios.length ? `<div class="dash-saas-secundarios">${secundarios.map(c=>`
       <div class="dash-saas-secundario-card" onclick="selectCourse(${c.id})">
-        <div class="nome">${c.icon||''} ${c.name}</div>
+        <div class="nome">${c.icon||''} ${escapeHtml(c.name)}</div>
         <div class="meta">${c.percentage}% concluído</div>
       </div>`).join('')}</div>` : ''}
     <div class="dash-saas-slot-tutor">
@@ -4404,7 +4448,7 @@ function _dashSaasRenderPontuacao(d){
     ${recentes.length ? `<div class="dash-saas-badges-recentes">${recentes.map(t=>`
       <div class="dash-saas-badge-recente${_dashSaasBadgeEhNova(t.date)?' dash-saas-badge-recente--nova':''}" title="${_dashSaasEscAttr(t.name)}">
         <div class="emoji">${t.icon||'🏅'}</div>
-        <span class="nome">${t.name}</span>
+        <span class="nome">${escapeHtml(t.name)}</span>
       </div>`).join('')}</div>` : `<div class="dash-saas-vazio" style="padding:var(--space-md) 0">
         <div class="dash-saas-vazio-msg">Suas conquistas aparecem aqui.</div>
       </div>`}`;
@@ -4437,7 +4481,7 @@ function _dashSaasRenderMetas(d){
     ${revisaoHtml}
     ${metas.map(m=>`<div class="dash-saas-meta-item">
         <span>${icon(m.type==='xp'?'points':m.type==='trofeu'?'achievements':m.type==='duvida'?'chat':'book','16')}</span>
-        <span style="font-size:var(--text-sm)">${m.description}</span>
+        <span style="font-size:var(--text-sm)">${escapeHtml(m.description)}</span>
       </div>`).join('')}`;
 }
 
@@ -4513,7 +4557,7 @@ async function renderActivityFeed(){
               <div class="activity-item">
                 <span class="activity-avatar">${a.user_initial}</span>
                 <div class="activity-content">
-                  <span class="activity-text"><strong>${a.user_name}</strong> concluiu o curso <strong>${a.course_name}</strong></span>
+                  <span class="activity-text"><strong>${escapeHtml(a.user_name)}</strong> concluiu o curso <strong>${escapeHtml(a.course_name)}</strong></span>
                   <span class="activity-time">${a.time_ago}</span>
                 </div>
               </div>`).join('')}
@@ -4541,7 +4585,7 @@ async function _renderDiscoverDashboard(){
     ${d.in_progress?`<div class="card" style="border-left:4px solid var(--primary);margin-bottom:var(--space-xl)"><div class="card-body"><h3 class="card-title">🚀 Continue Estudando</h3><div style="margin:var(--space-md) 0;font-size:var(--text-sm);font-weight:var(--fw-semibold);color:var(--dark)">${d.in_progress.icon} ${d.in_progress.name} — Aula ${d.in_progress.aula}/${d.in_progress.total}</div><div class="progress progress-sm" style="margin-bottom:var(--space-md)"><div class="progress-bar" style="width:${d.in_progress.percentage}%"></div></div><button class="btn btn-primary" onclick="selectCourse(${d.in_progress.id})">🚀 Continuar Aula</button></div></div>`:''}
     <div class="dash-section">
       <div class="dash-section-title">🌟 Descubra Cursos</div>
-      <div class="course-card-grid">${d.featured_courses.map(c=>`<div class="course-card-new stagger-item" onclick="selectCourse(${c.id})"><div class="course-image">${c.icon||'📚'}</div><div class="course-body"><div class="course-category">${c.category}</div><div class="course-name">${c.name}</div><div style="font-size:var(--text-xs);margin:var(--space-xs) 0">${stars(c.rating)} <span style="color:var(--gray)">(${c.review_count})</span></div><div class="course-meta-row"><span>📋 ${c.lessons} aula(s)</span><span style="color:var(--success)">Gratuito ✅</span></div></div><div class="course-footer"><button class="btn btn-primary btn-sm btn-full" onclick="event.stopPropagation();selectCourse(${c.id})">Começar Agora</button></div></div>`).join('')}</div>
+      <div class="course-card-grid">${d.featured_courses.map(c=>`<div class="course-card-new stagger-item" onclick="selectCourse(${c.id})"><div class="course-image">${c.icon||'📚'}</div><div class="course-body"><div class="course-category">${escapeHtml(c.category)}</div><div class="course-name">${escapeHtml(c.name)}</div><div style="font-size:var(--text-xs);margin:var(--space-xs) 0">${stars(c.rating)} <span style="color:var(--gray)">(${c.review_count})</span></div><div class="course-meta-row"><span>📋 ${c.lessons} aula(s)</span><span style="color:var(--success)">Gratuito ✅</span></div></div><div class="course-footer"><button class="btn btn-primary btn-sm btn-full" onclick="event.stopPropagation();selectCourse(${c.id})">Começar Agora</button></div></div>`).join('')}</div>
     </div>
     <div class="card" style="margin-bottom:var(--space-xl)">
       <div class="card-header"><h3 class="card-title">📊 Nossa Comunidade</h3></div>
@@ -4557,7 +4601,7 @@ async function _renderDiscoverDashboard(){
     <div class="card" style="margin-bottom:var(--space-xl)">
       <div class="card-header"><h3 class="card-title">💭 Depoimentos</h3></div>
       <div class="card-body">
-        <div class="testimonials-grid">${d.testimonials.map(t=>`<div class="testimonial"><p class="testimonial-text">"${t.text}"</p><p class="testimonial-author">— ${t.author}, ${t.location}</p></div>`).join('')}</div>
+        <div class="testimonials-grid">${d.testimonials.map(t=>`<div class="testimonial"><p class="testimonial-text">"${escapeHtml(t.text)}"</p><p class="testimonial-author">— ${escapeHtml(t.author)}, ${escapeHtml(t.location)}</p></div>`).join('')}</div>
       </div>
     </div>
     ${!currentUser?`<div class="quick-actions"><button class="btn btn-primary" onclick="show('login')">Criar Conta</button><button class="btn btn-outline" onclick="showCatalog()">Continuar Visitando</button></div>`:''}`;
@@ -4607,8 +4651,8 @@ async function renderTutorDashboard(){
       return `<div class="course-card stagger-item" onclick="selectCourse(${c.id})">
         <div class="course-card-banner">${c.icon||'📚'}</div>
         <div class="course-card-body">
-          <div class="course-card-tag">${c.tag}</div>
-          <div class="course-card-name">${c.name}</div>
+          <div class="course-card-tag">${escapeHtml(c.tag)}</div>
+          <div class="course-card-name">${escapeHtml(c.name)}</div>
           <div class="course-card-meta">
             <span>📋 ${(c.modules||[]).length} aula(s)</span>
             <span>💬 ${cQuestions.length} pergunta(s)${pend?' · '+pend+' pendente(s)':''}</span>
@@ -4620,17 +4664,17 @@ async function renderTutorDashboard(){
   } else {
     const card=(q)=>`<div class="pergunta-card">
       <div class="pergunta-header">
-        <div class="pergunta-avatar">${q.autor?q.autor.charAt(0).toUpperCase():'?'}</div>
+        <div class="pergunta-avatar">${escapeHtml(q.autor?q.autor.charAt(0).toUpperCase():'?')}</div>
         <div class="pergunta-meta">
-          <div class="pergunta-autor">${q.autor||'Aluno'} · <span style="font-weight:400;color:var(--muted)">${q.course_icon||''} ${q.course_name||''}</span></div>
+          <div class="pergunta-autor">${escapeHtml(q.autor||'Aluno')} · <span style="font-weight:400;color:var(--muted)">${q.course_icon||''} ${escapeHtml(q.course_name||'')}</span></div>
           <div class="pergunta-data">${q.created_at?new Date(q.created_at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):''}</div>
         </div>
         <span class="badge-${q.resposta?'respondida':'pendente'}">${q.resposta?'Respondida':'Pendente'}</span>
       </div>
-      <div class="pergunta-texto">${q.texto}</div>
+      <div class="pergunta-texto">${escapeHtml(q.texto)}</div>
       ${q.resposta
-        ? `<div class="resposta-area"><div class="resposta-avatar">T</div><div class="resposta-texto"><strong>${q.respondido_por||'Tutor'}:</strong> ${q.resposta}</div></div>`
-        : `<div class="resposta-area"><div class="resposta-texto" style="color:var(--muted)"><button class="btn-gold" style="padding:.35rem .9rem;font-size:.78rem" onclick='openAnswerModal(${q.id}, ${JSON.stringify(q.texto)}, ${JSON.stringify(q.autor||"Aluno")})'>Responder</button></div></div>`}
+        ? `<div class="resposta-area"><div class="resposta-avatar">T</div><div class="resposta-texto"><strong>${escapeHtml(q.respondido_por||'Tutor')}:</strong> ${escapeHtml(q.resposta)}</div></div>`
+        : `<div class="resposta-area"><div class="resposta-texto" style="color:var(--muted)"><button class="btn-gold" style="padding:.35rem .9rem;font-size:.78rem" onclick='openAnswerModal(${q.id}, ${jsAttr(q.texto)}, ${jsAttr(q.autor||"Aluno")})'>Responder</button></div></div>`}
     </div>`;
     let html='';
     html+=`<h3 style="font-size:.85rem;color:var(--navy);margin:0 0 .6rem">Sem resposta (${semResposta.length})</h3>`;
@@ -4703,7 +4747,7 @@ function showCatalog(){
 function _courseTrailChip(courseId){
   for(const t of allTrails){
     if((t.courses||[]).some(tc=>tc.course_id===courseId))
-      return `<span class="course-trail-chip">${t.icon} ${t.name}</span>`;
+      return `<span class="course-trail-chip">${t.icon} ${escapeHtml(t.name)}</span>`;
   }
   return '';
 }
@@ -4738,7 +4782,7 @@ function _courseCardV2(c, userPct, showEdit){
       </div>
       <div class="course-card-v2-body">
         <span class="course-category">${c.tag||''} ${accessChip}</span>
-        <h3 class="course-card-v2-title">${c.name}</h3>
+        <h3 class="course-card-v2-title">${escapeHtml(c.name)}</h3>
         <div class="course-card-v2-meta">
           <span>${icon('play-circle','14')} ${nModules} aula(s)</span>
           <span>${icon('clock','14')} ${c.duracao||'–'}</span>
@@ -5081,8 +5125,8 @@ async function renderTrailSelection(container){
           ${trails.map(t=>`
             <div class="trail-card stagger-item" onclick="enrollTrail(${t.id})">
               <span class="trail-card-icon">${t.icon}</span>
-              <div class="trail-card-name">${t.name}</div>
-              <div class="trail-card-description">${t.description}</div>
+              <div class="trail-card-name">${escapeHtml(t.name)}</div>
+              <div class="trail-card-description">${escapeHtml(t.description)}</div>
               <div class="trail-card-meta">
                 <span>${t.courses ? t.courses.length : 0} cursos</span>
                 <span class="trail-card-bonus">+${t.xp_bonus} pontos de bônus</span>
@@ -5103,7 +5147,7 @@ function renderTrailProgress(container, trail, extraTrailsCount){
       return `<div class="trail-step done">
         <div class="trail-step-marker">✓</div>
         <div class="trail-step-content">
-          <span class="trail-step-name">${c.course_icon||'📚'} ${c.course_name}</span>
+          <span class="trail-step-name">${c.course_icon||'📚'} ${escapeHtml(c.course_name)}</span>
           <span class="trail-step-status">Concluído · 100%</span>
         </div>
       </div>`;
@@ -5113,7 +5157,7 @@ function renderTrailProgress(container, trail, extraTrailsCount){
         <div class="trail-step-marker">${stepNum}</div>
         <div class="trail-step-content">
           <span class="trail-step-here">▶ VOCÊ ESTÁ AQUI</span>
-          <span class="trail-step-name">${c.course_icon||'📚'} ${c.course_name}</span>
+          <span class="trail-step-name">${c.course_icon||'📚'} ${escapeHtml(c.course_name)}</span>
           <span class="trail-step-status">Passo ${stepNum} de ${total}</span>
           <button class="btn btn-primary btn-sm" onclick="selectCourse(${c.course_id})">Continuar →</button>
         </div>
@@ -5122,7 +5166,7 @@ function renderTrailProgress(container, trail, extraTrailsCount){
     return `<div class="trail-step locked">
       <div class="trail-step-marker">${stepNum}</div>
       <div class="trail-step-content">
-        <span class="trail-step-name">${c.course_icon||'📚'} ${c.course_name}</span>
+        <span class="trail-step-name">${c.course_icon||'📚'} ${escapeHtml(c.course_name)}</span>
         <span class="trail-step-status">🔒 Libera ao concluir o passo ${stepNum - 1}</span>
       </div>
     </div>`;
@@ -5132,7 +5176,7 @@ function renderTrailProgress(container, trail, extraTrailsCount){
       <div class="trail-progress-header">
         <span class="trail-progress-icon">${trail.icon}</span>
         <div>
-          <div class="trail-progress-name">${trail.name}</div>
+          <div class="trail-progress-name">${escapeHtml(trail.name)}</div>
           <div class="trail-progress-sub">${done}/${total} cursos · ${pct}% concluído</div>
         </div>
       </div>
@@ -5142,7 +5186,7 @@ function renderTrailProgress(container, trail, extraTrailsCount){
           <div class="trail-step finish">
             <div class="trail-step-marker">🎓</div>
             <div class="trail-step-content">
-              <span class="trail-step-name">Certificado: ${trail.name}</span>
+              <span class="trail-step-name">Certificado: ${escapeHtml(trail.name)}</span>
               <span class="trail-step-status">${trail.completed ? '🎉 Trilha concluída! Parabéns!' : `⭐ +${trail.xp_bonus} pontos de bônus ao concluir`}</span>
             </div>
           </div>
@@ -5223,7 +5267,7 @@ async function renderTrilhasPage(){
     <div class="trail-row-card">
       <span class="trail-row-icon">${t.icon}</span>
       <div class="trail-row-info">
-        <div class="trail-row-name">${t.name}</div>
+        <div class="trail-row-name">${escapeHtml(t.name)}</div>
         <div class="trail-row-sub">Passo ${Math.min(t.done_count+1, t.total_courses)} de ${t.total_courses} · ${t.percentage}%</div>
         <div class="progress progress-sm"><div class="progress-bar" style="width:${t.percentage}%"></div></div>
       </div>
@@ -5235,8 +5279,8 @@ async function renderTrilhasPage(){
     ${available.map(t=>`
       <div class="trail-card stagger-item">
         <span class="trail-card-icon">${t.icon}</span>
-        <div class="trail-card-name">${t.name}</div>
-        <div class="trail-card-description">${t.description}</div>
+        <div class="trail-card-name">${escapeHtml(t.name)}</div>
+        <div class="trail-card-description">${escapeHtml(t.description)}</div>
         <div class="trail-card-meta">
           <span>${t.courses ? t.courses.length : 0} cursos</span>
           <span class="trail-card-bonus">+${t.xp_bonus} pontos de bônus</span>
@@ -5249,7 +5293,7 @@ async function renderTrilhasPage(){
     <div class="trail-row-card">
       <span class="trail-row-icon">🎓</span>
       <div class="trail-row-info">
-        <div class="trail-row-name">${t.name}</div>
+        <div class="trail-row-name">${escapeHtml(t.name)}</div>
         <div class="trail-row-sub">Concluída${t.completed_at ? ' em ' + new Date(t.completed_at).toLocaleDateString('pt-BR') : ''} · Certificado disponível</div>
       </div>
     </div>`).join('')
@@ -5287,7 +5331,7 @@ function downloadCertificate(certCode){
 
 function shareWhatsApp(cert){
   const text = encodeURIComponent(
-    `🎓 Acabei de conquistar o certificado "${cert.title}" no IBC Ensino!\n` +
+    `🎓 Acabei de conquistar o certificado "${escapeHtml(cert.title)}" no IBC Ensino!\n` +
     `Verifique: ${window.location.origin}/#verificar/${cert.cert_code}`
   );
   window.open(`https://wa.me/?text=${text}`, '_blank');
@@ -5320,7 +5364,7 @@ async function navigateToCertificados(){
             <div class="card" style="display:flex;align-items:center;gap:1rem;margin-bottom:var(--space-md);flex-wrap:wrap">
               <div style="font-size:2.5rem">🎓</div>
               <div style="flex:1;min-width:0">
-                <div style="font-weight:700;color:var(--dark)">${cert.title}</div>
+                <div style="font-weight:700;color:var(--dark)">${escapeHtml(cert.title)}</div>
                 <div style="font-size:.8rem;color:var(--gray);margin:.2rem 0">
                   ${cert.cert_type==='trail'?'Trilha':'Curso'} · Emitido em ${new Date(cert.issued_at).toLocaleDateString('pt-BR')}
                 </div>
@@ -5391,12 +5435,12 @@ async function renderMeuPerfil(){
       <div class="profile-section-title" style="margin-top:var(--space-lg)">${icon('achievements','18','icon--gold')} Conquistas (${earnedCount}/${achievements.length})</div>
       <div class="achievements-grid">
         ${achievements.map(a => `
-          <div class="achievement-card ${a.earned ? 'earned' : 'locked'}" title="${a.description||''}">
+          <div class="achievement-card ${a.earned ? 'earned' : 'locked'}" title="${escapeHtml(a.description||'')}">
             <div class="ach-icon">${a.earned ? a.icon : icon('lock','22')}</div>
-            <div class="ach-name">${a.name}</div>
+            <div class="ach-name">${escapeHtml(a.name)}</div>
             ${a.earned
               ? `<div class="ach-date">Conquistada em ${new Date(a.earned_at).toLocaleDateString('pt-BR')}</div>`
-              : `<div class="ach-desc">${a.description||''}</div>`}
+              : `<div class="ach-desc">${escapeHtml(a.description||'')}</div>`}
           </div>`).join('')}
       </div>
 
@@ -5409,7 +5453,7 @@ async function renderMeuPerfil(){
             <div class="card" style="display:flex;align-items:center;gap:1rem;margin-bottom:var(--space-md);flex-wrap:wrap">
               <div style="font-size:2.2rem">🎓</div>
               <div style="flex:1;min-width:0">
-                <div style="font-weight:700;color:var(--dark)">${cert.title}</div>
+                <div style="font-weight:700;color:var(--dark)">${escapeHtml(cert.title)}</div>
                 <div style="font-size:.8rem;color:var(--gray);margin:.2rem 0">
                   ${cert.cert_type==='trail'?'Trilha':'Curso'} · Emitido em ${new Date(cert.issued_at).toLocaleDateString('pt-BR')}
                 </div>
@@ -5496,8 +5540,8 @@ function _renderQuestionsList(){
           <span class="question-course">${q.course_icon||''} ${q.course_name||''}</span>
           <span class="question-status-badge badge-${status}">${statusLabel[status]||status}</span>
         </div>
-        <div class="question-text">${q.texto}</div>
-        ${q.resposta ? `<div class="question-answer"><strong>${q.respondido_por||'Tutor'} respondeu:</strong> ${q.resposta}</div>` : ''}
+        <div class="question-text">${escapeHtml(q.texto)}</div>
+        ${q.resposta ? `<div class="question-answer"><strong>${escapeHtml(q.respondido_por||'Tutor')} respondeu:</strong> ${escapeHtml(q.resposta)}</div>` : ''}
         <div class="question-meta">
           <span>${new Date(q.created_at).toLocaleDateString('pt-BR')}</span>
           ${status === 'answered' ? `<button class="btn btn-outline btn-sm" onclick="markQuestionResolved(${q.id})">${icon('check','14')} Marcar como resolvida</button>` : ''}
@@ -5652,8 +5696,8 @@ async function doVerifyCert(){
               <div style="font-size:.8rem;color:var(--gray)">Código: ${d.cert_code}</div>
             </div>
           </div>
-          <div style="font-size:.95rem;color:var(--dark)"><strong>Aluno:</strong> ${d.student_name}</div>
-          <div style="font-size:.95rem;color:var(--dark);margin:.3rem 0"><strong>${d.cert_type==='trail'?'Trilha':'Curso'}:</strong> ${d.title}</div>
+          <div style="font-size:.95rem;color:var(--dark)"><strong>Aluno:</strong> ${escapeHtml(d.student_name)}</div>
+          <div style="font-size:.95rem;color:var(--dark);margin:.3rem 0"><strong>${d.cert_type==='trail'?'Trilha':'Curso'}:</strong> ${escapeHtml(d.title)}</div>
           <div style="font-size:.85rem;color:var(--gray)">Emitido em: ${new Date(d.issued_at).toLocaleDateString('pt-BR')}</div>
           <button class="btn btn-outline" style="margin-top:1rem" onclick="downloadCertificate('${d.cert_code}')">⬇ Baixar PDF</button>
         </div>`;
@@ -5727,8 +5771,8 @@ async function onboardingNext(){
           recDiv.innerHTML = `
             <div class="onboarding-recommendation">
               <span class="onboarding-rec-icon">${_recommendedTrail.icon}</span>
-              <div class="onboarding-rec-name">${_recommendedTrail.name}</div>
-              <div class="onboarding-rec-desc">${_recommendedTrail.description}</div>
+              <div class="onboarding-rec-name">${escapeHtml(_recommendedTrail.name)}</div>
+              <div class="onboarding-rec-desc">${escapeHtml(_recommendedTrail.description)}</div>
             </div>`;
         }
       }
