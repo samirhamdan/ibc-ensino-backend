@@ -6,11 +6,16 @@ last_activity_date em transições de dia exigiria "viajar no tempo" pelo
 login real; chamar award_points direto com o estado montado é mais
 simples e testa exatamente a lógica nova.
 """
-from datetime import date, timedelta
+from datetime import timedelta
 
 import pytest
 
-from routes.gamification import award_points, STREAK_MARCOS
+from routes.gamification import award_points, STREAK_MARCOS, streak_efetivo, hoje_streak
+
+# hoje_streak() (America/Sao_Paulo), não date.today() (relógio local da
+# máquina, que pode ser UTC no CI) — testar com uma fonte de "hoje"
+# diferente da que routes/gamification.py usa é o tipo exato de bug que
+# passa/falha por acaso dependendo do fuso do runner (achado de revisão).
 
 
 @pytest.fixture()
@@ -60,7 +65,7 @@ def test_primeiro_login_inicia_streak_em_1(app, uid):
 
 
 def test_login_no_dia_seguinte_incrementa(app, uid):
-    ontem = date.today() - timedelta(days=1)
+    ontem = hoje_streak() - timedelta(days=1)
     _set_last_activity(app, uid, ontem)
     with app.app_context():
         from extensions import db
@@ -75,7 +80,7 @@ def test_login_no_dia_seguinte_incrementa(app, uid):
 
 
 def test_login_no_mesmo_dia_nao_conta_duas_vezes(app, uid):
-    hoje = date.today()
+    hoje = hoje_streak()
     _set_last_activity(app, uid, hoje)
     with app.app_context():
         from extensions import db
@@ -90,7 +95,7 @@ def test_login_no_mesmo_dia_nao_conta_duas_vezes(app, uid):
 
 
 def test_dia_perdido_reinicia_streak(app, uid):
-    tres_dias_atras = date.today() - timedelta(days=3)
+    tres_dias_atras = hoje_streak() - timedelta(days=3)
     _set_last_activity(app, uid, tres_dias_atras)
     with app.app_context():
         from extensions import db
@@ -105,7 +110,7 @@ def test_dia_perdido_reinicia_streak(app, uid):
 
 
 def test_longest_streak_nunca_diminui(app, uid):
-    ontem = date.today() - timedelta(days=1)
+    ontem = hoje_streak() - timedelta(days=1)
     _set_last_activity(app, uid, ontem)
     with app.app_context():
         from extensions import db
@@ -125,7 +130,7 @@ def test_longest_streak_nunca_diminui(app, uid):
 
 @pytest.mark.parametrize('marco', sorted(STREAK_MARCOS))
 def test_marco_de_streak_dispara_bonus(app, uid, marco):
-    ontem = date.today() - timedelta(days=1)
+    ontem = hoje_streak() - timedelta(days=1)
     _set_last_activity(app, uid, ontem)
     with app.app_context():
         from extensions import db
@@ -147,7 +152,7 @@ def test_marco_de_streak_dispara_bonus(app, uid, marco):
 
 
 def test_dia_normal_sem_marco_nao_da_bonus(app, uid):
-    ontem = date.today() - timedelta(days=1)
+    ontem = hoje_streak() - timedelta(days=1)
     _set_last_activity(app, uid, ontem)
     with app.app_context():
         from extensions import db
@@ -164,7 +169,7 @@ def test_dia_normal_sem_marco_nao_da_bonus(app, uid):
 
 
 def test_outras_acoes_nao_mexem_no_streak(app, uid):
-    ontem = date.today() - timedelta(days=1)
+    ontem = hoje_streak() - timedelta(days=1)
     _set_last_activity(app, uid, ontem)
     with app.app_context():
         from extensions import db
@@ -178,3 +183,86 @@ def test_outras_acoes_nao_mexem_no_streak(app, uid):
 
         up = UserPoints.query.filter_by(user_id=uid, tenant_id=default_tenant_id()).first()
         assert up.current_streak == 5   # inalterado — só daily_login mexe
+
+
+def test_outra_acao_nao_toca_last_activity_date(app, uid):
+    """Correção de revisão (H1): a versão anterior atualizava
+    last_activity_date em TODA ação — um material_read num dia sem login
+    "consertava" um streak que devia estar quebrado. Agora só daily_login
+    lê/escreve esse campo."""
+    ontem = hoje_streak() - timedelta(days=1)
+    tres_dias_atras = hoje_streak() - timedelta(days=3)
+    _set_last_activity(app, uid, tres_dias_atras)
+    with app.app_context():
+        from extensions import db
+        from models import UserPoints
+        from core.tenancy import default_tenant_id
+        up = UserPoints.query.filter_by(user_id=uid, tenant_id=default_tenant_id()).first()
+        up.current_streak = 10
+        db.session.commit()
+
+        award_points(uid, 'material_read')   # dia de estudo, SEM login
+
+        up = UserPoints.query.filter_by(user_id=uid, tenant_id=default_tenant_id()).first()
+        assert up.last_activity_date == tres_dias_atras   # não mudou
+        assert up.current_streak == 10   # streak "morto" continua intacto na linha
+
+        # login no dia seguinte àquele activity (não ao material_read de
+        # hoje) reinicia — o material_read de hoje não "salvou" o streak
+        r = award_points(uid, 'daily_login')
+        assert r['current_streak'] == 1
+
+
+def test_retry_no_mesmo_dia_nao_paga_marco_duas_vezes(app, uid):
+    """Correção de revisão (M2): antes, a checagem de marco ficava FORA
+    dos ramos de transição — uma segunda chamada de daily_login no mesmo
+    dia (retry, corrida) com current_streak já em cima de um marco pagava
+    o bônus de novo. Agora só o ramo que incrementa concede bônus."""
+    ontem = hoje_streak() - timedelta(days=1)
+    _set_last_activity(app, uid, ontem)
+    with app.app_context():
+        from extensions import db
+        from models import UserPoints
+        from core.tenancy import default_tenant_id
+        up = UserPoints.query.filter_by(user_id=uid, tenant_id=default_tenant_id()).first()
+        up.current_streak = 6   # vira 7 (marco) nesta chamada
+        db.session.commit()
+
+        r1 = award_points(uid, 'daily_login')
+        assert r1['streak_bonus'] == STREAK_MARCOS[7]
+
+        r2 = award_points(uid, 'daily_login')   # retry, mesmo dia
+        assert r2['streak_bonus'] == 0
+        assert r2['streak_marco_atingido'] is None
+        assert r2['current_streak'] == 7   # não incrementou de novo
+
+
+class TestStreakEfetivo:
+    """Correção de revisão (H2): current_streak só é zerado de verdade no
+    PRÓXIMO login (lazy reset) — o dashboard não pode mostrar um streak
+    morto há semanas como "vencendo hoje". streak_efetivo() reinterpreta
+    o valor na leitura, sem tocar o banco."""
+
+    def test_sem_streak(self):
+        assert streak_efetivo(None) == (0, False)
+
+    def test_renovado_hoje_nao_esta_em_risco(self, app):
+        with app.app_context():
+            from models import UserPoints
+            up = UserPoints(current_streak=5, last_activity_date=hoje_streak())
+            assert streak_efetivo(up) == (5, False)
+
+    def test_renovado_ontem_esta_em_risco(self, app):
+        with app.app_context():
+            from models import UserPoints
+            up = UserPoints(current_streak=5, last_activity_date=hoje_streak() - timedelta(days=1))
+            assert streak_efetivo(up) == (5, True)
+
+    def test_quebrado_ha_semanas_aparece_como_zero_nao_em_risco(self, app):
+        """O achado exato da revisão: current_streak=10 na linha, mas
+        last_activity_date de um mês atrás — não pode aparecer como
+        "sequência de 10 dias, vence hoje"."""
+        with app.app_context():
+            from models import UserPoints
+            up = UserPoints(current_streak=10, last_activity_date=hoje_streak() - timedelta(days=30))
+            assert streak_efetivo(up) == (0, False)

@@ -4381,7 +4381,10 @@ function _dashSaasBadgeEhNova(isoDate){
   if(!isoDate) return false;
   const desbloqueada = new Date(isoDate).getTime();
   if(Number.isNaN(desbloqueada)) return false;
-  return (Date.now() - desbloqueada) < 24*60*60*1000;
+  const diffMs = Date.now() - desbloqueada;
+  // diffMs negativo (desbloqueio "no futuro" por clock skew cliente/servidor)
+  // não conta como "nova" — só a janela real de até 24h à frente.
+  return diffMs >= 0 && diffMs < 24*60*60*1000;
 }
 
 function _dashSaasRenderPontuacao(d){

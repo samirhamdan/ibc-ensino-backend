@@ -2,6 +2,7 @@
 Gamification routes: points, levels and badges
 """
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from flask import Blueprint, request, jsonify, session
 from sqlalchemy.exc import IntegrityError
 from extensions import db
@@ -11,6 +12,42 @@ from models import (User, Badge, UserBadge, UserPoints, LessonProgress,
                     UserTrail, Certificate)
 
 gamification_bp = Blueprint('gamification', __name__)
+
+# Fuso fixo do público-alvo atual (IBC Ensino é 100% Brasil) — usado só
+# para decidir o "dia" de streak/login diário. datetime.utcnow().date()
+# vira o dia errado perto da virada BRT/UTC (ex.: 21h-24h local ainda é
+# "amanhã" em UTC), quebrando streak de quem loga sempre à noite. Vira
+# fuso por tenant/usuário na Release 1.0 (doc não pede multi-fuso agora);
+# até lá, um fuso fixo correto para o público real é melhor que UTC puro.
+_FUSO_STREAK = ZoneInfo('America/Sao_Paulo')
+
+
+def hoje_streak():
+    return datetime.now(_FUSO_STREAK).date()
+
+
+def streak_efetivo(up):
+    """Streak "de leitura" — current_streak só é zerado de verdade no
+    próximo login (lazy reset, dentro de award_points). Sem isto, o
+    dashboard mostrava "sequência de 10 dias, vence hoje" para quem sumiu
+    há um mês (achado de revisão de segurança): current_streak fica > 0
+    na linha até o usuário logar de novo, então precisa ser reinterpretado
+    na LEITURA. Devolve (streak_exibido, em_risco):
+      - sem linha/streak → (0, False)
+      - renovou hoje      → (current_streak, False) — já garantido por hoje
+      - renovou ontem     → (current_streak, True)  — ainda vale, mas some
+                             se não renovar até o fim do dia
+      - mais antigo que isso → (0, False) — já quebrou, só não foi
+                             zerado no banco ainda (vai zerar no próximo login)
+    """
+    if not up or not up.current_streak or not up.last_activity_date:
+        return 0, False
+    hoje = hoje_streak()
+    if up.last_activity_date == hoje:
+        return up.current_streak, False
+    if up.last_activity_date == hoje - timedelta(days=1):
+        return up.current_streak, True
+    return 0, False
 
 LEVEL_NAMES = {
     1: 'Iniciante', 2: 'Aprendiz', 3: 'Estudioso', 4: 'Conhecedor',
@@ -48,9 +85,18 @@ def calculate_level(total_points):
     return level, points_in_level
 
 
-def _get_or_create_points(user_id):
+def _get_or_create_points(user_id, lock=False):
+    """lock=True (Postgres: SELECT ... FOR UPDATE; SQLite: sem efeito, o
+    driver não suporta e a suíte de testes roda nele) serializa requests
+    concorrentes na mesma linha — usado no guard de login diário, onde um
+    double-click/retry sem lock lia o mesmo last_activity_date "antigo" em
+    duas transações e dava streak +2 / bônus de marco em dobro no mesmo
+    dia (achado de revisão de segurança)."""
     tid = current_tenant_id()
-    up = UserPoints.query.filter_by(user_id=user_id, tenant_id=tid).first()
+    q = UserPoints.query.filter_by(user_id=user_id, tenant_id=tid)
+    if lock:
+        q = q.with_for_update()
+    up = q.first()
     if not up:
         try:
             with db.session.begin_nested():
@@ -60,7 +106,10 @@ def _get_or_create_points(user_id):
         except IntegrityError:
             # Corrida: outra requisição concorrente já criou o registro
             # (unique (tenant_id, user_id)). Recarrega o que foi criado.
-            up = UserPoints.query.filter_by(user_id=user_id, tenant_id=tid).first()
+            q = UserPoints.query.filter_by(user_id=user_id, tenant_id=tid)
+            if lock:
+                q = q.with_for_update()
+            up = q.first()
     return up
 
 
@@ -134,7 +183,12 @@ def _completed_courses_count(user_id):
 
 
 def _consecutive_days(user_points):
-    return 0
+    # GAM-02 (Etapa 3): antes sempre retornava 0 (docs/DEBITOS.md #6 — o
+    # badge 'servo_fiel', streak de 7 dias, era inalcançável por design).
+    # Agora que current_streak existe de verdade, usa a mesma
+    # reinterpretação de leitura que o dashboard usa (streak_efetivo) —
+    # não o campo bruto, que só é zerado no próximo login (lazy reset).
+    return streak_efetivo(user_points)[0]
 
 
 # ── Badge check orchestration ────────────────────────────────────────────
@@ -176,28 +230,33 @@ def award_points(user_id, action, metadata=None):
     old_level = up.current_level
 
     # GAM-02 (Etapa 3, UX_ALUNO_SAAS.md §3 Grupo 3): streak de dias
-    # consecutivos, calculado pela transição do last_activity_date ANTERIOR
-    # a este award — só no gatilho 'daily_login' (o mesmo hook que já
-    # limitava o bônus de login a 1x/dia, routes/auth.py::login).
+    # consecutivos de LOGIN — deliberadamente só o gatilho 'daily_login'
+    # LÊ E ESCREVE last_activity_date agora (correção de um bug real: a
+    # versão anterior atualizava last_activity_date em TODA ação, então
+    # um material_read num dia sem login "consertava" um streak quebrado,
+    # e um dia de estudo sem reenviar o form de login não incrementava
+    # nada — o contador não media nem "dias de login" nem "dias de
+    # atividade" de forma coerente. Outras ações não tocam mais este campo.
     streak_bonus = 0
     marco_atingido = None
     if action == 'daily_login':
-        hoje = datetime.utcnow().date()
+        hoje = hoje_streak()
         ontem = hoje - timedelta(days=1)
         if up.last_activity_date == hoje:
             pass   # chamada duplicada no mesmo dia — não conta streak de novo
-        elif up.last_activity_date == ontem:
-            up.current_streak = (up.current_streak or 0) + 1
         else:
-            up.current_streak = 1   # primeira atividade ou dia perdido — reinicia
-        up.longest_streak = max(up.longest_streak or 0, up.current_streak or 0)
-        if up.current_streak in STREAK_MARCOS:
-            streak_bonus = STREAK_MARCOS[up.current_streak]
-            marco_atingido = up.current_streak
+            if up.last_activity_date == ontem:
+                up.current_streak = (up.current_streak or 0) + 1
+                if up.current_streak in STREAK_MARCOS:
+                    streak_bonus = STREAK_MARCOS[up.current_streak]
+                    marco_atingido = up.current_streak
+            else:
+                up.current_streak = 1   # primeira atividade ou dia perdido — reinicia
+            up.longest_streak = max(up.longest_streak or 0, up.current_streak or 0)
+            up.last_activity_date = hoje
 
     up.total_points = (up.total_points or 0) + points + streak_bonus
     up.current_level, up.points_in_level = calculate_level(up.total_points)
-    up.last_activity_date = datetime.utcnow().date()
     db.session.flush()
 
     level_up = up.current_level > old_level

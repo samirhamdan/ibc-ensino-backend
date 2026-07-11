@@ -205,24 +205,26 @@ def aluno_dashboard():
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
 
+    from routes.gamification import streak_efetivo
+
     up = UserPoints.query.filter_by(user_id=user.id, tenant_id=current_tenant_id()).first()
-    # Streak "em risco hoje" (GAM-02, Etapa 3): tem uma sequência ativa mas
-    # ainda não renovou hoje — a sessão pode ter sobrevivido dias sem
-    # reenviar o formulário de login (que é o único gatilho de streak hoje).
-    hoje = datetime.utcnow().date()
-    streak_em_risco = bool(up and up.current_streak and up.last_activity_date and up.last_activity_date < hoje)
+    # streak_efetivo reinterpreta current_streak na LEITURA: a linha só é
+    # zerada de verdade no próximo login (lazy reset) — sem isto, um
+    # streak morto há semanas ainda aparecia "vencendo hoje".
+    streak_exibido, streak_em_risco = streak_efetivo(up)
     user_stats = {
         'level': up.current_level if up else 1,
         'level_name': LEVEL_NAMES.get(up.current_level if up else 1, ''),
         'total_points': up.total_points if up else 0,
         'points_in_level': up.points_in_level if up else 0,
-        'current_streak': up.current_streak if up else 0,
+        'current_streak': streak_exibido,
         'longest_streak': up.longest_streak if up else 0,
         'streak_em_risco': streak_em_risco,
     }
 
     user_badges = UserBadge.query.filter_by(user_id=user.id, tenant_id=current_tenant_id()).order_by(UserBadge.unlocked_at.desc()).all()
-    trofeus_unlocked = [{'icon': ub.badge.icon, 'name': ub.badge.name, 'date': ub.unlocked_at.isoformat()} for ub in user_badges]
+    trofeus_unlocked = [{'icon': ub.badge.icon, 'name': ub.badge.name,
+                         'date': ub.unlocked_at.isoformat() + 'Z'} for ub in user_badges]
 
     enrolled_courses = []
     for c in Course.query.filter_by(tenant_id=current_tenant_id()).all():
