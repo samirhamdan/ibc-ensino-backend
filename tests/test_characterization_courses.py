@@ -54,6 +54,16 @@ def test_dashboard_aluno_carrega(aluno):
     assert r.status_code == 200
 
 
+def test_dashboard_recomendacoes_nao_inclui_rascunho(aluno, seeded):
+    """Correção de revisão (Etapa 4, GAM-04): other_courses (recomendações
+    do carrossel) não pode incluir curso em rascunho — mesmo filtro que
+    /api/courses já aplica pra quem não é admin/tutor."""
+    r = aluno.get('/api/aluno/dashboard')
+    assert r.status_code == 200
+    ids = [c['id'] for c in r.get_json()['other_courses']]
+    assert seeded['draft_course_id'] not in ids
+
+
 def test_spa_servida_na_raiz(client):
     r = client.get('/')
     assert r.status_code == 200

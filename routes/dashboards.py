@@ -243,7 +243,12 @@ def aluno_dashboard():
 
     in_progress_course = next((c for c in enrolled_courses if c['status'] == 'em_andamento'), None)
     other_courses = [c for c in enrolled_courses if c is not in_progress_course]
-    not_enrolled = [c for c in Course.query.filter_by(tenant_id=current_tenant_id()).all() if c.id not in {ec['id'] for ec in enrolled_courses}]
+    # status='published': mesmo filtro que list_courses() já aplica pra
+    # quem não é admin/tutor — sem isto, um curso em rascunho aparecia no
+    # carrossel de recomendações de todo aluno (a fatia cresceu de 4 pra
+    # 8 nesta etapa, achado de revisão de segurança).
+    not_enrolled = [c for c in Course.query.filter_by(tenant_id=current_tenant_id(), status='published').all()
+                    if c.id not in {ec['id'] for ec in enrolled_courses}]
     # Etapa 4 (UX_ALUNO_SAAS.md §3 Grupo 5): ordena por popularidade no
     # tenant — quantos alunos distintos têm QUALQUER progresso no curso.
     # Slot pronto pra LRN-03 (recomendação por learner model, Release

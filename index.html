@@ -4468,23 +4468,23 @@ function _dashSaasRenderRecomendacoes(d){
 
   elx.innerHTML = `
     <div class="dash-saas-grupo-titulo">${icon('catalog','14')} Recomendações</div>
-    <div class="dash-saas-carrossel" role="list">${cursos.map(c=>{
+    <div class="dash-saas-carrossel">${cursos.map(c=>{
       const hue = _dashSaasHashHue(c.name || '');
       const progresso = c.status==='em_andamento'
         ? `<div class="dash-saas-netflix-progress"><div style="width:${c.percentage}%"></div></div>` : '';
       const rotulo = c.status==='concluido' ? 'Concluído'
         : c.status==='em_andamento' ? `${c.percentage}% concluído` : 'Começar';
       return `
-      <button type="button" class="dash-saas-netflix-card" role="listitem"
+      <button type="button" class="dash-saas-netflix-card"
           aria-label="${_dashSaasEscAttr(c.name)} — ${_dashSaasEscAttr(rotulo)}"
           onclick="selectCourse(${c.id})">
         <div class="dash-saas-netflix-thumb" style="filter:hue-rotate(${hue}deg)">
-          <span aria-hidden="true">${c.icon||'📚'}</span>
+          <span aria-hidden="true">${_dashSaasEscAttr(c.icon)||'📚'}</span>
           ${progresso}
         </div>
         <div class="dash-saas-netflix-body">
           <div class="dash-saas-netflix-eyebrow">Curso</div>
-          <div class="dash-saas-netflix-titulo">${c.name}</div>
+          <div class="dash-saas-netflix-titulo">${_dashSaasEscAttr(c.name)}</div>
           ${c.status==='concluido'
             ? `<span style="color:var(--success);font-size:var(--text-xs)">${icon('checkmark-circle','12','icon--success')} Concluído</span>`
             : c.status==='em_andamento'

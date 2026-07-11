@@ -264,6 +264,7 @@
   }
 }
 .dash-saas-netflix-card:active { transform: scale(0.98); }
+.dash-saas-netflix-card:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: -2px; }
 
 @media (prefers-reduced-motion: reduce) {
   .dash-saas-skeleton { animation: none; }
