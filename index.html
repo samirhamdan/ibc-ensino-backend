@@ -5103,9 +5103,19 @@ async function loadTrailsSection(container){
       }
     } catch(e){}
     renderTrailProgress(container, trail, extra);
-    if(trail.new_badge){
-      showTrophyModal(trail.new_badge.icon, trail.new_badge.name, trail.new_badge.description);
-      showToast(`⭐ +${trail.xp_bonus} pontos de bônus da Trilha! 🎉`, 'xp');
+    // O GET só informa "completed" — quem premia (XP/badge) é o POST
+    // dedicado, idempotente (correção de segurança: GET nunca muta estado).
+    if(trail.completed){
+      try{
+        const claimRes = await api('POST', '/trails/active/claim');
+        if(claimRes.ok){
+          const claim = await claimRes.json();
+          if(claim.completed_now){
+            if(claim.new_badge) showTrophyModal(claim.new_badge.icon, claim.new_badge.name, claim.new_badge.description);
+            showToast(`⭐ +${claim.xp_bonus} pontos de bônus da Trilha! 🎉`, 'xp');
+          }
+        }
+      } catch(e){}
     }
   }
 }

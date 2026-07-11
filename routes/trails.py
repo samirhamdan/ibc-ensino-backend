@@ -206,24 +206,53 @@ def active_trail():
 
     trail_dict['current_course_id'] = first_undone
 
-    # check trail completion
-    all_done = all(tc['done'] for tc in trail_dict['courses'])
-    trail_dict['completed'] = all_done
-    if all_done:
-        ut = UserTrail.query.filter_by(user_id=user.id, trail_id=trail.id, tenant_id=current_tenant_id()).first()
-        if ut and not ut.completed_at:
-            from datetime import datetime
-            ut.completed_at = datetime.utcnow()
-            _add_xp(user.id, trail.xp_bonus)
-            awarded_badge = None
-            if trail.badge_code:
-                awarded_badge = _award_badge(user.id, trail.badge_code)
-            db.session.commit()
-            if awarded_badge:
-                trail_dict['new_badge'] = awarded_badge.to_dict()
-                trail_dict['xp_bonus'] = trail.xp_bonus
+    # Só computa/expõe se está completa — o AWARD (XP, badge, completed_at)
+    # não acontece mais aqui. GET não pode ter efeito colateral de escrita:
+    # sob SameSite=Lax, um GET ainda é acionável cross-site (ex.: <img
+    # src="/api/trails/active">, prefetch de link) — achado do ROADMAP.md
+    # §1.1. O cliente chama POST /trails/active/claim depois de ver
+    # completed=true (idempotente, ver abaixo).
+    trail_dict['completed'] = all(tc['done'] for tc in trail_dict['courses'])
 
     return jsonify(trail_dict)
+
+
+@trails_bp.route('/active/claim', methods=['POST'])
+def claim_active_trail_completion():
+    """Concede XP/badge de conclusão da trilha ativa — idempotente (só
+    premia 1x, na primeira chamada depois que a trilha vira 100% concluída;
+    chamadas seguintes não fazem nada e devolvem completed_now=False)."""
+    user = _current_user()
+    if not user:
+        return jsonify({'error': 'Não autenticado'}), 401
+
+    if not user.active_trail_id:
+        return jsonify({'completed_now': False}), 200
+
+    trail = get_scoped(Trail, user.active_trail_id)
+    if not trail:
+        return jsonify({'completed_now': False}), 200
+
+    done_course_ids = _completed_course_ids(user.id)
+    trail_course_ids = [tc.course_id for tc in trail.trail_courses]
+    all_done = bool(trail_course_ids) and all(cid in done_course_ids for cid in trail_course_ids)
+    if not all_done:
+        return jsonify({'completed_now': False}), 200
+
+    ut = UserTrail.query.filter_by(user_id=user.id, trail_id=trail.id, tenant_id=current_tenant_id()).first()
+    if not ut or ut.completed_at:
+        return jsonify({'completed_now': False}), 200
+
+    from datetime import datetime
+    ut.completed_at = datetime.utcnow()
+    _add_xp(user.id, trail.xp_bonus)
+    awarded_badge = _award_badge(user.id, trail.badge_code) if trail.badge_code else None
+    db.session.commit()
+
+    resposta = {'completed_now': True, 'xp_bonus': trail.xp_bonus}
+    if awarded_badge:
+        resposta['new_badge'] = awarded_badge.to_dict()
+    return jsonify(resposta), 200
 
 
 # ── Onboarding endpoints ─────────────────────────────────

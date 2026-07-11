@@ -6,7 +6,7 @@ import string
 from io import BytesIO
 from datetime import datetime
 from flask import Blueprint, jsonify, session, send_file, request, current_app
-from extensions import db
+from extensions import db, limiter
 from core.tenancy import current_tenant_id, get_scoped
 from models import Certificate, User, Course, Trail, UserTrail, ActivityFeed
 
@@ -115,8 +115,19 @@ def my_certificates():
 
 
 # ── Verify (public, no login) ──────────────────────────────────────────────
+#
+# ROADMAP.md §1.1 apontou "arquivo servido sem autenticação" para /download
+# no mesmo grupo de materials.py/uploads (que exigem sessão agora). Decisão
+# consciente de NÃO exigir login aqui: verificação e download de certificado
+# são, por design, um credencial PÚBLICO verificável (o mesmo modelo de
+# LinkedIn/Credly) — quem tem o link verifica sem precisar de conta (ex.:
+# empregador). cert_code tem ~41 bits de entropia (33^8 combinações,
+# alfabeto sem caracteres confusos) — não é enumerável por listagem (só
+# lookup exato) nem por força bruta prática. Rate limit abaixo é defesa em
+# profundidade contra scanning automatizado, não a mitigação principal.
 
 @certificates_bp.route('/verify/<cert_code>', methods=['GET'])
+@limiter.limit('30 per minute')
 def verify_certificate(cert_code):
     # Lookup global INTENCIONAL: verificação pública por código único
     # (empregadores etc.) — não vaza listagem, só o certificado exato.
@@ -143,6 +154,7 @@ def verify_certificate(cert_code):
 # ── Download PDF ───────────────────────────────────────────────────────────
 
 @certificates_bp.route('/<cert_code>/download', methods=['GET'])
+@limiter.limit('30 per minute')
 def download_certificate(cert_code):
     cert = Certificate.query.filter_by(cert_code=cert_code).first()
     if not cert:
