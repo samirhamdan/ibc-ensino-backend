@@ -4249,6 +4249,18 @@ function _dashSaasErro(retryFn){
     </div>`;
 }
 
+// UX_ALUNO_SAAS.md §5 (gate de aceite): "carrossel operável por setas" —
+// achado da auditoria de release, faltava inteiramente. Rola por um card
+// inteiro por vez (não a viewport toda) pra manter o card seguinte sempre
+// visível como pista de que dá pra continuar navegando.
+function _dashSaasCarrosselKeydown(ev, el){
+  if(ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+  ev.preventDefault();
+  const card = el.querySelector('.dash-saas-netflix-card');
+  const passo = card ? (card.getBoundingClientRect().width + 12) : el.clientWidth * 0.8;
+  el.scrollBy({ left: ev.key === 'ArrowRight' ? passo : -passo, behavior: 'smooth' });
+}
+
 async function _renderAlunoDashboardInner(){
   const el=document.getElementById('main-content');
   el.innerHTML=`
@@ -4344,7 +4356,7 @@ function _dashSaasRenderSaudacao(d){
         <h1>${_dashSaasSaudacaoPorHorario()}, ${_dashSaasEscAttr(nome)}</h1>
         <div class="dash-saas-saudacao-contexto">${contexto}</div>
       </div>
-      ${_dashSaasStreakChip(stats)}
+      <div aria-live="polite">${_dashSaasStreakChip(stats)}</div>
     </div>`;
 }
 
@@ -4410,11 +4422,11 @@ function _dashSaasRenderPontuacao(d){
 
   elx.innerHTML = `
     <div class="dash-saas-grupo-titulo">${icon('bar-chart','14')} Sua pontuação</div>
-    <div class="dash-saas-pontuacao-linha1">
+    <div class="dash-saas-pontuacao-linha1" aria-live="polite">
       <span class="dash-saas-pontuacao-total">${s.total_points||0}</span>
       <span class="dash-saas-pontuacao-nivel">pts · Nível ${s.level||1}${s.level_name?` (${s.level_name})`:''}</span>
     </div>
-    <div style="display:flex;justify-content:center;margin-bottom:var(--space-sm)">${_dashSaasStreakChip(s)}</div>
+    <div style="display:flex;justify-content:center;margin-bottom:var(--space-sm)" aria-live="polite">${_dashSaasStreakChip(s)}</div>
     ${s.longest_streak ? `<div style="text-align:center;font-size:var(--text-xs);color:var(--gray);margin-bottom:var(--space-sm)">Recorde: ${s.longest_streak} dia(s)</div>` : ''}
     ${recentes.length ? `<div class="dash-saas-badges-recentes">${recentes.map(t=>`
       <div class="dash-saas-badge-recente${_dashSaasBadgeEhNova(t.date)?' dash-saas-badge-recente--nova':''}" title="${_dashSaasEscAttr(t.name)}">
@@ -4483,7 +4495,8 @@ function _dashSaasRenderRecomendacoes(d){
 
   elx.innerHTML = `
     <div class="dash-saas-grupo-titulo">${icon('catalog','14')} Recomendações</div>
-    <div class="dash-saas-carrossel">${cursos.map(c=>{
+    <div class="dash-saas-carrossel" role="region" aria-label="Recomendações de cursos"
+        tabindex="0" onkeydown="_dashSaasCarrosselKeydown(event, this)">${cursos.map(c=>{
       const hue = _dashSaasHashHue(c.name || '');
       const progresso = c.status==='em_andamento'
         ? `<div class="dash-saas-netflix-progress"><div style="width:${c.percentage}%"></div></div>` : '';

@@ -141,6 +141,29 @@ def test_jornada_abrir_dashboard_e_continuar_licao(servidor_vivo, browser, seede
     page.close()
 
 
+def test_contadores_de_streak_e_pontos_tem_aria_live(servidor_vivo, browser, seeded):
+    """UX_ALUNO_SAAS.md §5 (gate de aceite): "contadores (streak, pontos)
+    com aria-live='polite' quando atualizam" — achado da auditoria de
+    release, faltava inteiramente (zero ocorrências de aria-live no HTML).
+    Prova real: inspeciona o DOM depois do dashboard carregar."""
+    page = browser.new_page()
+    page.goto(servidor_vivo + '/')
+    page.fill('#login-email', 'aluno@test.com')
+    page.fill('#login-pass', 'senha123')
+    page.press('#login-pass', 'Enter')
+    page.wait_for_selector('.dash-saas-pontuacao-linha1', timeout=8000)
+    page.wait_for_selector('.dash-saas-streak-chip', timeout=8000)
+
+    linha_pontos = page.locator('.dash-saas-pontuacao-linha1')
+    assert linha_pontos.get_attribute('aria-live') == 'polite'
+
+    streak_wrapper = page.evaluate(
+        "() => document.querySelector('.dash-saas-streak-chip')?.closest('[aria-live]') ? true : false")
+    assert streak_wrapper, 'chip de streak não está dentro de um container aria-live'
+
+    page.close()
+
+
 def test_dashboard_responsivo_sem_scroll_horizontal_no_mobile(servidor_vivo, browser, seeded):
     """§3: grid mobile-first, coluna única <768px, sem scroll horizontal."""
     page = browser.new_page(viewport={'width': 375, 'height': 900})
@@ -208,6 +231,61 @@ def test_carrossel_de_recomendacoes_nao_estoura_o_layout_no_mobile(app, servidor
         """)
         assert carrossel['scroll'] > carrossel['client'], \
             'carrossel com cards suficientes deveria precisar de scroll interno'
+
+        page.close()
+    finally:
+        with app.app_context():
+            from extensions import db
+            from models import Course
+            Course.query.filter(Course.id.in_(ids_criados)).delete(synchronize_session=False)
+            db.session.commit()
+
+
+def test_carrossel_navega_por_setas_do_teclado(app, servidor_vivo, browser, seeded):
+    """UX_ALUNO_SAAS.md §5 (gate de aceite): "carrossel operável por
+    setas" — achado da auditoria de release, faltava inteiramente (só
+    Tab/click funcionava). Prova real: foca o carrossel, aperta
+    ArrowRight, confirma que o scrollLeft realmente mudou."""
+    with app.app_context():
+        from extensions import db
+        from models import Course, Category
+        from core.tenancy import default_tenant_id
+        cat = Category.query.filter_by(tenant_id=default_tenant_id()).first()
+        if cat is None:
+            cat = Category(name='Categoria E2E', tenant_id=default_tenant_id())
+            db.session.add(cat)
+            db.session.flush()
+        criados = []
+        for i in range(8):
+            c = Course(name=f'Curso Teclado {i}', acesso='publico', status='published',
+                      category_id=cat.id, icon='📚')
+            db.session.add(c)
+            criados.append(c)
+        db.session.commit()
+        ids_criados = [c.id for c in criados]
+
+    try:
+        page = browser.new_page(viewport={'width': 1200, 'height': 800})
+        page.goto(servidor_vivo + '/')
+        page.fill('#login-email', 'aluno@test.com')
+        page.fill('#login-pass', 'senha123')
+        page.press('#login-pass', 'Enter')
+        page.wait_for_selector('.dash-saas-carrossel .dash-saas-netflix-card', timeout=8000)
+
+        carrossel = page.locator('.dash-saas-carrossel')
+        carrossel.focus()
+        assert page.evaluate("document.activeElement.classList.contains('dash-saas-carrossel')")
+
+        scroll_antes = page.evaluate("document.querySelector('.dash-saas-carrossel').scrollLeft")
+        page.keyboard.press('ArrowRight')
+        page.wait_for_timeout(400)   # scrollBy(behavior:'smooth')
+        scroll_depois = page.evaluate("document.querySelector('.dash-saas-carrossel').scrollLeft")
+        assert scroll_depois > scroll_antes, 'ArrowRight não rolou o carrossel'
+
+        page.keyboard.press('ArrowLeft')
+        page.wait_for_timeout(400)
+        scroll_final = page.evaluate("document.querySelector('.dash-saas-carrossel').scrollLeft")
+        assert scroll_final < scroll_depois, 'ArrowLeft não rolou o carrossel de volta'
 
         page.close()
     finally:
