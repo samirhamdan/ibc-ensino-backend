@@ -54,6 +54,55 @@ def browser():
         b.close()
 
 
+def test_tenant_com_cor_diferente_aplica_de_verdade_no_browser(app, servidor_vivo, browser):
+    """Etapa 1 (§6): achado da auditoria de release — GET /api/theme
+    calculava a cor certa e o <style id="tenant-theme"> era injetado com o
+    valor certo, mas design-system.css (carregado DEPOIS na versão antiga)
+    declarava --brand-primary de novo em :root com o fallback fixo do IBC —
+    mesma especificidade, ordem no documento decidia, e o fallback sempre
+    vencia. Provado aqui via getComputedStyle no navegador de verdade (não
+    só inspecionando o texto do <style> injetado, que "passava" mesmo com o
+    bug): tenant demo com cor diferente do IBC precisa aplicar a cor DELE."""
+    from extensions import db
+    from core.tenancy import Tenant
+
+    with app.app_context():
+        demo = Tenant.query.filter_by(slug='demo').first()
+        assert demo is not None
+        demo.tema_json = {**(demo.tema_json or {}), 'cor_primaria': '#7c3aed'}
+        db.session.commit()
+
+    ctx_ibc = browser.new_context(extra_http_headers={'X-Tenant-Slug': 'ibc'})
+    ctx_demo = browser.new_context(extra_http_headers={'X-Tenant-Slug': 'demo'})
+    try:
+        page_ibc = ctx_ibc.new_page()
+        page_ibc.goto(servidor_vivo + '/')
+        page_ibc.wait_for_selector('#tenant-theme', state='attached', timeout=5000)
+        cor_ibc = page_ibc.evaluate(
+            "getComputedStyle(document.documentElement).getPropertyValue('--brand-primary').trim()")
+
+        page_demo = ctx_demo.new_page()
+        page_demo.goto(servidor_vivo + '/')
+        page_demo.wait_for_selector('#tenant-theme', state='attached', timeout=5000)
+        cor_demo = page_demo.evaluate(
+            "getComputedStyle(document.documentElement).getPropertyValue('--brand-primary').trim()")
+
+        assert cor_ibc.lower() == '#008ea8', f'IBC deveria manter a cor de sempre, veio {cor_ibc}'
+        assert cor_demo.lower() != cor_ibc.lower(), (
+            f'demo aplicou a MESMA cor do IBC ({cor_demo}) — a cor do tenant não está '
+            'realmente sendo aplicada no navegador, só calculada no servidor')
+
+        page_ibc.close()
+        page_demo.close()
+    finally:
+        ctx_ibc.close()
+        ctx_demo.close()
+        with app.app_context():
+            demo = Tenant.query.filter_by(slug='demo').first()
+            demo.tema_json = {k: v for k, v in (demo.tema_json or {}).items() if k != 'cor_primaria'}
+            db.session.commit()
+
+
 def test_jornada_abrir_dashboard_e_continuar_licao(servidor_vivo, browser, seeded):
     """Critério de aceite da Etapa 2: um aluno com progresso em andamento
     abre o dashboard e vê a estrutura de 5 grupos com o card de 'continuar'
