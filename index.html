@@ -4539,10 +4539,10 @@ async function renderActivityFeed(){
           <div class="activity-feed-list">
             ${items.map(a => `
               <div class="activity-item">
-                <span class="activity-avatar">${a.user_initial}</span>
+                <span class="activity-avatar">${_dashSaasEscAttr(a.user_initial)}</span>
                 <div class="activity-content">
-                  <span class="activity-text"><strong>${a.user_name}</strong> concluiu o curso <strong>${a.course_name}</strong></span>
-                  <span class="activity-time">${a.time_ago}</span>
+                  <span class="activity-text"><strong>${_dashSaasEscAttr(a.user_name)}</strong> concluiu o curso <strong>${_dashSaasEscAttr(a.course_name)}</strong></span>
+                  <span class="activity-time">${_dashSaasEscAttr(a.time_ago)}</span>
                 </div>
               </div>`).join('')}
           </div>

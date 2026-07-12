@@ -344,3 +344,51 @@ def test_nome_de_curso_malicioso_nao_executa_no_dashboard(app, servidor_vivo, br
             LessonProgress.query.filter_by(user_id=seeded['users']['aluno'],
                                            course_id=seeded['course_id']).delete()
             db.session.commit()
+
+
+def test_mural_de_atividades_escapa_nome_de_usuario_malicioso(app, servidor_vivo, browser, seeded):
+    """Achado da 2ª revisão Fable 5 (auditoria de release): o fix de H1
+    cobriu os 5 grupos novos (_dashSaasRender*), mas renderActivityFeed —
+    função legada (Sprint 6.2) que TAMBÉM é chamada dentro do mesmo
+    dashboard (_renderAlunoDashboardInner → renderActivityFeed()) —
+    continuava injetando user_name/course_name/user_initial em innerHTML
+    sem escape. Mesma classe de vazamento: qualquer usuário que renomeia a
+    própria conta executa JS pra todo mundo que abrir o dashboard e ver o
+    "Mural de Conclusões"."""
+    payload = '<img src=x onerror="window.__xss_fired_feed=true">'
+    with app.app_context():
+        from extensions import db
+        from models import User, ActivityFeed
+        uid = seeded['users']['aluno']
+        user = User.query.get(uid)
+        nome_original = user.name
+        user.name = payload
+        db.session.add(ActivityFeed(user_id=uid, course_id=seeded['course_id'], action='completed'))
+        db.session.commit()
+
+    try:
+        page = browser.new_page(viewport={'width': 1280, 'height': 900})
+        disparou_dialog = []
+        page.on('dialog', lambda d: (disparou_dialog.append(d.message), d.dismiss()))
+
+        page.goto(servidor_vivo + '/')
+        page.fill('#login-email', 'aluno@test.com')
+        page.fill('#login-pass', 'senha123')
+        page.press('#login-pass', 'Enter')
+        page.wait_for_selector('#activityFeedSection', timeout=8000)
+        page.wait_for_timeout(800)   # renderActivityFeed() é async, roda depois do grid
+
+        assert not disparou_dialog, f'JS malicioso disparou dialog: {disparou_dialog}'
+        assert page.evaluate('window.__xss_fired_feed') is None, \
+            'onerror do payload executou — renderActivityFeed não escapava user_name'
+        assert page.locator('#activityFeedSection img[src="x"]').count() == 0
+
+        page.close()
+    finally:
+        with app.app_context():
+            from extensions import db
+            from models import User, ActivityFeed
+            uid = seeded['users']['aluno']
+            User.query.get(uid).name = nome_original
+            ActivityFeed.query.filter_by(user_id=uid, course_id=seeded['course_id']).delete()
+            db.session.commit()
