@@ -170,6 +170,33 @@ def test_dia_normal_sem_marco_nao_da_bonus(app, uid):
         assert r['streak_bonus'] == 0
 
 
+def test_resposta_do_tutor_nao_mantem_streak_do_aluno_que_perguntou(app, uid):
+    """Achado da 2ª revisão Fable 5 (mesma classe do bloqueador H2): quem
+    AGE em 'question_answered' é o TUTOR que responde — award_points(uid,
+    'question_answered') credita pontos pro aluno que perguntou, mas isso
+    não é o aluno "estando ativo hoje". Um tutor respondendo uma pergunta
+    antiga não pode manter/estender o streak de alguém que não fez nada."""
+    ontem = hoje_streak() - timedelta(days=1)
+    _set_last_activity(app, uid, ontem)
+    with app.app_context():
+        from extensions import db
+        from models import UserPoints
+        from core.tenancy import default_tenant_id
+        up = UserPoints.query.filter_by(user_id=uid, tenant_id=default_tenant_id()).first()
+        up.current_streak = 5
+        db.session.commit()
+
+        from routes.gamification import POINTS_PER_ACTION
+        r = award_points(uid, 'question_answered')   # ação do TUTOR, não do aluno
+
+        assert r['streak_bonus'] == 0
+        assert r['streak_marco_atingido'] is None
+        up = UserPoints.query.filter_by(user_id=uid, tenant_id=default_tenant_id()).first()
+        assert up.current_streak == 5   # não mexeu — nem incrementou nem reiniciou
+        assert up.last_activity_date == ontem   # não atualizou last_activity_date
+        assert r['points_awarded'] == POINTS_PER_ACTION['question_answered']   # os pontos, sim, continuam sendo dados
+
+
 def test_estudar_sem_logar_de_novo_mantem_o_streak(app, uid):
     """Correção da auditoria de release (achado H2/Etapa 3): a versão
     anterior só contava 'daily_login' — um aluno que estuda todo dia sem

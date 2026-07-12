@@ -69,14 +69,21 @@ POINTS_PER_ACTION = {
 # o valor de current_streak que dispara o bônus.
 STREAK_MARCOS = {7: 50, 30: 200, 100: 500}
 
-# Todas as ações que award_points aceita (routes/lessons.py, routes/auth.py,
-# routes/questions.py, routes/materials.py, routes/certificates.py) contam
-# como "esteve ativo hoje" pro streak — nota que 'quiz_passed' não é chave
-# de POINTS_PER_ACTION (o valor de pontos dela é calculado à parte, por
-# tentativa), por isso não dá pra usar POINTS_PER_ACTION.keys() aqui.
+# Ações de award_points que contam como "o PRÓPRIO usuário esteve ativo
+# hoje" pro streak (routes/lessons.py, routes/auth.py, routes/questions.py,
+# routes/materials.py, routes/certificates.py) — nota que 'quiz_passed' não
+# é chave de POINTS_PER_ACTION (o valor de pontos dela é calculado à parte,
+# por tentativa), por isso não dá pra usar POINTS_PER_ACTION.keys() aqui.
+#
+# 'question_answered' fica de FORA de propósito (achado da 2ª revisão Fable
+# 5, mesma classe do bloqueador H2/streak-só-por-login): ela credita pontos
+# pro ALUNO que perguntou, mas quem AGE é o tutor que responde
+# (routes/questions.py::answer_question) — um tutor respondendo uma
+# pergunta antiga mantinha/estendia o streak do aluno num dia em que ele
+# não fez nada, o que não é "esteve ativo hoje" por definição nenhuma.
 _ACOES_QUE_CONTAM_STREAK = {
     'material_read', 'quiz_attempted', 'quiz_passed', 'question_asked',
-    'question_answered', 'course_completed', 'daily_login',
+    'course_completed', 'daily_login',
 }
 
 
@@ -246,11 +253,12 @@ def award_points(user_id, action, metadata=None):
     # "completar a revisão mantém o streak" — um aluno que estuda todo dia
     # sem reenviar o form de login (sessão continua viva) perdia o streak
     # silenciosamente, e o CTA "em risco" não era acionável pela ação que
-    # ele recomendava. Agora QUALQUER ação real de award_points conta como
-    # "esteve ativo hoje" — todas as chamadas a award_points já são
-    # engajamento real do usuário (quiz, material, curso, pergunta, login),
-    # nunca eventos passivos/automáticos, então generalizar de 'daily_login'
-    # para "qualquer ação" é seguro.
+    # ele recomendava. Agora qualquer ação em _ACOES_QUE_CONTAM_STREAK conta
+    # como "esteve ativo hoje" — mas nem toda chamada de award_points é
+    # engajamento do PRÓPRIO usuário que recebe os pontos (achado da 2ª
+    # revisão Fable 5: 'question_answered' credita o aluno que perguntou por
+    # uma ação do TUTOR que responde, então fica de fora do set — ver
+    # comentário de _ACOES_QUE_CONTAM_STREAK).
     #
     # UPDATE...WHERE guardado (não SELECT...FOR UPDATE): generalizar pra
     # "qualquer ação" multiplica os pontos de entrada que podem disparar o
