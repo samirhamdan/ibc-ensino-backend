@@ -4486,12 +4486,12 @@ function _dashSaasRenderMetas(d){
   if(!elx) return;
   const metas = d.next_metas || [];
 
+  // Quando a IA de revisão ainda não está habilitada para o tenant, o slot
+  // não renderiza nada (nem placeholder) — evita expor um recurso que ainda
+  // não existe para o usuário final (GAM-05).
   const revisaoHtml = DASH_SAAS_FLAGS.revisao_ia_enabled
-    ? '' // Release 1.0: card real de revisão do dia (LRN-02)
-    : `<div class="dash-saas-meta-revisao">
-         <div style="font-weight:var(--fw-semibold);font-size:var(--text-sm)">${icon('lightbulb','14')} Revisão do dia</div>
-         <div style="font-size:var(--text-xs);color:var(--gray)">Chega na Release 1.0 — vai te ajudar a fixar o que você já aprendeu.</div>
-       </div>`;
+    ? '' // TODO (LRN-02): card real de revisão do dia quando a flag for ligada
+    : '';
 
   if(!metas.length){
     elx.innerHTML = `

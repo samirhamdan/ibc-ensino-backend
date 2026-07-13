@@ -18,3 +18,4 @@ scripts/run_rehearsal.sh
 rehearsal-*.log
 rehearsal-backup-*.dump
 rehearsal-backup-*.sql
+.venv/

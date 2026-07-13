@@ -37,6 +37,10 @@ jobs:
       # Etapa 3.4: query em tabela tenant-scoped sem filtro de tenant
       # derruba o pipeline (relatório em docs/AUDITORIA-QUERIES.md)
       - run: python scripts/audit_queries.py --check
+      # GAM-05: CTA de identidade do tenant (.btn-primary / .dash-saas-*)
+      # sem hex hardcoded — ver scripts/check_hardcoded_hex.py para o
+      # histórico do gap (nunca esteve ligado ao CI até aqui).
+      - run: python scripts/check_hardcoded_hex.py
 
   test:
     runs-on: ubuntu-latest

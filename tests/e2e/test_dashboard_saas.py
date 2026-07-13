@@ -392,3 +392,74 @@ def test_mural_de_atividades_escapa_nome_de_usuario_malicioso(app, servidor_vivo
             User.query.get(uid).name = nome_original
             ActivityFeed.query.filter_by(user_id=uid, course_id=seeded['course_id']).delete()
             db.session.commit()
+
+
+def test_revisao_do_dia_nao_renderiza_nada(servidor_vivo, browser, seeded):
+    """GAM-05 (docs/MELHORIAS-UI-ALUNO.md PR 1, decisão D2): com
+    DASH_SAAS_FLAGS.revisao_ia_enabled desligado (estado atual, feature
+    LRN-02 não existe de verdade ainda), o slot "Revisão do dia" no Grupo 4
+    ("Próximas metas") não deve renderizar NADA — nem um card de
+    placeholder mencionando a feature futura. Antes desta correção, o
+    grupo mostrava um card fixo "Revisão do dia / Chega na Release 1.0"."""
+    page = browser.new_page()
+    page.goto(servidor_vivo + '/')
+    page.fill('#login-email', 'aluno@test.com')
+    page.fill('#login-pass', 'senha123')
+    page.press('#login-pass', 'Enter')
+    page.wait_for_selector('#dash-saas-metas', timeout=8000)
+    page.wait_for_timeout(300)   # _dashSaasRenderMetas() roda depois do fetch inicial
+
+    metas_html = page.locator('#dash-saas-metas').inner_html()
+    assert 'dash-saas-meta-revisao' not in metas_html
+    assert 'Revisão do dia' not in metas_html
+    assert 'Release' not in metas_html
+
+    page.close()
+
+
+def test_botao_ver_catalogo_usa_gradiente_do_tenant(servidor_vivo, browser, seeded):
+    """GAM-05 (docs/MELHORIAS-UI-ALUNO.md PR 1, item 3): o botão "Ver
+    catálogo" (.btn-primary, grupo 'Continue seus estudos') deve pintar
+    com --brand-gradient (identidade do tenant, core/theming.py) — não com
+    um gradiente teal→violeta fixo (--gradient-btn, que nunca muda por
+    tenant)."""
+    page = browser.new_page()
+    page.goto(servidor_vivo + '/')
+    page.fill('#login-email', 'aluno@test.com')
+    page.fill('#login-pass', 'senha123')
+    page.press('#login-pass', 'Enter')
+    page.wait_for_selector('#dash-saas-continuar', timeout=8000)
+
+    botao = page.get_by_role('button', name='Ver catálogo')
+    assert botao.count() == 1
+    background = botao.evaluate("el => getComputedStyle(el).backgroundImage")
+    assert background != 'none'
+
+    # Comparar background (computado) direto com o texto CRU de
+    # --brand-gradient (custom property, nunca passa pela normalização do
+    # navegador — vira "rgb(...)" no computed style) sempre diverge em
+    # formato e faz o assert degradar pra "é algum linear-gradient", o que
+    # o bug original (--gradient-btn fixo) também satisfaz (achado da
+    # revisão Fable 5). Em vez disso, renderiza DOIS elementos ocultos —
+    # um com var(--brand-gradient), outro com var(--gradient-btn) — e
+    # compara o backgroundImage COMPUTADO de cada um contra o do botão:
+    # mesma normalização dos dois lados, comparação sem ambiguidade.
+    referencia_tenant, referencia_fixa = page.evaluate("""
+        () => {
+          const mk = (expr) => {
+            const el = document.createElement('div');
+            el.style.background = expr;
+            document.body.appendChild(el);
+            const v = getComputedStyle(el).backgroundImage;
+            el.remove();
+            return v;
+          };
+          return [mk('var(--brand-gradient)'), mk('var(--gradient-btn)')];
+        }
+    """)
+    assert background == referencia_tenant, (
+        f'botão não herda --brand-gradient do tenant: {background!r} != {referencia_tenant!r}')
+    assert background != referencia_fixa, (
+        'botão ainda usa o gradiente fixo da plataforma (--gradient-btn), não o do tenant')
+
+    page.close()
