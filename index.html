@@ -4314,7 +4314,7 @@ async function _renderAlunoDashboardInner(){
         <div class="dash-saas-grupo" id="dash-saas-continuar">${_dashSaasSkeleton()}</div>
       </div>
       <div class="dash-saas-col-lateral">
-        <div class="dash-saas-grupo" id="dash-saas-pontuacao">${_dashSaasSkeleton()}</div>
+        <div class="dash-saas-grupo dash-saas-grupo--pontuacao" id="dash-saas-pontuacao">${_dashSaasSkeleton()}</div>
         <div class="dash-saas-grupo" id="dash-saas-metas">${_dashSaasSkeleton()}</div>
       </div>
       <div class="dash-saas-grupo dash-saas-full" id="dash-saas-recomendacoes">${_dashSaasSkeleton()}</div>
@@ -4377,30 +4377,38 @@ function _dashSaasRenderSaudacao(d){
   const nome = (currentUser && currentUser.name ? currentUser.name.split(' ')[0] : 'aluno');
   const ip = d.in_progress_course;
   const stats = d.user_stats || {};
-  // Prioridade da frase de contexto (§3 Grupo 1): (a) streak em risco —
-  // GAM-02, Etapa 3; (b) revisões pendentes — LRN-02 real é Release 1.0;
-  // (c) progresso — sempre disponível hoje, é o fallback.
+  // Prioridade da frase de contexto (§3 Grupo 1, GAM-05 PR 2): (1) streak em
+  // risco — GAM-02, Etapa 3; (2) revisão pendente — LRN-02 real é Release
+  // 1.0, ainda SEM fonte de dados nenhuma no payload do dashboard hoje
+  // (nada em `d` descreve "revisão pendente"), então este tier não tem
+  // condição real pra checar ainda — fica documentado aqui como o lugar
+  // onde ela entra quando LRN-02 existir, sem inventar dado nem placeholder
+  // fake; (3) progresso do curso em andamento — fallback real disponível
+  // hoje. O fallback antigo ("+90 pontos para o próximo nível", vindo de
+  // next_metas[0] quando não havia curso em andamento) foi REMOVIDO daqui
+  // de propósito — essa frase deve viver só no Grupo 4 (Próximas Metas),
+  // nunca duplicada na saudação.
   let contexto = 'Pronto para continuar sua jornada de estudos?';
   if(stats.streak_em_risco && stats.current_streak){
     const dias = stats.current_streak === 1 ? '1 dia' : `${stats.current_streak} dias`;
     contexto = `Sua sequência de ${dias} vence hoje — estude um pouco para mantê-la!`;
   } else if(ip){
     contexto = `Você está a ${Math.max(0, ip.total_aulas - ip.aula_atual + 1)} aula(s) de concluir "${_dashSaasEscAttr(ip.name)}".`;
-  } else if(d.next_metas && d.next_metas.length){
-    contexto = _dashSaasEscAttr(d.next_metas[0].description);
   }
 
   // XSS (achado H1 da revisão Fable 5): nome/contexto acabam em innerHTML
   // (não em atributo) — mas _dashSaasEscAttr também escapa &/</>, então
   // serve pros dois contextos; `nome` vem de currentUser.name (próprio
   // usuário logado, mas escapado por defesa em profundidade mesmo assim).
+  // GAM-05 PR 2 (P0.3): o chip de streak SAIU daqui — agora vive só dentro
+  // do card "Sua pontuação" (_dashSaasRenderPontuacao), pra não duplicar o
+  // número de dias em dois lugares da tela.
   elx.innerHTML = `
     <div class="dash-saas-saudacao">
       <div class="dash-saas-saudacao-texto">
         <h1>${_dashSaasSaudacaoPorHorario()}, ${_dashSaasEscAttr(nome)}</h1>
         <div class="dash-saas-saudacao-contexto">${contexto}</div>
       </div>
-      <div aria-live="polite">${_dashSaasStreakChip(stats)}</div>
     </div>`;
 }
 
@@ -4464,14 +4472,22 @@ function _dashSaasRenderPontuacao(d){
   const s = d.user_stats || {};
   const recentes = (d.recent_trofeus||[]).slice(0,3);
 
+  // GAM-05 PR 2 (P0.2/P0.3): redesenho do card — vira o ponto focal do
+  // dashboard (fundo --brand-gradient, número de pontos é o MAIOR texto da
+  // página) e absorve o chip de streak que antes vivia duplicado na
+  // Saudação (_dashSaasRenderSaudacao). Nível ganha um chip visual próprio
+  // em vez de texto plano ao lado dos pontos.
   elx.innerHTML = `
     <div class="dash-saas-grupo-titulo">${icon('bar-chart','14')} Sua pontuação</div>
     <div class="dash-saas-pontuacao-linha1" aria-live="polite">
       <span class="dash-saas-pontuacao-total">${s.total_points||0}</span>
-      <span class="dash-saas-pontuacao-nivel">pts · Nível ${s.level||1}${s.level_name?` (${s.level_name})`:''}</span>
+      <span class="dash-saas-pontuacao-nivel">pts</span>
     </div>
-    <div style="display:flex;justify-content:center;margin-bottom:var(--space-sm)" aria-live="polite">${_dashSaasStreakChip(s)}</div>
-    ${s.longest_streak ? `<div style="text-align:center;font-size:var(--text-xs);color:var(--gray);margin-bottom:var(--space-sm)">Recorde: ${s.longest_streak} dia(s)</div>` : ''}
+    <div class="dash-saas-pontuacao-meta-linha" aria-live="polite">
+      <span class="dash-saas-nivel-chip">Nível ${s.level||1}${s.level_name?` · ${_dashSaasEscAttr(s.level_name)}`:''}</span>
+      ${_dashSaasStreakChip(s)}
+    </div>
+    ${s.longest_streak ? `<div class="dash-saas-pontuacao-recorde">Recorde: ${s.longest_streak} dia(s)</div>` : ''}
     ${recentes.length ? `<div class="dash-saas-badges-recentes">${recentes.map(t=>`
       <div class="dash-saas-badge-recente${_dashSaasBadgeEhNova(t.date)?' dash-saas-badge-recente--nova':''}" title="${_dashSaasEscAttr(t.name)}">
         <div class="emoji">${_dashSaasEscAttr(t.icon)||'🏅'}</div>

@@ -89,6 +89,23 @@ def cor_sobre_primaria(cor_primaria):
     return escuro
 
 
+def cor_sobre_gradiente(cor_a, cor_b):
+    """Como cor_sobre_primaria, mas para texto sobre --brand-gradient (que
+    vai de cor_a a cor_b, ver construir_tokens) — GAM-05 PR 2 (P0.2)
+    passou a colocar texto grande DIRETO sobre o gradiente (número de
+    pontos do card 'Sua pontuação'), e escolher a cor de texto olhando só
+    pra cor_a (como cor_sobre_primaria fazia até aqui) podia aprovar uma
+    combinação que falha feio na OUTRA ponta do gradiente — achado real
+    verificando o IBC padrão: '#0a0f1e' dava 4.94:1 contra a ponta teal
+    mas só 2.63:1 contra a ponta azul do gradiente (rotação de matiz de
+    +20°). Maximin: entre branco e escuro, escolhe quem tem o MELHOR
+    PIOR-CASO contra as duas pontas, não só contra cor_a."""
+    branco, escuro = '#ffffff', '#0a0f1e'
+    pior_branco = min(razao_de_contraste(branco, cor_a), razao_de_contraste(branco, cor_b))
+    pior_escuro = min(razao_de_contraste(escuro, cor_a), razao_de_contraste(escuro, cor_b))
+    return branco if pior_branco >= pior_escuro else escuro
+
+
 def garantir_acessivel(cor_primaria, minimo=CONTRASTE_MINIMO_TEXTO):
     """Se a cor escolhida pelo tenant não alcança contraste AA contra
     --bg-base OU --text-primary (§2.2.4 — usada como texto/borda sobre o
@@ -118,13 +135,17 @@ def construir_tokens(tema_json, nome_tenant):
     tema_json = tema_json or {}
     bruta = tema_json.get('primary') or tema_json.get('cor_primaria') or '#008ea8'
     primaria, ajustada = garantir_acessivel(bruta)
+    gradiente_fim = rotacionar_matiz(primaria, 20)
 
     return {
         '--brand-primary': primaria,
         '--brand-primary-hover': escurecer(primaria, 0.08),
         '--brand-primary-subtle': com_opacidade(primaria, 0.10),
-        '--brand-gradient': f'linear-gradient(120deg, {primaria} 0%, {rotacionar_matiz(primaria, 20)} 100%)',
-        '--brand-on-primary': cor_sobre_primaria(primaria),
+        '--brand-gradient': f'linear-gradient(120deg, {primaria} 0%, {gradiente_fim} 100%)',
+        # cor_sobre_gradiente (não cor_sobre_primaria): --brand-on-primary
+        # também pinta o texto do card de pontuação (P0.2, GAM-05 PR 2),
+        # que fica sobre --brand-gradient inteiro, não só sobre `primaria`.
+        '--brand-on-primary': cor_sobre_gradiente(primaria, gradiente_fim),
         '_meta': {
             'nome_exibido': tema_json.get('nome_exibido') or nome_tenant,
             'logo': tema_json.get('logo') or '',

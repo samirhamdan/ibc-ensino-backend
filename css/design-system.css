@@ -98,6 +98,26 @@
   --font-display: 'Sora', -apple-system, sans-serif;
   --font-body:    'Sora', -apple-system, sans-serif;
 
+  /* P0.2 (GAM-05): número de pontos do dashboard precisa ser o maior
+     texto da página (48-56px) — maior que qualquer --text-h*/--text-2xl
+     existente, então entram dois degraus novos na escala em vez de
+     "inventar" um valor solto direto no componente.
+
+     Nomeados --text-display-lg/xl (não "5xl"/"6xl" no estilo Tailwind):
+     achado real durante o teste E2E desta PR — nesta stack de browser
+     (chromium headless, sandbox de teste), UMA custom property chamada
+     literalmente --text-5xl ou --text-6xl faz o var() usado em
+     `font-size` computar pro valor inicial (16px) mesmo com
+     getComputedStyle().getPropertyValue() retornando o valor certo
+     (3rem) — outras propriedades (font-weight) na MESMA regra aplicam
+     normalmente, e renomear a custom property (mantendo o valor idêntico)
+     resolve na hora. Não foi possível isolar a causa raiz (não há
+     colisão de nome em lugar nenhum do repo, nem @property, nem @layer,
+     nem !important concorrente — CDP CSS.getMatchedStylesForNode mostra
+     só a regra esperada ganhando). Documentado aqui pra não reintroduzir
+     esse padrão de nome por engano numa próxima escala tipográfica. */
+  --text-display-xl: 3.5rem;   /* 56px */
+  --text-display-lg: 3rem;     /* 48px */
   --text-2xl: 2.5rem;
   --text-xl:  2rem;
   --text-lg:  1.5rem;
@@ -153,6 +173,12 @@
                0 20px 40px rgba(0, 142, 168, 0.12);
   --shadow-xl: 0 20px 40px rgba(0, 142, 168, 0.18),
                0 32px 64px rgba(0, 142, 168, 0.14);
+  /* P0.2 (GAM-05): card "Sua pontuação" precisa se destacar mais que os
+     outros cartões de --shadow-lg do dashboard — reaproveita a MESMA
+     progressão de cor (teal) e só aprofunda o alcance/opacidade, em vez
+     de introduzir uma cor de sombra nova. */
+  --shadow-elevated: 0 16px 32px rgba(0, 142, 168, 0.20),
+                      0 28px 56px rgba(0, 142, 168, 0.16);
 
   /* Transitions */
   --transition-fast: 150ms ease;

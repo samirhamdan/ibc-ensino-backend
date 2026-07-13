@@ -22,6 +22,32 @@
   .dash-saas-full          { grid-column: 1 / -1; }
 }
 
+/* P0.1 (MELHORIAS-UI-ALUNO.md): em telas muito largas o grid 8/4 esticava
+   até a borda do viewport — colunas absurdamente largas, linhas de texto
+   longas demais pra ler. Trava a largura do conteúdo (~1360px) e centraliza;
+   o ancestral direto de #main-content garante o respiro nas bordas via seu
+   próprio padding (1.5rem, css/app.css), então só precisamos do max-width
+   aqui — sem duplicar padding. Não mexe no grid 8/4 nem no single-column
+   <768px, só limita a LARGURA MÁXIMA do container em viewports grandes.
+
+   .content:has(...) porque o ancestral REAL é a classe legada `.content`
+   (css/app.css), não `.app-content` — ela trava max-width:860px pra TODA
+   página (cursos, admin, dashboard, tudo), sem media query nenhuma. Sem
+   este override, o max-width:1360px abaixo nunca tinha espaço pra valer —
+   860px < 1360px, então o pai sempre vencia (achado real, não hipotético:
+   medido em 1920px, o grid renderizava a 812px/42% do viewport, não os
+   ~1360px/70% esperados). Escopado só a quando o dashboard SaaS está
+   presente — outras páginas mantêm o cap de 860px como sempre tiveram. */
+@media (min-width: 1440px) {
+  .content:has(.dash-saas-grid) {
+    max-width: none;
+  }
+  .dash-saas-grid {
+    max-width: 1360px;
+    margin: 0 auto;
+  }
+}
+
 .dash-saas-grupo {
   background: var(--white);
   border-radius: var(--radius-lg);
@@ -164,15 +190,81 @@
   text-align: center;
 }
 
-/* ── Grupo 3: Sua pontuação ── */
-.dash-saas-pontuacao-linha1 { display: flex; align-items: baseline; gap: var(--space-sm); margin-bottom: var(--space-md); }
-.dash-saas-pontuacao-total { font-size: var(--text-h3); font-weight: var(--fw-bold); color: var(--dark); }
-.dash-saas-pontuacao-nivel { font-size: var(--text-sm); color: var(--gray); }
+/* ── Grupo 3: Sua pontuação ── (GAM-05 PR 2, P0.2: ponto focal do
+   dashboard — fundo de marca, sombra elevada, o número vira o MAIOR
+   texto da página; P0.3: absorve o chip de streak que antes duplicava
+   na Saudação). */
+.dash-saas-grupo--pontuacao {
+  background: var(--brand-gradient);
+  color: var(--brand-on-primary);
+  box-shadow: var(--shadow-elevated);
+}
+.dash-saas-grupo--pontuacao .dash-saas-grupo-titulo,
+.dash-saas-grupo--pontuacao .dash-saas-vazio-msg,
+.dash-saas-grupo--pontuacao .dash-saas-badge-recente .nome {
+  color: inherit;
+  opacity: .82;
+}
+/* Achado da revisão Fable 5 (GAM-05 PR 2): --ativa/--risco do chip de
+   streak foram desenhados pro fundo branco da Saudação (fundo translúcido
+   + texto colorido) — dentro do card de pontuação (fundo --brand-gradient)
+   essa combinação pode cair abaixo de AA (laranja sobre teal/azul).
+   Fundo opaco branco + texto na cor própria do estado resolve nas duas
+   pontas do gradiente sem depender da cor do tenant. */
+.dash-saas-grupo--pontuacao .dash-saas-streak-chip--ativa,
+.dash-saas-grupo--pontuacao .dash-saas-streak-chip--risco {
+  background: var(--white);
+}
+
+.dash-saas-pontuacao-linha1 { display: flex; align-items: baseline; gap: .4rem; margin-bottom: var(--space-sm); }
+/* !important em font-size: achado real da investigação desta PR, não um
+   hábito de código. Sem ele, o browser usado nos testes E2E (chromium
+   headless deste sandbox) computa font-size como 16px pra este elemento
+   mesmo com a regra abaixo sendo a ÚNICA que casa (confirmado via CDP
+   CSS.getMatchedStylesForNode — nenhuma outra regra concorrente) e com
+   getComputedStyle().getPropertyValue('--text-display-lg') retornando o
+   valor certo (3rem) no MESMO elemento. font-weight na mesma declaração
+   aplica normalmente; só font-size falha. Passamos horas isolando causa
+   raiz (renomear a custom property, desabilitar cache via CDP, contexto
+   de browser limpo, comparar com outros var()-based font-size da mesma
+   página que funcionam) sem conseguir cravar o mecanismo exato — pode
+   ser peculiaridade deste build específico de chromium headless.!important
+   resolve de forma reprodutível e sem efeito colateral (não há nenhuma
+   outra regra de font-size pra esta classe que precise ganhar depois). */
+.dash-saas-pontuacao-total { font-size: var(--text-display-lg) !important; font-weight: var(--fw-bold); line-height: 1; color: inherit; }
+.dash-saas-pontuacao-nivel { font-size: var(--text-base); opacity: .82; }
+@media (min-width: 480px) {
+  .dash-saas-pontuacao-total { font-size: var(--text-display-xl) !important; }
+}
+
+.dash-saas-pontuacao-meta-linha {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+.dash-saas-nivel-chip {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, .18);
+  border-radius: 999px;
+  padding: .25rem .75rem;
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  color: inherit;
+}
+.dash-saas-pontuacao-recorde {
+  font-size: var(--text-xs);
+  opacity: .72;
+  margin-bottom: var(--space-sm);
+}
 
 .dash-saas-badges-recentes { display: flex; gap: var(--space-sm); flex-wrap: wrap; margin-top: var(--space-md); }
 .dash-saas-badge-recente { text-align: center; width: 3.5rem; }
 .dash-saas-badge-recente .emoji { font-size: 1.6rem; }
 .dash-saas-badge-recente .nome { font-size: .65rem; color: var(--gray); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-saas-grupo--pontuacao .dash-saas-badge-recente .nome { color: inherit; }
 
 /* ── Grupo 4: Próximas metas ── */
 .dash-saas-meta-item {
