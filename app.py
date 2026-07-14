@@ -113,6 +113,16 @@ def create_app(config_name='development'):
         # existentes) até o schema legado ser baselineado na Fase 3.
         from core.tenancy import Tenant, TenantUser, init_tenant_middleware
 
+        # BIL-01 (Release 1.0, primeiro módulo do novo layout — doc 02 §3):
+        # mesmo racional acima, registrar aqui faz o create_all de dev/teste
+        # criar domain_events/audit_log/subscriptions/ai_usage também.
+        # Vive em shared/ e core/billing/ (não app/shared, app/core/billing)
+        # pelo mesmo motivo de core/__init__.py: `app.py` ainda existe como
+        # módulo legado e um pacote `app/` sombrearia `app:create_app`.
+        from shared.events import DomainEvent
+        from shared.audit import AuditLog
+        from core.billing.models import Subscription, AiUsage
+
         # Fase 6 do playbook: registrado ANTES de tudo — em manutenção,
         # nenhuma rota (nem a resolução de tenant) deve rodar contra um
         # schema potencialmente a meio caminho de `alembic upgrade head`.
