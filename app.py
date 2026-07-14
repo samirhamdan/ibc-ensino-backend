@@ -158,6 +158,7 @@ def create_app(config_name='development'):
         from routes.notifications import notifications_bp
         from routes.aluno import aluno_bp
         from routes.theme import theme_bp
+        from core.billing.routes import billing_bp
 
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
         app.register_blueprint(courses_bp, url_prefix='/api/courses')
@@ -174,6 +175,7 @@ def create_app(config_name='development'):
         app.register_blueprint(notifications_bp, url_prefix='/api')
         app.register_blueprint(aluno_bp, url_prefix='/api/aluno')
         app.register_blueprint(theme_bp, url_prefix='/api')
+        app.register_blueprint(billing_bp, url_prefix='/billing')
 
         # Convenience alias so GET /api/user works alongside /api/auth/user
         @app.route('/api/user', methods=['GET'])

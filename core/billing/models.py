@@ -60,6 +60,41 @@ class Subscription(TenantScopedModel, db.Model):
         }
 
 
+class WebhookEvent(TenantScopedModel, db.Model):
+    """Idempotência de webhooks Asaas (BIL-02, PR 2) — doc 02 §7.
+
+    JUDGMENT CALL: o payload clássico de webhook do Asaas não traz um id de
+    evento dedicado (não confundir com o id do pagamento, que se repete a
+    cada notificação do MESMO pagamento em estados diferentes). A chave de
+    idempotência usada é `f"{evento}:{payment_id}"` — reentrega do MESMO
+    evento para o MESMO pagamento (retry do Asaas, replay manual) cai na
+    mesma linha; evento diferente (ex.: CONFIRMED depois OVERDUE) para o
+    mesmo pagamento é uma chave diferente, processado normalmente.
+    `event_id` é UNIQUE globalmente (não por tenant): o id do pagamento no
+    Asaas já é globalmente único, então a chave também é — não há por que
+    permitir a mesma chave em tenants diferentes (seria, na prática,
+    impossível: o pagamento pertence a um customer de um tenant só)."""
+    __tablename__ = 'billing_webhook_events'
+
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.String(160), nullable=False, unique=True)
+    tipo = db.Column(db.String(60), nullable=False)
+    criado_em = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.Index('ix_billing_webhook_events_tenant_id_id', 'tenant_id', 'id'),
+    )
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'tenant_id': str(self.tenant_id),
+            'event_id': self.event_id,
+            'tipo': self.tipo,
+            'criado_em': self.criado_em.isoformat() if self.criado_em else None,
+        }
+
+
 class AiUsage(TenantScopedModel, db.Model):
     """Medição de consumo de IA por tenant (BIL-03). `periodo` é
     'YYYY-MM' — ver nota de JUDGMENT CALL no topo do arquivo."""

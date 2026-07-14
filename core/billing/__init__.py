@@ -11,7 +11,7 @@ PR 1 de 4 (esta PR): modelo de dados (`Subscription`, `AiUsage`) e o catálogo
 de planos. Integração com Asaas (webhooks, cobrança) e o worker de medição
 de IA entram nas próximas PRs do módulo.
 """
-from core.billing.models import Subscription, AiUsage
+from core.billing.models import Subscription, AiUsage, WebhookEvent
 from core.billing.plans import PLANOS, Plano, get_plan
 
-__all__ = ['Subscription', 'AiUsage', 'PLANOS', 'Plano', 'get_plan']
+__all__ = ['Subscription', 'AiUsage', 'WebhookEvent', 'PLANOS', 'Plano', 'get_plan']

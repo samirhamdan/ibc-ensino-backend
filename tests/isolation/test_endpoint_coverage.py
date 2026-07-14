@@ -2,7 +2,8 @@
 isolamento DERRUBA o pipeline. É este teste que transforma a regra do
 CLAUDE.md ("nenhum endpoint novo sem caso de isolamento") em verificação
 executável."""
-from tests.isolation.registry import TENANT_SCOPED, LEGACY_PRE_TENANCY, PUBLIC_INFRA
+from tests.isolation.registry import (TENANT_SCOPED, LEGACY_PRE_TENANCY, PUBLIC_INFRA,
+                                       EXTERNAL_WEBHOOK)
 
 
 def _endpoints(app):
@@ -11,7 +12,7 @@ def _endpoints(app):
 
 def test_todo_endpoint_esta_classificado(iso_app):
     atuais = _endpoints(iso_app)
-    classificados = set(TENANT_SCOPED) | LEGACY_PRE_TENANCY | PUBLIC_INFRA
+    classificados = set(TENANT_SCOPED) | LEGACY_PRE_TENANCY | PUBLIC_INFRA | set(EXTERNAL_WEBHOOK)
 
     sem_classificacao = atuais - classificados
     assert not sem_classificacao, (
@@ -28,7 +29,7 @@ def test_todo_endpoint_esta_classificado(iso_app):
 def test_registro_sem_entradas_orfas(iso_app):
     """Entrada no registro apontando p/ endpoint inexistente = lixo acumulado."""
     atuais = _endpoints(iso_app)
-    classificados = set(TENANT_SCOPED) | LEGACY_PRE_TENANCY | PUBLIC_INFRA
+    classificados = set(TENANT_SCOPED) | LEGACY_PRE_TENANCY | PUBLIC_INFRA | set(EXTERNAL_WEBHOOK)
     orfaos = classificados - atuais
     assert not orfaos, f'Entradas órfãs no registry (endpoint não existe): {sorted(orfaos)}'
 
@@ -37,7 +38,10 @@ def test_classificacoes_nao_se_sobrepoem():
     a = set(TENANT_SCOPED) & LEGACY_PRE_TENANCY
     b = set(TENANT_SCOPED) & PUBLIC_INFRA
     c = LEGACY_PRE_TENANCY & PUBLIC_INFRA
-    assert not (a | b | c), f'Endpoint em mais de uma classificação: {a | b | c}'
+    d = set(TENANT_SCOPED) & set(EXTERNAL_WEBHOOK)
+    e = LEGACY_PRE_TENANCY & set(EXTERNAL_WEBHOOK)
+    f = PUBLIC_INFRA & set(EXTERNAL_WEBHOOK)
+    assert not (a | b | c | d | e | f), f'Endpoint em mais de uma classificação: {a | b | c | d | e | f}'
 
 
 def test_tenant_scoped_indica_teste_existente():

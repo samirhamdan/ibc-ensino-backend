@@ -15,6 +15,12 @@ Classificações:
                   (gamificação → progresso → conteúdo). Um endpoint só pode
                   ficar aqui enquanto a tabela não tiver tenant_id.
   PUBLIC_INFRA    infra sem dado de domínio (health, estáticos, SPA).
+  EXTERNAL_WEBHOOK  endpoint sem sessão/tenant de subdomínio, verificado por
+                  segredo compartilhado (header) em vez de auth de usuário;
+                  resolve e ESCREVE dado tenant-scoped, mas por um mecanismo
+                  de isolamento diferente da suíte de sessão/subdomínio —
+                  coberto por teste dedicado (não pela suíte de isolamento
+                  padrão, que assume sessão de usuário autenticado).
 """
 
 # ── Superfície tenant-scoped (Fase 2) ────────────────────────────────────
@@ -114,6 +120,16 @@ TENANT_SCOPED = {
     'dashboards.aluno_externo_dashboard': 'test_content_isolation.py::test_catalogo_por_tenant',
     'dashboards.tutor_dashboard': 'test_content_isolation.py::test_catalogo_por_tenant',
     'dashboards.admin_dashboard': 'test_content_isolation.py::test_catalogo_por_tenant',
+}
+
+# ── Webhooks externos (BIL-02) ────────────────────────────────────────────
+# Verificado por Asaas-Access-Token (hmac.compare_digest), não por sessão;
+# resolve o tenant explicitamente a partir do payload (nunca do fallback de
+# tenant padrão — docs/DEBITOS.md #24). Isolamento provado em
+# tests/test_billing_webhook.py (2 tenants, webhook de um nunca toca o
+# outro) em vez da suíte de isolamento de sessão padrão.
+EXTERNAL_WEBHOOK = {
+    'billing.webhook_asaas': 'test_billing_webhook.py::test_webhook_isola_por_tenant',
 }
 
 # ── Infra pública (sem dado de domínio) ──────────────────────────────────
