@@ -2,7 +2,7 @@
 **Produto:** XR Educação · **Versão:** 2.0 (substitui UX_ALUNO.md single-tenant)
 **Escopo:** dashboard do aluno + componentes compartilhados + sistema de theming por tenant
 **Requisitos cobertos:** GAM-02, GAM-03, GAM-04, LRN-02, LRN-03, TUT-01 (slot), TEN-03
-**Branch:** `feat/GAM-04-dashboard-saas` (separada da release/0.9-tenancy)
+**Branch:** `feat/GAM-04-dashboard-saas` (Etapas 1-4, já mergeada em `claude/zen-hopper-SeRac`) + `feat/GAM-05-polish-dashboard` (refinamento pós-lançamento, jul/2026)
 
 ---
 
@@ -26,30 +26,43 @@ O layout, a hierarquia e o comportamento são **fixos da plataforma** (é o que 
 
 Toda cor no CSS do dashboard referencia tokens — **nenhum hex hardcoded em componente**:
 
+> **D1 (GAM-05, jul/2026): tema CLARO é o padrão oficial do aluno**, não o
+> escuro/navy originalmente especificado nesta seção. A implementação real
+> (`css/design-system.css`) sempre foi clara — fundo branco/cinza-claro,
+> texto escuro — e essa decisão foi formalizada como a paleta padrão da
+> plataforma. O bloco abaixo reflete os tokens REAIS em uso, não a
+> especificação original (mantida como histórico do racional de
+> arquitetura — identidade do tenant vs. fixo da plataforma continua
+> válido, só a paleta de base mudou de escura pra clara):
+
 ```css
 :root {
   /* IDENTIDADE (injetados por tenant via tema_json) */
   --brand-primary: #008ea8;        /* IBC default */
   --brand-logo-url: url(...);
-  
+
   /* DERIVADOS (calculados no build do tema, não pelo tenant) */
   --brand-primary-hover: ...;      /* primary escurecido 8% */
   --brand-primary-subtle: ...;     /* primary a 10% opacidade (fundos) */
   --brand-gradient: ...;           /* primary → primary rotacionado 20° no hue */
-  --brand-on-primary: ...;         /* branco ou preto por contraste calculado */
-  
-  /* FIXOS DA PLATAFORMA (iguais para todos os tenants) */
-  --bg-base: #0a0f1e;              /* navy escuro — base da plataforma */
-  --bg-surface: #111827;
-  --bg-elevated: #1a2332;
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --success: #10b981;  --warning: #f59e0b;  --danger: #ef4444;
+  --brand-on-primary: ...;         /* branco ou escuro por contraste maximin
+                                       contra as DUAS pontas do gradiente
+                                       (core/theming.py::cor_sobre_gradiente,
+                                       GAM-05 PR 2) */
+
+  /* FIXOS DA PLATAFORMA (iguais para todos os tenants) — tema CLARO */
+  --white:         #ffffff;        /* fundo base dos cards/superfícies */
+  --gray-lighter:  #f5f7fa;        /* fundo de página/skeleton */
+  --dark:          #2c3e50;        /* texto principal */
+  --gray:          #7f8c8d;        /* texto secundário/muted */
+  --success: var(--success-500);  --warning: var(--warning-500);  --danger: var(--danger-500);
   --streak-flame: #f97316;         /* streak é identidade da PLATAFORMA */
-  --radius-card: 12px;  --radius-button: 8px;
-  --shadow-card: 0 4px 12px rgb(0 0 0 / 0.3);
-  --shadow-elevated: 0 8px 24px rgb(0 0 0 / 0.4);
+  --radius-lg: 12px;  --radius-md: 8px;
+  --shadow-sm: 0 1px 2px rgb(0 30 40 / .05), 0 2px 4px rgb(0 30 40 / .08);
+  --shadow-elevated: 0 16px 32px rgb(0 142 168 / .20), 0 28px 56px rgb(0 142 168 / .16);
+
+  /* Escala tipográfica explícita (GAM-05 PR 3, §4.4): 14/16/20/28/40/56px —
+     --text-sm/--text-base/--text-20/--text-28/--text-2xl/--text-display-xl */
 }
 ```
 
@@ -58,11 +71,11 @@ Toda cor no CSS do dashboard referencia tokens — **nenhum hex hardcoded em com
 1. `tenants.tema_json` guarda apenas: `{ "primary": "#008ea8", "logo": "...", "nome_exibido": "IBC Ensino" }`.
 2. Endpoint `GET /api/theme` (cacheado por tenant, TTL 5 min) calcula os derivados no servidor (Python: escurecer, opacidade, contraste WCAG) e retorna o bloco de custom properties.
 3. SPA injeta em `<style id="tenant-theme">` no boot, antes do primeiro paint (evita flash de tema errado).
-4. **Validação no painel admin:** ao escolher a cor, o sistema calcula contraste contra `--bg-base` e `--text-primary`; cores reprovadas (contraste < 4.5:1 em texto) recebem ajuste automático de luminosidade com aviso ao admin. O tenant nunca consegue publicar um tema ilegível.
+4. **Validação de contraste:** `core/theming.py::garantir_acessivel` calcula contraste da cor do tenant contra o fundo fixo da plataforma (`--gray-lighter`/`--white`, tema claro — D1) e ajusta automaticamente a luminosidade se reprovar AA (4.5:1); `cor_sobre_gradiente` (GAM-05 PR 2) escolhe a cor do texto sobre `--brand-gradient` por maximin contra as duas pontas. **Débito conhecido (docs/DEBITOS.md #23):** pra cor padrão do IBC especificamente, nenhuma das duas opções de texto bate 4.5:1 nas duas pontas do gradiente ao mesmo tempo — a validação de painel admin descrita aqui (aviso interativo ao tenant ao escolher a cor) ainda não tem UI própria; o ajuste automático roda só no backend hoje.
 
 ### 2.3 O que o tenant NUNCA configura
 
-Fundo escuro (identidade da plataforma), tipografia, espaçamentos, ícones (Lucide, `stroke-width: 1.75` em toda a plataforma), cor do streak (laranja-fogo é assinatura XR Educação, igual em todo tenant — vira reconhecível), emojis nativos (proibidos em toda a plataforma, sem exceção).
+Fundo claro (identidade da plataforma — D1, GAM-05), tipografia, espaçamentos, ícones (Lucide, `stroke-width: 1.75` em toda a plataforma), cor do streak (laranja-fogo é assinatura XR Educação, igual em todo tenant — vira reconhecível), emojis nativos (proibidos em toda a plataforma, sem exceção).
 
 ## 3. Estrutura do dashboard — 5 grupos verticais (preservados + slots SaaS)
 
