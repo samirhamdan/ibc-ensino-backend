@@ -12,6 +12,7 @@ import hmac
 import logging
 import os
 import uuid as uuid_mod
+from datetime import date
 
 from flask import Blueprint, jsonify, request
 from sqlalchemy import text
@@ -28,20 +29,28 @@ billing_bp = Blueprint('billing', __name__)
 logger = logging.getLogger(__name__)
 
 # Eventos Asaas tratados nesta PR (doc 02 §7: 'pagamento.confirmado/falhou').
-# PAYMENT_OVERDUE/PAYMENT_DELETED só registram o evento — a régua real
-# (D+10 leitura / D+30 suspensão) é a PR 3 (job separado que lê o estado
-# gravado aqui, não este handler).
+# PAYMENT_OVERDUE/PAYMENT_DELETED só registram o evento (Subscription.status
+# + overdue_desde) — a régua (core/billing/regua.py, PR 3) é quem decide
+# billing_status a partir de overdue_desde (D+10 leitura / D+30 suspensão).
+#
+# Achado HIGH da revisão Fable 5 da PR 3: a versão anterior desta PR 2 já
+# fazia PAYMENT_OVERDUE → billing_status='leitura' AQUI, no instante em que
+# o pagamento vence — pulando o D+10 inteiro (PRD BIL-02: "inadimplência
+# >10 dias move para modo leitura", não no dia 0) e deixando a condição da
+# régua (`billing_status == 'ativo'` pra disparar a transição) nunca
+# satisfeita em produção, já que o webhook já tinha adiantado o estado.
+# None = "não mexe em tenant.billing_status aqui" — só Subscription.status.
+_EVENTO_ASAAS_PARA_BILLING_STATUS = {
+    'PAYMENT_CONFIRMED': 'ativo',
+    'PAYMENT_RECEIVED': 'ativo',
+    'PAYMENT_OVERDUE': None,
+    'PAYMENT_DELETED': None,
+}
 _EVENTO_ASAAS_PARA_STATUS = {
     'PAYMENT_CONFIRMED': 'active',
     'PAYMENT_RECEIVED': 'active',
     'PAYMENT_OVERDUE': 'overdue',
     'PAYMENT_DELETED': 'canceled',
-}
-_EVENTO_ASAAS_PARA_BILLING_STATUS = {
-    'PAYMENT_CONFIRMED': 'ativo',
-    'PAYMENT_RECEIVED': 'ativo',
-    'PAYMENT_OVERDUE': 'leitura',
-    'PAYMENT_DELETED': 'suspenso',
 }
 _EVENTO_ASAAS_PARA_DOMAIN_EVENT = {
     'PAYMENT_CONFIRMED': 'pagamento.confirmado',
@@ -211,8 +220,22 @@ def webhook_asaas():
     tipo_evento_dominio = _EVENTO_ASAAS_PARA_DOMAIN_EVENT[evento]
 
     try:
+        # PR 3 (régua de inadimplência): grava a data em que a subscription
+        # entrou em 'overdue' — só na TRANSIÇÃO (idempotente: reentrega do
+        # mesmo PAYMENT_OVERDUE pro mesmo pagamento nem chega aqui, já caiu
+        # no ramo "ja_processado" acima; mas um novo evento OVERDUE de um
+        # pagamento diferente do MESMO ciclo não deve empurrar a data pra
+        # frente). Volta a 'active'/'canceled' limpa a data — o ciclo de
+        # inadimplência anterior encerrou, a régua não deve mais contar dias
+        # a partir dele.
+        if novo_status == 'overdue' and sub.overdue_desde is None:
+            sub.overdue_desde = date.today()
+        elif novo_status in ('active', 'canceled'):
+            sub.overdue_desde = None
+
         sub.status = novo_status
-        tenant.billing_status = novo_billing_status
+        if novo_billing_status is not None:
+            tenant.billing_status = novo_billing_status
 
         db.session.add(WebhookEvent(tenant_id=tenant_id, event_id=chave, tipo=evento))
         publish_event(tenant_id, tipo_evento_dominio, payload)

@@ -204,9 +204,18 @@ def test_webhook_isola_por_tenant(app, billing_client):
 
 
 def test_webhook_overdue_registra_sem_implementar_regua(app, billing_client):
+    """Achado HIGH da revisão Fable 5 da PR 3: PAYMENT_OVERDUE não pode
+    mexer em tenant.billing_status diretamente aqui — só grava
+    Subscription.status='overdue' + overdue_desde. Quem decide
+    billing_status (D+10 leitura / D+30 suspenso) é a régua
+    (core/billing/regua.py), a partir de overdue_desde. Se este webhook
+    já adiantasse billing_status='leitura' no dia 0, a condição da régua
+    pra disparar a transição de leitura (billing_status=='ativo') nunca
+    seria satisfeita em produção — o PRD exige >10 dias, não o dia 0."""
     with app.app_context():
         from extensions import db
         tenant, sub = _novo_tenant_com_subscription(db, 'wh-overdue', 'cus_overdue_1')
+        tenant_id = tenant.id
 
     resp = billing_client.post('/billing/webhook/asaas',
                                 json=_payload('PAYMENT_OVERDUE', 'cus_overdue_1', payment_id='pay_overdue_1'),
@@ -216,5 +225,9 @@ def test_webhook_overdue_registra_sem_implementar_regua(app, billing_client):
     with app.app_context():
         db_sub = Subscription.query.filter_by(asaas_customer_id='cus_overdue_1').first()
         assert db_sub.status == 'overdue'
+        assert db_sub.overdue_desde is not None
         eventos = DomainEvent.query.filter_by(tenant_id=db_sub.tenant_id, tipo='pagamento.falhou').all()
         assert len(eventos) == 1
+        # billing_status continua 'ativo' — a régua, não o webhook, decide
+        # quando virar 'leitura' (D+10).
+        assert Tenant.query.get(tenant_id).billing_status == 'ativo'

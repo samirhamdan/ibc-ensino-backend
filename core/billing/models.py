@@ -21,6 +21,14 @@ from datetime import datetime
 from extensions import db
 from core.tenancy.models import TenantScopedModel
 
+# PR 3 (BIL-02, régua de inadimplência): status 'overdue' por si só não diz
+# HÁ QUANTOS DIAS a subscription está inadimplente — core/billing/regua.py
+# precisa disso pros limiares D+10/D+30. `overdue_desde` (migração 0017) é
+# setada pelo webhook (core/billing/routes.py) na transição PARA 'overdue' e
+# limpa na transição de volta pra 'active'/'canceled' (pagamento resolvido —
+# ver JUDGMENT CALL no webhook: não faz sentido a régua olhar uma data de
+# inadimplência de um ciclo de cobrança já encerrado).
+
 # status: pending | active | overdue | suspended | canceled (BIL-02: webhooks
 # Asaas atualizam este campo; >10 dias inadimplente -> 'overdue' (leitura),
 # >30 dias -> 'suspended', espelhando tenants.billing_status)
@@ -40,6 +48,9 @@ class Subscription(TenantScopedModel, db.Model):
     # ciclo de cobrança: 'mensal' | 'anual' (Asaas: MONTHLY/YEARLY)
     ciclo = db.Column(db.String(_CICLO_LEN), nullable=False, default='mensal')
     proximo_vencimento = db.Column(db.Date, nullable=True)
+    # data em que o status virou 'overdue' pela última vez (None se nunca
+    # esteve/não está mais overdue) — ver nota no topo do arquivo.
+    overdue_desde = db.Column(db.Date, nullable=True)
     criado_em = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     atualizado_em = db.Column(db.DateTime, nullable=False, default=datetime.utcnow,
                               onupdate=datetime.utcnow)
@@ -57,6 +68,7 @@ class Subscription(TenantScopedModel, db.Model):
             'status': self.status,
             'ciclo': self.ciclo,
             'proximo_vencimento': self.proximo_vencimento.isoformat() if self.proximo_vencimento else None,
+            'overdue_desde': self.overdue_desde.isoformat() if self.overdue_desde else None,
         }
 
 

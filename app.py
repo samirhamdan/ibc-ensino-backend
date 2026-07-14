@@ -139,10 +139,18 @@ def create_app(config_name='development'):
         # vira defesa real após o runbook docs/RUNBOOK-RLS.md.
         from core.tenancy.rls import init_rls
         init_rls()
-        
+
+        # BIL-02 (PR 3, régua de inadimplência): bloqueia por
+        # Tenant.billing_status. Precisa rodar DEPOIS da resolução de tenant
+        # (usa current_tenant()) e ANTES dos blueprints de conteúdo — ver
+        # core/billing/middleware.py sobre a lista de exceções (webhook,
+        # /health, /api/theme sempre passam).
+        from core.billing.middleware import init_billing_middleware
+        init_billing_middleware(app)
+
         # Criar tabelas
         db.create_all()
-        
+
         # Registrar blueprints (rotas)
         from routes.auth import auth_bp
         from routes.courses import courses_bp
