@@ -1405,6 +1405,17 @@ async function submitAulaQuiz(){
     if(aulaQuizFeedback.new_achievements && aulaQuizFeedback.new_achievements.length){
       setTimeout(()=>showAchievementPopups(aulaQuizFeedback.new_achievements), 900);
     }
+    // Trilha concluída (correção H1, revisão de release): o award agora
+    // acontece no servidor no instante em que o curso completa uma
+    // trilha — aqui só é a notificação visual, não o gatilho.
+    if(aulaQuizFeedback.trail_completions && aulaQuizFeedback.trail_completions.length){
+      aulaQuizFeedback.trail_completions.forEach((t,i)=>{
+        setTimeout(()=>{
+          if(t.new_badge) showTrophyModal(t.new_badge.icon, t.new_badge.name, t.new_badge.description);
+          showToast(`🏁 Trilha "${escapeHtml(t.trail_name)}" concluída! +${t.xp_bonus} pontos de bônus 🎉`, 'xp');
+        }, 1600 + i*1200);
+      });
+    }
     renderAulaPage();
     if(aulaQuizFeedback.passed && !wasPassedBefore && aulaQuizFeedback.next_lesson){
       setTimeout(()=>showLessonCompletedPanel(aulaQuizFeedback.next_lesson), 1300);

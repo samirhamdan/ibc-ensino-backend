@@ -1,7 +1,7 @@
 """
 Certificate endpoints: issue, download PDF, verify (public), list
 """
-import random
+import secrets
 import string
 from io import BytesIO
 from datetime import datetime
@@ -18,8 +18,8 @@ _CERT_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'  # no 0/O/1/I
 def generate_cert_code():
     """Generate unique IBC-XXXX-XXXX code."""
     while True:
-        part1 = ''.join(random.choices(_CERT_CHARS, k=4))
-        part2 = ''.join(random.choices(_CERT_CHARS, k=4))
+        part1 = ''.join(secrets.choice(_CERT_CHARS) for _ in range(4))
+        part2 = ''.join(secrets.choice(_CERT_CHARS) for _ in range(4))
         code = f'IBC-{part1}-{part2}'
         if not Certificate.query.filter_by(cert_code=code).first():
             return code
@@ -121,7 +121,7 @@ def my_certificates():
 # consciente de NÃO exigir login aqui: verificação e download de certificado
 # são, por design, um credencial PÚBLICO verificável (o mesmo modelo de
 # LinkedIn/Credly) — quem tem o link verifica sem precisar de conta (ex.:
-# empregador). cert_code tem ~41 bits de entropia (33^8 combinações,
+# empregador). cert_code tem ~40 bits de entropia (32^8 combinações,
 # alfabeto sem caracteres confusos) — não é enumerável por listagem (só
 # lookup exato) nem por força bruta prática. Rate limit abaixo é defesa em
 # profundidade contra scanning automatizado, não a mitigação principal.

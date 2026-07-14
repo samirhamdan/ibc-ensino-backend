@@ -238,6 +238,7 @@ def submit_aula_quiz(course_id, aula_num):
     # Check if course is now fully complete → issue certificate
     certificate_issued = False
     cert_code = None
+    trail_completions = []
     if passed and is_last:
         all_modules = modules
         all_progs = {p.module_id: p for p in LessonProgress.query.filter_by(user_id=user.id, course_id=course_id, tenant_id=current_tenant_id()).all()}
@@ -256,6 +257,16 @@ def submit_aula_quiz(course_id, aula_num):
                 # 100 pts de curso concluído: concedidos junto com o certificado
                 # (1x por curso, por construção — só entra aqui se não existia).
                 points = _merge_points(points, award_points(user.id, 'course_completed'))
+
+            # Gatilho PRINCIPAL do award de trilha (correção H1, revisão de
+            # release): no INSTANTE em que este curso vira 100% concluído,
+            # verifica todas as trilhas em que o aluno está inscrito e que
+            # tinham este curso como pendente — se alguma virou completa,
+            # premia na hora (XP/badge, uma vez só — claim_trail_if_complete
+            # é atômico, correção H2). my_trails() é a rede de segurança
+            # pra quem completar por outro caminho.
+            from routes.trails import claim_completed_trails_for_course
+            trail_completions = claim_completed_trails_for_course(user.id, course_id)
 
     new_achievements = check_and_grant_achievements(user.id) if passed else []
 
@@ -284,6 +295,7 @@ def submit_aula_quiz(course_id, aula_num):
         'new_achievements': new_achievements,
         'next_lesson': next_lesson,
         'points': points,
+        'trail_completions': trail_completions,
     }), 200
 
 

@@ -46,12 +46,129 @@ def _award_badge(user_id, code):
     return badge
 
 
+def claim_trail_if_complete(user_id, trail, done_course_ids=None):
+    """Concede XP/badge de conclusão de UMA trilha — atomicamente. Ponto
+    ÚNICO de award para toda a trilha (chamado automaticamente ao concluir
+    o último curso — routes/lessons.py — e como rede de segurança em
+    my_trails(); POST /trails/active/claim também reusa isto).
+
+    Correção H2 (revisão de release): o UPDATE abaixo, guardado por
+    completed_at IS NULL, decide quem ganha o prêmio sob concorrência —
+    não é "ler completed_at, decidir, depois escrever" (que tem uma janela
+    entre leitura e escrita onde duas requisições simultâneas passam as
+    duas pela checagem). UPDATE...WHERE é atômico por linha em qualquer
+    banco relacional: só UMA execução consegue de fato mudar
+    completed_at de NULL para um timestamp; a(s) outra(s) recebe(m)
+    rowcount=0 e sabe(m) que chegou(aram) tarde, sem tocar XP/badge.
+    Mesmo padrão sugerido no playbook de revisão — equivalente ao
+    `with_for_update()` já usado em core/tenancy/auth.py::
+    _get_or_create_points para o mesmo tipo de corrida (login concorrente).
+
+    Retorna None se a trilha não está 100% concluída, se o usuário não
+    está inscrito, ou se o prêmio já tinha sido reivindicado (por esta
+    chamada ou por uma concorrente que venceu a corrida)."""
+    if done_course_ids is None:
+        done_course_ids = _completed_course_ids(user_id)
+    trail_course_ids = [tc.course_id for tc in trail.trail_courses]
+    if not trail_course_ids or not all(cid in done_course_ids for cid in trail_course_ids):
+        return None
+
+    from datetime import datetime
+    from sqlalchemy import update
+    resultado = db.session.execute(
+        update(UserTrail)
+        .where(UserTrail.user_id == user_id, UserTrail.trail_id == trail.id,
+               UserTrail.tenant_id == current_tenant_id(), UserTrail.completed_at.is_(None))
+        .values(completed_at=datetime.utcnow())
+    )
+    if resultado.rowcount == 0:
+        # Não inscrito, ou já reivindicado (por esta chamada antes, ou por
+        # uma requisição concorrente que ganhou a corrida agora mesmo).
+        db.session.rollback()
+        return None
+    db.session.commit()   # o UPDATE já decidiu o vencedor — commit já trava isso
+
+    _add_xp(user_id, trail.xp_bonus)
+    awarded_badge = _award_badge(user_id, trail.badge_code) if trail.badge_code else None
+    db.session.commit()
+
+    resposta = {'trail_id': trail.id, 'trail_name': trail.name, 'xp_bonus': trail.xp_bonus}
+    if awarded_badge:
+        resposta['new_badge'] = awarded_badge.to_dict()
+    return resposta
+
+
+def claim_completed_trails_for_course(user_id, course_id):
+    """Chamado automaticamente quando um curso vira 100% concluído
+    (routes/lessons.py::submit_aula_quiz) — reivindica TODAS as trilhas
+    (não só a "ativa") em que esse curso é o último pendente. Um curso
+    pode pertencer a mais de uma trilha; a trilha "ativa" é só a que o
+    aluno está focando na UI, não limita quais trilhas podem completar."""
+    trail_ids = [tc.trail_id for tc in
+                TrailCourse.query.filter_by(tenant_id=current_tenant_id(), course_id=course_id).all()]
+    if not trail_ids:
+        return []
+    inscritas = {ut.trail_id for ut in
+                UserTrail.query.filter_by(user_id=user_id, tenant_id=current_tenant_id())
+                .filter(UserTrail.trail_id.in_(trail_ids), UserTrail.completed_at.is_(None)).all()}
+    if not inscritas:
+        return []
+    done_course_ids = _completed_course_ids(user_id)
+    premios = []
+    for tid in inscritas:
+        trail = get_scoped(Trail, tid)
+        if not trail:
+            continue
+        premio = claim_trail_if_complete(user_id, trail, done_course_ids)
+        if premio:
+            premios.append(premio)
+    return premios
+
+
 # ── Trail endpoints ──────────────────────────────────────
+
+def _trail_dict_scoped(trail, user, is_staff):
+    """Mesma política de acesso a curso já aplicada em
+    routes/courses.py::list_courses (correção M1, revisão de release):
+    staff vê tudo; qualquer outro (autenticado ou não) só vê curso
+    publicado; anônimo, adicionalmente, nunca vê curso acesso='interno'.
+    Sem isto, o título de curso interno/rascunho vazava pra qualquer
+    visitante através de QUALQUER trilha que o contivesse — mesma classe
+    de vazamento do catálogo, só que por um caminho diferente.
+
+    Aplicado em TODO lugar que serializa trail.courses pra fora (list_trails,
+    active_trail, my_trails, enroll_trail, submit_onboarding) — não só nos
+    dois primeiros; o vazamento também acontecia em enroll/onboarding."""
+    data = trail.to_dict(include_courses=False)
+    courses = []
+    for tc in trail.trail_courses:
+        c = tc.course
+        if not is_staff:
+            if not c or c.status != 'published':
+                continue
+            if not user and c.acesso == 'interno':
+                continue
+        courses.append(tc.to_dict())
+    data['courses'] = courses
+    return data
+
+
+def _trail_fully_done(trail, done_course_ids):
+    """Conclusão real da trilha (TODOS os cursos, inclusive rascunho/interno
+    que um não-staff não enxerga na listagem) — não pode ser calculada sobre
+    a lista já filtrada por _trail_dict_scoped, senão diverge do critério
+    usado por claim_trail_if_complete (que exige 100% dos trail_courses) e a
+    UI mostra completed=true sem nunca conseguir reivindicar o prêmio."""
+    trail_course_ids = [tc.course_id for tc in trail.trail_courses]
+    return bool(trail_course_ids) and all(cid in done_course_ids for cid in trail_course_ids)
+
 
 @trails_bp.route('', methods=['GET'])
 def list_trails():
+    user = _current_user()
+    is_staff = bool(user and role_no_tenant(user) in ('admin', 'tutor'))
     trails = Trail.query.filter_by(tenant_id=current_tenant_id()).all()
-    return jsonify([t.to_dict(include_courses=True) for t in trails])
+    return jsonify([_trail_dict_scoped(t, user, is_staff) for t in trails])
 
 
 @trails_bp.route('/<int:trail_id>/enroll', methods=['POST'])
@@ -71,8 +188,9 @@ def enroll_trail(trail_id):
     user.active_trail_id = trail_id
     db.session.commit()
 
+    is_staff = role_no_tenant(user) in ('admin', 'tutor')
     return jsonify({'ok': True, 'already_enrolled': already,
-                    'trail': trail.to_dict(include_courses=True)})
+                    'trail': _trail_dict_scoped(trail, user, is_staff)})
 
 
 @trails_bp.route('/<int:trail_id>/focus', methods=['POST'])
@@ -111,12 +229,12 @@ def _completed_course_ids(user_id):
     return done_ids
 
 
-def _annotate_trail_progress(trail, user_id, done_course_ids=None):
+def _annotate_trail_progress(trail, user, is_staff, done_course_ids=None):
     """Return trail dict with per-course done/current/locked states."""
     if done_course_ids is None:
-        done_course_ids = _completed_course_ids(user_id)
+        done_course_ids = _completed_course_ids(user.id)
 
-    trail_dict = trail.to_dict(include_courses=True)
+    trail_dict = _trail_dict_scoped(trail, user, is_staff)
     first_undone = None
     for tc in trail_dict['courses']:
         done = tc['course_id'] in done_course_ids
@@ -137,7 +255,11 @@ def _annotate_trail_progress(trail, user_id, done_course_ids=None):
     trail_dict['done_count'] = done_count
     trail_dict['total_courses'] = total
     trail_dict['percentage'] = round(done_count / total * 100) if total else 0
-    trail_dict['completed'] = total > 0 and done_count == total
+    # Completude REAL (todos os trail_courses, não só os visíveis pro papel
+    # do usuário) — precisa bater com claim_trail_if_complete, senão a UI
+    # mostra completed=true pra uma trilha que nunca vai conseguir premiar
+    # (ex.: trilha com um curso rascunho que só staff enxerga).
+    trail_dict['completed'] = _trail_fully_done(trail, done_course_ids)
     return trail_dict
 
 
@@ -149,13 +271,22 @@ def my_trails():
 
     enrollments = UserTrail.query.filter_by(user_id=user.id, tenant_id=current_tenant_id()).all()
     done_course_ids = _completed_course_ids(user.id)
+    is_staff = role_no_tenant(user) in ('admin', 'tutor')
 
     in_progress, completed = [], []
     for ut in enrollments:
         if not ut.trail:
             continue
-        td = _annotate_trail_progress(ut.trail, user.id, done_course_ids)
+        td = _annotate_trail_progress(ut.trail, user, is_staff, done_course_ids)
         td['enrolled_at'] = ut.enrolled_at.isoformat()
+        if not ut.completed_at and td['completed']:
+            # Rede de segurança (correção H1): o gatilho principal é
+            # automático em submit_aula_quiz, mas se por qualquer motivo
+            # o aluno completou o último curso sem passar por lá (ex.:
+            # sessão anterior, corrida, etc.), a página "Minhas Trilhas"
+            # reivindica na hora em que é aberta — nunca fica presa
+            # "computada como completa" sem o prêmio de verdade.
+            claim_trail_if_complete(user.id, ut.trail, done_course_ids)
         if ut.completed_at or td['completed']:
             td['completed_at'] = ut.completed_at.isoformat() if ut.completed_at else None
             completed.append(td)
@@ -182,7 +313,8 @@ def active_trail():
     if not trail:
         return jsonify(None)
 
-    trail_dict = trail.to_dict(include_courses=True)
+    is_staff = role_no_tenant(user) in ('admin', 'tutor')
+    trail_dict = _trail_dict_scoped(trail, user, is_staff)
 
     # annotate each course with state: done | current | locked
     done_course_ids = _completed_course_ids(user.id)
@@ -212,16 +344,30 @@ def active_trail():
     # src="/api/trails/active">, prefetch de link) — achado do ROADMAP.md
     # §1.1. O cliente chama POST /trails/active/claim depois de ver
     # completed=true (idempotente, ver abaixo).
-    trail_dict['completed'] = all(tc['done'] for tc in trail_dict['courses'])
+    #
+    # Usa _trail_fully_done (todos os trail_courses reais), não
+    # `all(tc['done'] for tc in trail_dict['courses'])` — essa lista já foi
+    # filtrada por _trail_dict_scoped, então pra um não-staff ela nunca
+    # inclui um curso rascunho/interno da trilha; calcular "completed" só
+    # sobre os cursos visíveis fazia a UI achar a trilha 100% concluída sem
+    # que claim_trail_if_complete (que exige TODOS os cursos) jamais
+    # conseguisse premiar.
+    trail_dict['completed'] = _trail_fully_done(trail, done_course_ids)
 
     return jsonify(trail_dict)
 
 
 @trails_bp.route('/active/claim', methods=['POST'])
 def claim_active_trail_completion():
-    """Concede XP/badge de conclusão da trilha ativa — idempotente (só
-    premia 1x, na primeira chamada depois que a trilha vira 100% concluída;
-    chamadas seguintes não fazem nada e devolvem completed_now=False)."""
+    """Concede XP/badge de conclusão da trilha ativa — idempotente e
+    seguro sob concorrência (claim_trail_if_complete, correção H2).
+
+    Gatilho PRINCIPAL: automático, em routes/lessons.py::submit_aula_quiz,
+    no instante em que o último curso pendente da trilha é concluído (e
+    em my_trails(), como rede de segurança pra quem completou por outro
+    caminho). Este endpoint continua existindo pra disparo explícito do
+    cliente/testes — mas a UI não depende mais só dele (correção H1: o
+    call site antigo, loadTrailsSection, não era mais alcançável)."""
     user = _current_user()
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
@@ -233,26 +379,12 @@ def claim_active_trail_completion():
     if not trail:
         return jsonify({'completed_now': False}), 200
 
-    done_course_ids = _completed_course_ids(user.id)
-    trail_course_ids = [tc.course_id for tc in trail.trail_courses]
-    all_done = bool(trail_course_ids) and all(cid in done_course_ids for cid in trail_course_ids)
-    if not all_done:
+    premio = claim_trail_if_complete(user.id, trail)
+    if not premio:
         return jsonify({'completed_now': False}), 200
 
-    ut = UserTrail.query.filter_by(user_id=user.id, trail_id=trail.id, tenant_id=current_tenant_id()).first()
-    if not ut or ut.completed_at:
-        return jsonify({'completed_now': False}), 200
-
-    from datetime import datetime
-    ut.completed_at = datetime.utcnow()
-    _add_xp(user.id, trail.xp_bonus)
-    awarded_badge = _award_badge(user.id, trail.badge_code) if trail.badge_code else None
-    db.session.commit()
-
-    resposta = {'completed_now': True, 'xp_bonus': trail.xp_bonus}
-    if awarded_badge:
-        resposta['new_badge'] = awarded_badge.to_dict()
-    return jsonify(resposta), 200
+    premio['completed_now'] = True
+    return jsonify(premio), 200
 
 
 # ── Onboarding endpoints ─────────────────────────────────
@@ -290,9 +422,10 @@ def submit_onboarding():
     user.onboarding_completed = True
     db.session.commit()
 
+    is_staff = role_no_tenant(user) in ('admin', 'tutor')
     return jsonify({
         'ok': True,
-        'recommended_trail': trail.to_dict(include_courses=True) if trail else None,
+        'recommended_trail': _trail_dict_scoped(trail, user, is_staff) if trail else None,
     })
 
 
