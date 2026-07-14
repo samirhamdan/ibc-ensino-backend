@@ -80,6 +80,7 @@ body.focus-mode .topbar-subtitle {
 }
 
 .lesson-completed-check {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -90,6 +91,58 @@ body.focus-mode .topbar-subtitle {
   background: linear-gradient(135deg, var(--success-500, #1fa96a), var(--success-700, #0f7a4a));
   color: #fff;
   box-shadow: 0 0 0 1px rgba(31,169,106,.15), 0 0 26px rgba(31,169,106,.4);
+}
+
+/* P1.5 (GAM-05 PR 3): micro-interação de celebração — dispara UMA vez por
+   evento real de conclusão (a classe é adicionada só dentro de
+   showLessonCompletedPanel(), chamada só quando o quiz muda de
+   reprovado→aprovado; um recarregamento de página nunca recria o painel
+   sozinho, então a animação nunca "reaparece" sem uma conclusão nova).
+   Scale + 2 partículas simples usando --brand-primary (identidade do
+   tenant, não uma cor fixa da plataforma), ~800ms, desligada com
+   prefers-reduced-motion. */
+@keyframes dash-celebrate-pop {
+  0%   { transform: scale(.55); }
+  55%  { transform: scale(1.14); }
+  100% { transform: scale(1); }
+}
+@keyframes dash-celebrate-particle {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dash-cel-x, 24px), var(--dash-cel-y, -24px)) scale(0); opacity: 0; }
+}
+.lesson-completed-check--celebrate {
+  animation: dash-celebrate-pop 800ms var(--ease-spring, cubic-bezier(.34, 1.56, .64, 1));
+}
+.lesson-completed-check--celebrate::before,
+.lesson-completed-check--celebrate::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand-primary);
+  animation: dash-celebrate-particle 800ms ease-out forwards;
+  pointer-events: none;
+}
+.lesson-completed-check--celebrate::before { --dash-cel-x: -30px; --dash-cel-y: -26px; }
+.lesson-completed-check--celebrate::after  { --dash-cel-x: 30px;  --dash-cel-y: -26px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lesson-completed-check--celebrate {
+    animation: none;
+  }
+  /* Achado da revisão Fable 5: as partículas só ficam invisíveis por
+     TERMINAREM a animação em opacity:0 (forwards) — com animation:none
+     elas nunca "terminam", então sem isto ficariam permanentemente
+     visíveis (dois pontinhos ao lado do ícone) pra quem usa
+     prefers-reduced-motion, o oposto do que a preferência pede. */
+  .lesson-completed-check--celebrate::before,
+  .lesson-completed-check--celebrate::after {
+    animation: none;
+    opacity: 0;
+  }
 }
 
 .lesson-completed-title {

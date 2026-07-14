@@ -38,6 +38,7 @@
 <link rel="stylesheet" href="css/components/login.css">
 <link rel="stylesheet" href="css/components/micro.css">
 <link rel="stylesheet" href="css/components/toast.css">
+<link rel="stylesheet" href="css/components/tooltip.css">
 <link rel="stylesheet" href="css/components/hero.css">
 <link rel="stylesheet" href="css/components/trails.css">
 <link rel="stylesheet" href="css/components/onboarding.css">
@@ -221,7 +222,7 @@
 <div id="screen-main" class="screen" style="flex-direction:column">
   <div class="topbar">
     <div class="topbar-left">
-      <button class="sidebar-hamburger" id="sidebarHamburger" onclick="toggleSidebar()" aria-label="Abrir menu" title="Menu">
+      <button class="sidebar-hamburger" id="sidebarHamburger" onclick="toggleSidebar()" aria-label="Abrir menu" title="Menu" data-tooltip="Menu">
         <svg class="icon" width="22" height="22" viewBox="0 0 24 24"><use href="#icon-menu"></use></svg>
       </button>
       <div class="topbar-logo-box"><img src="images/logo-ibc.png" alt="Escola da IBC"></div>
@@ -232,14 +233,14 @@
     <div class="topbar-user">
       <button id="continueBtn" class="btn-gold" style="display:none;padding:.35rem .9rem;font-size:.78rem;border-radius:6px" onclick="continueLastLesson()"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-play"></use></svg> Continuar</button>
       <span id="timerDisplay" class="timer-display" style="display:none" title="Tempo de estudo nesta aula">00:00</span>
-      <button class="topbar-icon-btn" id="studyTimerToggle" onclick="toggleStudyTimer()" title="Cronômetro de estudo">
+      <button class="topbar-icon-btn" id="studyTimerToggle" onclick="toggleStudyTimer()" title="Cronômetro de estudo" data-tooltip="Cronômetro de estudo" aria-label="Cronômetro de estudo">
         <svg class="icon" width="22" height="22" viewBox="0 0 24 24"><use href="#icon-clock"></use></svg>
       </button>
-      <button class="topbar-icon-btn" id="focusToggle" onclick="toggleFocusMode()" title="Modo foco">
+      <button class="topbar-icon-btn" id="focusToggle" onclick="toggleFocusMode()" title="Modo foco" data-tooltip="Modo foco" aria-label="Ativar modo foco">
         <svg class="icon" width="22" height="22" viewBox="0 0 24 24"><use href="#icon-eye"></use></svg>
       </button>
       <div style="position:relative">
-        <button class="topbar-bell" id="topbar-bell-btn" onclick="toggleNotificationsDropdown()" title="Notificações">
+        <button class="topbar-bell" id="topbar-bell-btn" onclick="toggleNotificationsDropdown()" title="Notificações" data-tooltip="Notificações" aria-label="Ver notificações" aria-haspopup="true">
           <svg class="icon" width="20" height="20" viewBox="0 0 24 24"><use href="#icon-bell"></use></svg>
           <span class="bell-badge hidden" id="bell-badge-count">0</span>
         </button>
@@ -1438,7 +1439,7 @@ function showLessonCompletedPanel(nextLesson){
   panel.className = 'lesson-completed-panel';
   panel.innerHTML = `
     <div class="lesson-completed-card">
-      <div class="lesson-completed-check">${icon('checkmark-circle','40','icon--success')}</div>
+      <div class="lesson-completed-check lesson-completed-check--celebrate">${icon('checkmark-circle','40','icon--success')}</div>
       <h2 class="lesson-completed-title">Aula concluída!</h2>
       <p class="lesson-completed-msg">Parabéns, você avançou para a próxima etapa.</p>
       <div class="lesson-completed-next">
@@ -4285,6 +4286,23 @@ function _dashSaasSkeleton(){
           <div class="dash-saas-skeleton dash-saas-skeleton--bloco"></div>`;
 }
 
+// P1.1 (GAM-05 PR 3): helper único pro estado "vazio" dos 5 grupos —
+// antes cada grupo duplicava a mesma estrutura de markup (dash-saas-vazio
+// + msg + cta opcional) com tom variando de "convidativo" a puramente
+// informativo/robótico. Centraliza aqui pra manter tom e estrutura
+// consistentes; grupos que precisam de um ícone silhueta (ex.: conquista
+// bloqueada) passam `iconeClasse`.
+function _dashSaasVazio(iconeNome, msgHtml, ctaHtml, iconeClasse){
+  const iconeHtml = iconeNome
+    ? `<div class="dash-saas-vazio-icone${iconeClasse ? ' ' + iconeClasse : ''}">${icon(iconeNome,'28')}</div>`
+    : '';
+  return `<div class="dash-saas-vazio">
+      ${iconeHtml}
+      <div class="dash-saas-vazio-msg">${msgHtml}</div>
+      ${ctaHtml || ''}
+    </div>`;
+}
+
 function _dashSaasErro(retryFn){
   return `<div class="dash-saas-erro">
       <div>${icon('x-circle','24','icon--x-circle')}</div>
@@ -4421,11 +4439,9 @@ function _dashSaasRenderContinuar(d){
   if(!ip){
     elx.innerHTML = `
       <div class="dash-saas-grupo-titulo">${icon('target','14')} Continue seus estudos</div>
-      <div class="dash-saas-vazio">
-        <div class="dash-saas-vazio-icone">${icon('book','28')}</div>
-        <div class="dash-saas-vazio-msg">Você ainda não começou nenhum curso.</div>
-        <button class="btn btn-primary btn-sm" onclick="showPanel('courses')">${icon('catalog','14')} Ver catálogo</button>
-      </div>`;
+      ${_dashSaasVazio('book',
+        'Sua jornada começa aqui — escolha um curso do catálogo e dê o primeiro passo.',
+        `<button class="btn btn-primary btn-sm" onclick="showPanel('courses')">${icon('catalog','14')} Ver catálogo</button>`)}`;
     return;
   }
 
@@ -4492,9 +4508,9 @@ function _dashSaasRenderPontuacao(d){
       <div class="dash-saas-badge-recente${_dashSaasBadgeEhNova(t.date)?' dash-saas-badge-recente--nova':''}" title="${_dashSaasEscAttr(t.name)}">
         <div class="emoji">${_dashSaasEscAttr(t.icon)||'🏅'}</div>
         <span class="nome">${_dashSaasEscAttr(t.name)}</span>
-      </div>`).join('')}</div>` : `<div class="dash-saas-vazio" style="padding:var(--space-md) 0">
-        <div class="dash-saas-vazio-msg">Suas conquistas aparecem aqui.</div>
-      </div>`}`;
+      </div>`).join('')}</div>` : _dashSaasVazio('achievements',
+        'Complete sua primeira lição para ganhar a conquista <strong>Primeiro Passo</strong>.',
+        '', 'dash-saas-vazio-icone--conquista')}`;
 }
 
 function _dashSaasRenderMetas(d){
@@ -4513,9 +4529,8 @@ function _dashSaasRenderMetas(d){
     elx.innerHTML = `
       <div class="dash-saas-grupo-titulo">${icon('lightbulb','14','icon--lightbulb')} Próximas metas</div>
       ${revisaoHtml}
-      <div class="dash-saas-vazio">
-        <div class="dash-saas-vazio-msg">Nenhuma meta pendente — explore as recomendações abaixo.</div>
-      </div>`;
+      ${_dashSaasVazio('lightbulb',
+        'Nenhuma meta pendente por aqui — dê uma olhada nas recomendações abaixo para continuar avançando.')}`;
     return;
   }
 
@@ -4547,9 +4562,8 @@ function _dashSaasRenderRecomendacoes(d){
   if(!cursos.length){
     elx.innerHTML = `
       <div class="dash-saas-grupo-titulo">${icon('catalog','14')} Recomendações</div>
-      <div class="dash-saas-vazio">
-        <div class="dash-saas-vazio-msg">Novos cursos aparecem aqui assim que forem publicados.</div>
-      </div>`;
+      ${_dashSaasVazio('catalog',
+        'Novidades chegando em breve — volte aqui assim que novos cursos forem publicados.')}`;
     return;
   }
 
@@ -5265,14 +5279,23 @@ async function renderSidebarTrails(){
       el.innerHTML = `<div class="sidebar-empty">Nenhuma trilha iniciada<br><a onclick="navigateToTrilhas()">Conhecer trilhas →</a></div>`;
       return;
     }
-    el.innerHTML = all.map(t=>`
+    el.innerHTML = all.map(t=>{
+      // P1.2 (GAM-05 PR 3): nome completo (sem truncar em 1 linha) vira
+      // tooltip via title= — precisa do MESMO escape usado em atributo
+      // (_dashSaasEscAttr, aspas quebram o atributo mesmo sem `<`/`>`), e o
+      // texto visível some do line-clamp de 2 linhas via CSS, não corta o
+      // nome inteiro num único onclick de leitura.
+      const nomeCurto = t.name.replace(/^Trilha (de |do |da )?/i,'');
+      const nomeEscapado = _dashSaasEscAttr(`${t.icon} ${nomeCurto}`);
+      return `
       <div class="sidebar-trail-item ${t.id===my.focused_trail_id?'focused':''}" onclick="focusTrail(${t.id})">
-        <span class="sidebar-trail-name">${t.icon} ${t.name.replace(/^Trilha (de |do |da )?/i,'')}</span>
+        <span class="sidebar-trail-name" title="${nomeEscapado}">${nomeEscapado}</span>
         <div class="sidebar-trail-progress">
           <div class="progress progress-sm"><div class="progress-bar" style="width:${t.percentage}%"></div></div>
           <span class="sidebar-trail-pct">${t.percentage}%</span>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   } catch(e){}
 }
 

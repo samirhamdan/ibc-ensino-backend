@@ -601,3 +601,117 @@ def test_botao_ver_catalogo_usa_gradiente_do_tenant(servidor_vivo, browser, seed
         'botão ainda usa o gradiente fixo da plataforma (--gradient-btn), não o do tenant')
 
     page.close()
+
+
+def test_celebracao_dispara_uma_vez_por_conclusao_real_e_nao_reaparece_no_reload(
+        app, servidor_vivo, browser, seeded):
+    """GAM-05 PR 3 (P1.5): a micro-interação de celebração (scale + 2
+    partículas em --brand-primary) precisa disparar num evento REAL de
+    conclusão — não em qualquer re-render do dashboard — e não pode
+    reaparecer sozinha num reload/re-render sem uma conclusão nova.
+
+    Prova end-to-end: usa um aluno com progresso zerado (`fresh` via
+    registro direto, não o `aluno` compartilhado — outros testes desta
+    suíte já usam esse usuário e podem deixar a aula 1 concluída),
+    responde e envia o quiz de verdade (POST real pra
+    /api/courses/<id>/aulas/<n>/submit-quiz) através da própria função
+    submitAulaQuiz() do app — não injeta o painel nem a classe via DOM.
+    Confirma que a classe de celebração aparece no card certo, então
+    recarrega a página e confirma que ela NÃO existe em lugar nenhum sem
+    um novo evento de conclusão."""
+    from extensions import db
+    from models import User
+    from core.tenancy import TenantUser
+
+    email = 'celebra@test.com'
+    with app.app_context():
+        existente = User.query.filter_by(email=email).first()
+        if existente:
+            TenantUser.query.filter_by(user_id=existente.id).delete()
+            db.session.delete(existente)
+            db.session.commit()
+
+    page = browser.new_page(viewport={'width': 1280, 'height': 900})
+    page.goto(servidor_vivo + '/')
+
+    # Registro direto via API (evita depender do formulário de cadastro
+    # do SPA, que não é o objeto deste teste) — mas o login em seguida
+    # É feito pelo navegador de verdade, como qualquer usuário faria.
+    page.evaluate(f"""
+        () => fetch('/api/auth/register', {{
+            method: 'POST', headers: {{'Content-Type': 'application/json'}},
+            body: JSON.stringify({{name: 'Aluno Celebra', email: '{email}',
+                                   password: 'senha123', confirm_password: 'senha123'}})
+        }})
+    """)
+
+    page.goto(servidor_vivo + '/')
+    # Segundo goto na mesma page reintroduz a UI de login do zero (a tela
+    # some enquanto o app aguarda GET /api/auth/user pra decidir se mostra
+    # login ou dashboard) — espera ficar visível antes de preencher, senão
+    # o fill corre uma race real contra esse fetch inicial.
+    page.wait_for_selector('#login-email', state='visible', timeout=15000)
+    page.fill('#login-email', email)
+    page.fill('#login-pass', 'senha123')
+    page.press('#login-pass', 'Enter')
+    page.wait_for_selector('#dash-saas-continuar', timeout=8000)
+
+    course_id = seeded['course_id']
+    # Abre a Aula 1 do curso semeado (2 questões, resposta correta = índice 1)
+    # através da própria função do app (loadAula), como o clique em
+    # "Continuar lição"/carrossel faria.
+    # Usuário recém-registrado dispara o modal de onboarding, que fica
+    # sobreposto ao dashboard/quiz e intercepta cliques (achado real deste
+    # teste, não do fluxo de conclusão) — fecha como o usuário faria.
+    page.evaluate("""
+      try { closeOnboardingModal(); } catch(e) {}
+      document.querySelectorAll('.modal,[id*=modal],.onboarding-modal').forEach(m=>m.remove());
+    """)
+
+    page.evaluate(f"loadAula({course_id}, 1)")
+    page.wait_for_selector('#aqcard-0 .option', timeout=8000)
+
+    # Responde as 2 questões com a opção correta (índice 1, ver conftest.seeded)
+    for qi in range(2):
+        page.click(f'#aqcard-{qi} .option >> nth=1')
+
+    page.click('button:has-text("Enviar respostas")')
+
+    # submitAulaQuiz() dispara showLessonCompletedPanel() com um
+    # setTimeout(1300ms) quando a aula é aprovada pela primeira vez.
+    page.wait_for_selector('.lesson-completed-check--celebrate', timeout=5000)
+    assert page.locator('.lesson-completed-check--celebrate').count() == 1, \
+        'classe de celebração não apareceu no card de "Aula concluída" após conclusão real'
+
+    # Fecha o painel (fluxo normal do usuário) e recarrega a página sem
+    # gerar NENHUM evento de conclusão novo — a celebração não pode
+    # reaparecer sozinha num re-render/reload.
+    page.evaluate('closeLessonCompletedPanel()')
+    page.reload()
+    # A sessão (cookie) segue válida depois do reload — o app vai direto
+    # pro dashboard, sem tela de login. Preencher #login-email/#login-pass
+    # aqui é bug do teste: esses campos nunca aparecem pra um usuário já
+    # autenticado, e o fill trava até estourar o timeout esperando um
+    # formulário que corretamente não é mostrado.
+    page.wait_for_selector('#dash-saas-continuar', timeout=8000)
+    page.wait_for_timeout(500)
+
+    assert page.locator('.lesson-completed-check--celebrate').count() == 0, \
+        'classe de celebração reapareceu num reload sem conclusão nova — deveria só existir ' \
+        'no card criado por um evento real de conclusão'
+
+    page.close()
+    with app.app_context():
+        from models import User
+        from core.tenancy import TenantUser
+        u = User.query.filter_by(email=email).first()
+        if u:
+            # TenantUser não tem cascade de FK — apagar só o User deixa a
+            # linha órfã em tenant_users. Sem isto, o próximo teste que
+            # criar um usuário reaproveitando o mesmo id (SQLite reusa
+            # rowid livre) esbarra num UNIQUE constraint (tenant_id,
+            # user_id) alheio, quebrando um teste que não tem nada a ver
+            # com celebração (achado real ao rodar a suíte inteira).
+            TenantUser.query.filter_by(user_id=u.id).delete()
+            db.session.delete(u)
+            db.session.commit()

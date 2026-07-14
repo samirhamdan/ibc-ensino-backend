@@ -235,12 +235,24 @@
 }
 .sidebar-trail-item:hover { background: var(--primary-lighter, rgba(0,142,168,0.08)); }
 .sidebar-trail-item.focused { background: rgba(0,142,168,0.1); }
+/* P1.2 (GAM-05 PR 3): nome comprido não trunca mais em 1 linha com
+   ellipsis — quebra em até 2 linhas (line-clamp) e ganha tooltip (title=
+   no HTML, index.html::renderSidebarTrails) pra quem precisar do nome
+   inteiro sem quebra. */
 .sidebar-trail-name {
   font-size: var(--text-sm); font-weight: 600; color: var(--gray-dark);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
 }
 .sidebar-trail-progress { display: flex; align-items: center; gap: 8px; }
-.sidebar-trail-progress .progress { flex: 1; height: 5px; }
+/* P1.2: barra de progresso da trilha em 6px, preenchimento na cor de
+   marca do tenant (--brand-primary) — antes herdava a cor genérica de
+   .progress-bar (não reagia ao tema do tenant). */
+.sidebar-trail-progress .progress { flex: 1; height: 6px; }
+.sidebar-trail-progress .progress-bar { background: var(--brand-primary); }
 .sidebar-trail-pct { font-size: var(--text-xs); color: var(--gray); font-weight: 600; }
 
 /* ── Trails page (Sprint 2.1) ── */

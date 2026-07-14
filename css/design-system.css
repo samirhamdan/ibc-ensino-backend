@@ -122,6 +122,17 @@
   --text-xl:  2rem;
   --text-lg:  1.5rem;
 
+  /* GAM-05 PR 3 (P1.4): escala explícita 14/16/20/28/40/56px pedida pro
+     polimento do dashboard. 14/16px já existiam (--text-sm/--text-base),
+     40/56px também já existiam (--text-2xl/--text-display-xl) — só 20px e
+     28px faltavam como degrau nomeado (existia --text-h4 em 1.3rem/20.8px,
+     perto mas não exato). Nomes numéricos de propósito (não "-md"/"-xl2"
+     etc.): ver o achado documentado acima sobre --text-5xl/--text-6xl não
+     aplicarem em font-size neste ambiente de teste — evita reintroduzir
+     esse padrão de nome por engano. */
+  --text-20: 1.25rem;  /* 20px */
+  --text-28: 1.75rem;  /* 28px */
+
   /* Escala tipográfica corajosa (rev 2) */
   --text-h1: 3.4rem;
   --text-h2: 2.2rem;
