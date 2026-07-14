@@ -40,7 +40,12 @@ def test_migracao_0017_overdue_desde_reversivel():
         con.close()
         assert 'overdue_desde' in cols
 
-        r = subprocess.run([sys.executable, '-m', 'alembic', 'downgrade', '-1'],
+        # Downgrade até a revisão IMEDIATAMENTE ANTERIOR a 0017 (não
+        # `-1` relativo ao head atual — desde a PR 4, 0018 é o head, e
+        # `-1` relativo pararia em 0017, que ainda TEM a coluna; o teste
+        # é sobre a reversibilidade de 0017 especificamente).
+        r = subprocess.run([sys.executable, '-m', 'alembic', 'downgrade',
+                            '0016_billing_webhook_events'],
                            capture_output=True, text=True, env=env, cwd=repo_root)
         assert r.returncode == 0, r.stderr
         con = sqlite3.connect(path)

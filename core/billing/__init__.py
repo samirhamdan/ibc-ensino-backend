@@ -13,5 +13,9 @@ de IA entram nas próximas PRs do módulo.
 """
 from core.billing.models import Subscription, AiUsage, WebhookEvent
 from core.billing.plans import PLANOS, Plano, get_plan
+from core.billing.metering import registrar_interacao_ia, consumo_do_tenant, checar_cota
 
-__all__ = ['Subscription', 'AiUsage', 'WebhookEvent', 'PLANOS', 'Plano', 'get_plan']
+__all__ = [
+    'Subscription', 'AiUsage', 'WebhookEvent', 'PLANOS', 'Plano', 'get_plan',
+    'registrar_interacao_ia', 'consumo_do_tenant', 'checar_cota',
+]

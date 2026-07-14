@@ -69,13 +69,50 @@ D_SUSPENSO = 30
 def _candidatos_overdue():
     """Linhas cruas (sem RLS/GUC — não há g.tenant no job) de subscriptions
     overdue com `overdue_desde` conhecido. Ver nota de RLS/GUC no topo do
-    arquivo: NUNCA `Subscription.query.filter_by(...)` aqui."""
+    arquivo: NUNCA `Subscription.query.filter_by(...)` aqui.
+
+    Exclui tenants com `regua_pausada=True` (PR 4, BIL-03): override manual
+    do operador pra negociação em andamento — ver docs/OPS-BILLING.md
+    "Pausar a régua para negociação". `:pausada` é passado como parâmetro
+    (não interpolado) pra funcionar nos dois dialetos (Postgres booleano
+    nativo, SQLite 0/1) sem SQL condicional por dialect."""
     with db.engine.connect() as conn:
         rows = conn.execute(
             text("SELECT id, tenant_id, overdue_desde FROM subscriptions "
-                 "WHERE status = 'overdue' AND overdue_desde IS NOT NULL")
+                 "WHERE status = 'overdue' AND overdue_desde IS NOT NULL "
+                 "AND (regua_pausada IS NULL OR regua_pausada = :pausada)"),
+            {'pausada': False},
         ).fetchall()
     return list(rows)
+
+
+def pausar_regua(tenant_id, pausar=True):
+    """Override do operador (docs/OPS-BILLING.md): pausa/retoma a régua de
+    inadimplência para UM tenant específico, tipicamente durante negociação
+    de pagamento. Não altera billing_status/status — só faz
+    `_candidatos_overdue` ignorar este tenant enquanto `pausar=True`. Uso
+    esperado: `flask shell` / script de operador (nenhuma rota HTTP nesta
+    PR — a única superfície é este helper, mesmo nível de acesso que os
+    outros scripts operacionais deste módulo, ver scripts/regua_cobranca.py).
+    Retorna a Subscription atualizada ou None se o tenant não tiver uma.
+
+    Mesmo cuidado de GUC/RLS do resto deste arquivo: quem chama isto (shell
+    de operador, script) não necessariamente tem `g.tenant` setado pro
+    tenant certo (pode não haver request nenhum) — `set_current_tenant` +
+    `rollback` antes da consulta ORM garante que a transação abre com o GUC
+    do tenant CERTO, não o padrão/mono-tenant."""
+    tenant = Tenant.query.get(tenant_id)   # tenants não tem RLS — seguro direto
+    if tenant is None:
+        return None
+    set_current_tenant(tenant)
+    db.session.rollback()
+
+    sub = Subscription.query.filter_by(tenant_id=tenant_id).first()
+    if sub is None:
+        return None
+    sub.regua_pausada = bool(pausar)
+    db.session.commit()
+    return sub
 
 
 def _admin_email(tenant_id):

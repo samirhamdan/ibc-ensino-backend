@@ -51,6 +51,14 @@ class Subscription(TenantScopedModel, db.Model):
     # data em que o status virou 'overdue' pela última vez (None se nunca
     # esteve/não está mais overdue) — ver nota no topo do arquivo.
     overdue_desde = db.Column(db.Date, nullable=True)
+    # PR 4 (BIL-03): override manual do operador (docs/OPS-BILLING.md
+    # "pausar a régua para negociação") — enquanto True, core/billing/
+    # regua.py::_candidatos_overdue ignora este tenant mesmo estando
+    # 'overdue' há mais de D+10/D+30. NÃO altera billing_status/status por
+    # si só (só impede a régua de agir); voltar a False não reaplica
+    # retroativamente nenhuma transição perdida — a régua reavalia a partir
+    # do estado ATUAL na próxima execução, mesma idempotência de sempre.
+    regua_pausada = db.Column(db.Boolean, nullable=False, default=False)
     criado_em = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     atualizado_em = db.Column(db.DateTime, nullable=False, default=datetime.utcnow,
                               onupdate=datetime.utcnow)
@@ -69,6 +77,7 @@ class Subscription(TenantScopedModel, db.Model):
             'ciclo': self.ciclo,
             'proximo_vencimento': self.proximo_vencimento.isoformat() if self.proximo_vencimento else None,
             'overdue_desde': self.overdue_desde.isoformat() if self.overdue_desde else None,
+            'regua_pausada': self.regua_pausada,
         }
 
 
@@ -118,6 +127,12 @@ class AiUsage(TenantScopedModel, db.Model):
     tokens_entrada = db.Column(db.Integer, nullable=False, default=0)
     tokens_saida = db.Column(db.Integer, nullable=False, default=0)
     custo_estimado = db.Column(db.Numeric(10, 4), nullable=False, default=0)
+    # PR 4 (BIL-03): já publicamos 'ai.cota_80pct' PARA ESTE período? Evita
+    # reenviar o evento a cada interação subsequente enquanto o tenant segue
+    # entre 80% e 100% da cota — ver core/billing/metering.py::checar_cota.
+    # Por linha de `ai_usage` (1 por tenant+período): reseta sozinho a cada
+    # novo mês, já que um período novo é uma linha nova (default False).
+    alerta_80pct_enviado = db.Column(db.Boolean, nullable=False, default=False)
     criado_em = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     __table_args__ = (
@@ -134,4 +149,5 @@ class AiUsage(TenantScopedModel, db.Model):
             'tokens_entrada': self.tokens_entrada,
             'tokens_saida': self.tokens_saida,
             'custo_estimado': float(self.custo_estimado or 0),
+            'alerta_80pct_enviado': self.alerta_80pct_enviado,
         }

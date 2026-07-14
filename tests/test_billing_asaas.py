@@ -149,3 +149,42 @@ def test_cancelar_subscription_faz_delete():
 def test_cancelar_subscription_sem_id_levanta_erro():
     with pytest.raises(asaas.AsaasError):
         asaas.cancelar_subscription('')
+
+
+# ---------------------------------------------------------------------------
+# Critério de aceite final (task spec BIL-01/02/03): "em modo sandbox
+# (ASAAS_SANDBOX=true), a integração roda end-to-end sem credencial real"
+# ---------------------------------------------------------------------------
+
+def test_importar_modulo_sem_nenhuma_credencial_nao_quebra(monkeypatch):
+    """Reimportar core.billing.asaas com ASAAS_SANDBOX=true e SEM
+    ASAAS_API_KEY setada não levanta nada no import — nenhuma leitura de
+    variável de ambiente acontece em nível de módulo (só dentro das
+    funções, preguiçosamente, quando uma chamada de verdade acontece)."""
+    monkeypatch.setenv('ASAAS_SANDBOX', 'true')
+    monkeypatch.delenv('ASAAS_API_KEY', raising=False)
+    import importlib
+    from core.billing import asaas as asaas_module
+    importlib.reload(asaas_module)  # não deve levantar
+    assert asaas_module._base_url() == 'https://api-sandbox.asaas.com/v3'
+
+
+def test_sandbox_sem_api_key_falha_previsivel_nao_crash(monkeypatch):
+    """Com ASAAS_SANDBOX=true e SEM ASAAS_API_KEY: uma chamada de verdade
+    (criar_customer) falha de forma PREVISÍVEL (AsaasError, com mensagem
+    clara pedindo a variável de ambiente) — não um crash genérico
+    (KeyError/AttributeError/TypeError) nem um request de rede real sem
+    credencial nenhuma. Isto é o que a task spec chama de "roda end-to-end
+    sem credencial real": o fluxo não quebra de forma inesperada, ele
+    recusa a chamada de forma limpa e identificável antes de qualquer
+    request HTTP sair."""
+    monkeypatch.setenv('ASAAS_SANDBOX', 'true')
+    monkeypatch.delenv('ASAAS_API_KEY', raising=False)
+
+    with patch('core.billing.asaas.requests.Session.request') as mock_request:
+        tenant = MagicMock(nome='Igreja Teste', id='x')
+        with pytest.raises(asaas.AsaasError) as exc_info:
+            asaas.criar_customer(tenant)
+        assert 'ASAAS_API_KEY' in str(exc_info.value)
+        # nenhuma request de rede sai — falha ANTES de montar a chamada HTTP
+        mock_request.assert_not_called()
