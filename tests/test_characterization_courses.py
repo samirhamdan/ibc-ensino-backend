@@ -22,6 +22,38 @@ def test_anonimo_lista_publicados(client, seeded):
     assert seeded['course_id'] in ids
 
 
+def test_anonimo_nao_lista_curso_interno(app, aluno, seeded):
+    """Correção de docs/DEBITOS.md #8: catálogo vazava título/resumo de
+    curso acesso='interno' pra anônimo (só o detalhe, GET /<id>, já
+    bloqueava). Um autenticado qualquer continua vendo — get_course()
+    já libera 'interno' pra qualquer sessão logada, não só matriculados.
+
+    Nota: `aluno` reusa o mesmo test client de `client` (login por cima
+    dele) — pedir os dois na mesma assinatura faria a requisição
+    "anônima" sair já autenticada. Usa app.test_client() direto pro
+    caso anônimo."""
+    with app.app_context():
+        from extensions import db
+        from models import Course
+        course = Course.query.get(seeded['course_id'])
+        course.acesso = 'interno'
+        db.session.commit()
+    try:
+        anonimo = app.test_client()
+        ids_anon = [c['id'] for c in anonimo.get('/api/courses').get_json()]
+        assert seeded['course_id'] not in ids_anon
+
+        ids_aluno = [c['id'] for c in aluno.get('/api/courses').get_json()]
+        assert seeded['course_id'] in ids_aluno
+    finally:
+        with app.app_context():
+            from extensions import db
+            from models import Course
+            course = Course.query.get(seeded['course_id'])
+            course.acesso = 'publico'
+            db.session.commit()
+
+
 def test_detalhe_curso_com_modulos_e_quiz_sem_gabarito(aluno, seeded):
     r = aluno.get(f"/api/courses/{seeded['course_id']}")
     assert r.status_code == 200

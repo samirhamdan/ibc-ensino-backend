@@ -80,7 +80,15 @@ def test_tenant_user_papel_por_tenant(app, seeded):
         with pytest.raises(IntegrityError):
             db.session.commit()
         db.session.rollback()
+
+        # Restaura o baseline do fixture `seeded` (vínculo 'aluno' no tenant
+        # padrão) em vez de só apagar — `aluno` é compartilhado (session-
+        # scoped) por toda a suíte; sem isto, login de aluno@test.com em
+        # QUALQUER teste que rodar depois deste (em qualquer arquivo) falha
+        # com 403 "sem acesso ao tenant" (achado real: só apareceu quando um
+        # teste de outro arquivo, alfabeticamente depois, tentou logar).
         TenantUser.query.filter_by(user_id=uid).delete()
+        db.session.add(TenantUser(tenant_id=ibc.id, user_id=uid, papel='aluno'))
         db.session.commit()
 
 

@@ -1417,6 +1417,17 @@ async function submitAulaQuiz(){
     if(aulaQuizFeedback.new_achievements && aulaQuizFeedback.new_achievements.length){
       setTimeout(()=>showAchievementPopups(aulaQuizFeedback.new_achievements), 900);
     }
+    // Trilha concluída (correção H1, revisão de release): o award agora
+    // acontece no servidor no instante em que o curso completa uma
+    // trilha — aqui só é a notificação visual, não o gatilho.
+    if(aulaQuizFeedback.trail_completions && aulaQuizFeedback.trail_completions.length){
+      aulaQuizFeedback.trail_completions.forEach((t,i)=>{
+        setTimeout(()=>{
+          if(t.new_badge) showTrophyModal(t.new_badge.icon, t.new_badge.name, t.new_badge.description);
+          showToast(`🏁 Trilha "${escapeHtml(t.trail_name)}" concluída! +${t.xp_bonus} pontos de bônus 🎉`, 'xp');
+        }, 1600 + i*1200);
+      });
+    }
     renderAulaPage();
     if(aulaQuizFeedback.passed && !wasPassedBefore && aulaQuizFeedback.next_lesson){
       setTimeout(()=>showLessonCompletedPanel(aulaQuizFeedback.next_lesson), 1300);
@@ -5161,9 +5172,19 @@ async function loadTrailsSection(container){
       }
     } catch(e){}
     renderTrailProgress(container, trail, extra);
-    if(trail.new_badge){
-      showTrophyModal(trail.new_badge.icon, trail.new_badge.name, trail.new_badge.description);
-      showToast(`⭐ +${trail.xp_bonus} pontos de bônus da Trilha! 🎉`, 'xp');
+    // O GET só informa "completed" — quem premia (XP/badge) é o POST
+    // dedicado, idempotente (correção de segurança: GET nunca muta estado).
+    if(trail.completed){
+      try{
+        const claimRes = await api('POST', '/trails/active/claim');
+        if(claimRes.ok){
+          const claim = await claimRes.json();
+          if(claim.completed_now){
+            if(claim.new_badge) showTrophyModal(claim.new_badge.icon, claim.new_badge.name, claim.new_badge.description);
+            showToast(`⭐ +${claim.xp_bonus} pontos de bônus da Trilha! 🎉`, 'xp');
+          }
+        }
+      } catch(e){}
     }
   }
 }

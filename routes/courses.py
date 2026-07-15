@@ -44,6 +44,13 @@ def list_courses():
     query = Course.query.filter_by(tenant_id=current_tenant_id())
     if not user or role_no_tenant(user) not in ('admin', 'tutor'):
         query = query.filter_by(status='published')
+        # docs/DEBITOS.md #8: catálogo público vazava título/resumo de
+        # cursos acesso='interno' pra ANÔNIMO (o detalhe, GET /<id>, já
+        # bloqueava — só a listagem não). get_course() já libera 'interno'
+        # pra qualquer autenticado (não exige matrícula), então o mesmo
+        # corte vale aqui: exige só estar logado, não um papel específico.
+        if not user:
+            query = query.filter(Course.acesso != 'interno')
 
     category = request.args.get('category')
     if category:

@@ -58,6 +58,7 @@ TENANT_SCOPED = {
     'trails.my_trails': 'test_progress_isolation.py::test_matricula_em_trilha_nao_vaza',
     'trails.enroll_trail': 'test_progress_isolation.py::test_matricula_em_trilha_nao_vaza',
     'trails.active_trail': 'test_progress_isolation.py::test_matricula_em_trilha_nao_vaza',
+    'trails.claim_active_trail_completion': 'test_progress_isolation.py::test_matricula_em_trilha_nao_vaza',
     'trails.focus_trail': 'test_progress_isolation.py::test_matricula_em_trilha_nao_vaza',
     'onboarding.submit_onboarding': 'test_progress_isolation.py::test_onboarding_answer_por_tenant',
     'aluno.save_study_time': 'test_progress_isolation.py::test_progresso_de_aula_nao_desbloqueia_em_outro_tenant',
