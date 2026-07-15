@@ -130,8 +130,12 @@ def create_app(config_name='development'):
         from core.tenancy.rls import init_rls
         init_rls()
         
-        # Criar tabelas
-        db.create_all()
+        # Criar tabelas — só fora de produção. Em produção o schema é
+        # responsabilidade exclusiva do Alembic (`alembic upgrade head` no
+        # preDeployCommand do railway.json); um create_all() aqui mascararia
+        # silenciosamente uma migração esquecida em vez de falhar o boot.
+        if not is_production:
+            db.create_all()
         
         # Registrar blueprints (rotas)
         from routes.auth import auth_bp
