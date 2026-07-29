@@ -183,6 +183,95 @@ Os dados já existem: `UserPoints.last_activity_date` (`models.py:430`, tipo Dat
 
 O `course-card-v2` (`_courseCardV2`, `:4419` + `course-cards.css:200-308`) **já tem** `:hover{transform:translateY(-4px);box-shadow:...}` e `scale(1.12)` no ícone. A repaginação toca: (1) trocar `translateY` por `scale(1.04)` com `z-index` no hover para "saltar" sobre vizinhos; (2) overlay de ação ("Continuar/Começar") revelado no hover; (3) ajustar o grid para o card ampliado não ser cortado. **Riscos:** layout shift (usar `transform`, não `width/height`; talvez `overflow:visible` no grid); mobile/touch não tem `:hover` (fallback sempre-visível <768px); a11y (é a oportunidade de converter o `<div onclick>` em elemento focável).
 
+## 2.8 Repaginação da página de curso e do player de aula
+
+Origem: análise comparativa com a UX do **Canva Design School** (jul/2026), tomada
+como referência de mercado para consumo de vídeo-aula. Os itens abaixo são
+independentes entre si; os quatro primeiros (A2, C1, C4, A1/A4) **não tocam o
+banco**. Do C2/A3/C3 em diante entram migrações Alembic reversíveis e casos de
+isolamento, conforme as regras do CLAUDE.md.
+
+**Diagnóstico.** Duas divergências estruturais entre o que temos e a referência:
+
+1. **A página do curso fatia por tipo de conteúdo, não por aula.** `renderCourse()`
+   (`index.html:1555`) entrega 5 abas — Resumo · Módulos · Material · Exercícios ·
+   Perguntas — e transfere ao aluno a decisão de para onde ir. A referência entrega
+   **um** CTA de retomada e um accordion por aula, que é a unidade em que o aluno
+   pensa.
+2. **O player não tem noção de percurso.** `renderAulaPage()` (`index.html:1019`)
+   empilha 3 cards (Vídeo → Material → Exercício) no layout normal; não há índice,
+   nem "quanto falta", nem saída explícita.
+
+### Página do curso
+
+- **C1 — Hero + CTA único de retomada.** *Esforço B / Impacto A.* Botão primário
+  "Continuar curso" no topo, apontando para a próxima aula não concluída, com
+  contador "aula N de M". Reusa `renderCourseResume()` (`:950`) e
+  `getCourseProgressPct()`. PRD: **GAM-04** (grupo CONTINUE SEUS ESTUDOS aplicado
+  à página do curso).
+- **C2 — Accordion de aulas no lugar das abas Módulos/Material/Exercícios.**
+  *Esforço M / Impacto A.* Cada `Module` vira um item expansível com seus 3
+  conteúdos (Vídeo · Material · Exercício), ícone de tipo e ✓ quando concluído —
+  reusa o estado já existente (`videoWatched` / `matRead` / `passed`). Abas
+  remanescentes: Resumo e Perguntas. PRD: **CUR-01** (hierarquia Trilha → Curso →
+  Módulo → Lição → Blocos fica visível na UI pela primeira vez).
+  > **Dependência inversa útil:** este accordion é a estrutura que a Fase 3 exige
+  > para *drip content* ("Semana N abre na segunda") — cada item ganha estado
+  > `bloqueado / disponível / concluído`. Fazer C2 antes da Fase 3 evita
+  > reescrever a mesma tela duas vezes.
+- **C3 — Rail lateral com certificado, metadados, habilidades e prova social.**
+  *Esforço M-A / Impacto M-A.* Agrupa o que hoje está espalhado ou não existe:
+  card de certificado com preview + "Receber certificado" (a infra de
+  `routes/certificates.py` já gera o PDF — falta a vitrine; hoje o aluno não sabe
+  que o certificado existe); duração · nº de aulas · **nível**; chips de
+  **habilidades**; contagem de participantes; "última atualização".
+  **Requer 3 migrações:** `Course.level` (não existe), `Course.updated_at` (só há
+  `created_at`) e habilidades (hoje `Course.tag` é string única — precisa de
+  tabela associativa ou coluna JSON). A contagem de participantes é agregação
+  sobre `LessonProgress` — fazer com `GROUP BY`, respeitando o N+1 da §1.3.
+  PRD: **GAM-01** (certificados por tenant), **CUR-03** (conceitos/habilidades
+  declarados por lição — as chips são a superfície visível disso).
+- **C4 — Trocar os emojis do meta por ícones vetoriais.** *Esforço B / Impacto B.*
+  `renderCourse()` emite `📋 ⏱ 📄 ❓` literais (`:1567-1571`); o helper `icon()`
+  já existe. Fecha o **DEBITOS #9** ("zero emoji nativo" do design system) nesta
+  tela. PRD: **GAM-04**.
+
+### Player de aula
+
+- **A2 — "Próximo" persistente + "Continuar mais tarde", aposentando o overlay
+  auto-avançante.** *Esforço B / Impacto A.* **Prioridade máxima da §2.8.** O painel
+  "Aula concluída!" (`index.html:1442`) dispara `setTimeout(openLesson, 3000)`
+  (`:1348`) que só é cancelado pelos botões do próprio painel — é o item CRÍTICO
+  já registrado na **§2.6**. A referência resolve com um CTA fixo acionado pelo
+  aluno. **Um único commit corrige o bug crítico e entrega o ganho de UX.**
+  PRD: **NFR-04** (o overlay `position:fixed;inset:0` é especialmente hostil em
+  360px).
+- **A1 — Modo foco com rail de progresso.** *Esforço M / Impacto A.* Os 3 cards
+  empilhados passam a conviver com um rail esquerdo: "Aula N de M" + barra fina +
+  os 3 passos numerados com ✓, conteúdo ativo no palco. É reorganização de layout
+  sobre estado que já existe. PRD: **GAM-04**, **NFR-04**.
+- **A3 — Progresso real de vídeo via player API.** *Esforço M / Impacto A.* O botão
+  "JÁ ASSISTI O VÍDEO" (+10 pts, `:1053`) é auto-declarado porque o vídeo é um
+  `<iframe>` cru (`:1047`). Com a **YouTube IFrame API** / **Vimeo Player SDK** dá
+  para detectar ~90% assistido e liberar o exercício sozinho.
+  > **Atenção de segurança:** a API melhora o *sinal*, não substitui validação. O
+  > crédito de pontos continua tendo que ser server-side — este item deve ser feito
+  > **junto** com a remoção do `/add-points` client-side (§1.1, IMPORTANTE), senão
+  > só troca um botão falsificável por um evento falsificável.
+  PRD: **GAM-01**, **NFR-06**.
+- **A4 — Controles nativos de legenda e velocidade.** *Esforço B / Impacto M.*
+  Parâmetros do embed (`cc_load_policy` etc.). Alto retorno de acessibilidade numa
+  seção (§2.4) que está inteiramente em aberto. PRD: **NFR-08** (WCAG 2.1 AA).
+
+### Sequenciamento sugerido
+
+1. **A2** — junta correção do CRÍTICO da §2.6 com o ganho de UX. Começar por aqui.
+2. **C1 + C4** — baixo esforço, ganho imediato, sem migração.
+3. **A1 + A4** — modo foco + acessibilidade.
+4. **C2** — accordion (prepara o terreno da Fase 3).
+5. **A3** — player API **+** endurecimento server-side da pontuação.
+6. **C3** — rail lateral (maior escopo: 3 migrações).
+
 ---
 
 # FASE 3 — NOVAS FUNCIONALIDADES
