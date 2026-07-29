@@ -1418,49 +1418,101 @@ async function submitAulaQuiz(){
     }
     renderAulaPage();
     if(aulaQuizFeedback.passed && !wasPassedBefore && aulaQuizFeedback.next_lesson){
-      setTimeout(()=>showLessonCompletedPanel(aulaQuizFeedback.next_lesson), 1300);
+      // O atraso deixa os toasts de pontos/badge aparecerem antes do painel.
+      // Guarda a aula de origem: se o aluno já tiver navegado para outra
+      // aula nesse meio tempo, o painel não abre por cima dela.
+      const aulaDeOrigem = currentAula && currentAula.id;
+      const proxima = aulaQuizFeedback.next_lesson;
+      setTimeout(()=>{
+        if(currentAula && currentAula.id === aulaDeOrigem) showLessonCompletedPanel(proxima);
+      }, 1300);
     }
   } else {
     alert('Erro ao enviar respostas.');
   }
 }
 
-// ── Próxima aula automática (Sprint 6.2) ──────────────────────────────────
-let lessonCompletedRedirectTimeout = null;
+// ── Painel de conclusão de aula (ROADMAP §2.8 A2 / corrige o CRÍTICO §2.6) ─
+//
+// Antes: o painel auto-avançava para a próxima aula com
+// setTimeout(openLesson, 3000), e esse timeout só era cancelado pelos
+// botões do próprio painel. Como o overlay é position:fixed;inset:0 com
+// z-index 2000, ele cobre inclusive a sidebar — o aluno não conseguia
+// navegar para lado nenhum, não tinha Esc nem clique-fora, e em 3s era
+// arrastado para a aula seguinte quisesse ou não.
+//
+// Agora quem decide avançar é o aluno ("Próxima aula") — sem timer. E como
+// o overlay bloqueia a navegação lateral enquanto está aberto, ele PRECISA
+// ser dispensável: Esc, clique-fora e botão de fechar, os três levando ao
+// mesmo closeLessonCompletedPanel(). Sem auto-avanço não sobra timer para
+// "cancelar na troca de rota": a rota só muda depois que o painel fechou.
+//
+// De quebra, fecha parte da §2.4 (modais sem role/aria-modal, sem focus
+// trap e sem devolver o foco a quem o tinha).
+let lessonCompletedLastFocus = null;
 
 function showLessonCompletedPanel(nextLesson){
-  const existing = document.getElementById('lesson-completed-panel');
-  if(existing) existing.remove();
-  if(lessonCompletedRedirectTimeout) clearTimeout(lessonCompletedRedirectTimeout);
+  closeLessonCompletedPanel();
+  lessonCompletedLastFocus = document.activeElement;
 
   const panel = document.createElement('div');
   panel.id = 'lesson-completed-panel';
   panel.className = 'lesson-completed-panel';
   panel.innerHTML = `
-    <div class="lesson-completed-card">
+    <div class="lesson-completed-card" role="dialog" aria-modal="true"
+         aria-labelledby="lesson-completed-title">
+      <button type="button" class="lesson-completed-close" aria-label="Fechar"
+              onclick="closeLessonCompletedPanel()">${icon('x','18')}</button>
       <div class="lesson-completed-check">${icon('checkmark-circle','40','icon--success')}</div>
-      <h2 class="lesson-completed-title">Aula concluída!</h2>
+      <h2 class="lesson-completed-title" id="lesson-completed-title">Aula concluída!</h2>
       <p class="lesson-completed-msg">Parabéns, você avançou para a próxima etapa.</p>
       <div class="lesson-completed-next">
         <span class="lcn-label">Próxima aula</span>
         <span class="lcn-title">${escapeHtml(nextLesson.title)}</span>
       </div>
       <div class="lesson-completed-actions">
-        <button class="btn btn-primary" onclick="openLesson(${nextLesson.course_id},${nextLesson.id})">Continuar para próxima aula →</button>
-        <button class="btn btn-outline" onclick="closeLessonCompletedPanel(); selectCourse(${nextLesson.course_id})">Voltar ao curso</button>
+        <button class="btn btn-primary" id="lesson-completed-next-btn"
+                onclick="openLesson(${nextLesson.course_id},${nextLesson.id})">Próxima aula ${icon('arrow-right','14')}</button>
+        <button class="btn btn-outline"
+                onclick="closeLessonCompletedPanel(); selectCourse(${nextLesson.course_id})">Continuar mais tarde</button>
       </div>
     </div>`;
-  document.body.appendChild(panel);
 
-  lessonCompletedRedirectTimeout = setTimeout(()=>{
-    openLesson(nextLesson.course_id, nextLesson.id);
-  }, 3000);
+  // Clique no backdrop (e só nele — não em cliques que borbulham do card).
+  panel.addEventListener('click', e => {
+    if(e.target === panel) closeLessonCompletedPanel();
+  });
+
+  document.body.appendChild(panel);
+  document.addEventListener('keydown', lessonCompletedKeydown);
+
+  const nextBtn = document.getElementById('lesson-completed-next-btn');
+  if(nextBtn) nextBtn.focus();
+}
+
+function lessonCompletedKeydown(e){
+  if(e.key === 'Escape'){ e.preventDefault(); closeLessonCompletedPanel(); return; }
+  if(e.key !== 'Tab') return;
+  const panel = document.getElementById('lesson-completed-panel');
+  if(!panel) return;
+  const focusables = panel.querySelectorAll('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])');
+  if(!focusables.length) return;
+  const first = focusables[0], last = focusables[focusables.length - 1];
+  if(e.shiftKey && document.activeElement === first){ e.preventDefault(); last.focus(); }
+  else if(!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
 }
 
 function closeLessonCompletedPanel(){
-  if(lessonCompletedRedirectTimeout){ clearTimeout(lessonCompletedRedirectTimeout); lessonCompletedRedirectTimeout = null; }
   const panel = document.getElementById('lesson-completed-panel');
   if(panel) panel.remove();
+  document.removeEventListener('keydown', lessonCompletedKeydown);
+  // Devolve o foco a quem o tinha antes do painel abrir (§2.4). Só se o
+  // elemento ainda estiver no documento — o render da aula pode tê-lo
+  // substituído no meio do caminho.
+  if(lessonCompletedLastFocus && document.contains(lessonCompletedLastFocus)){
+    lessonCompletedLastFocus.focus();
+  }
+  lessonCompletedLastFocus = null;
 }
 
 function openLesson(courseId, lessonId){

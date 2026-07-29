@@ -69,6 +69,7 @@ body.focus-mode .topbar-subtitle {
 }
 
 .lesson-completed-card {
+  position: relative;
   background: #fff;
   border-radius: var(--radius-lg, 14px);
   padding: 2rem 1.8rem;
@@ -77,6 +78,37 @@ body.focus-mode .topbar-subtitle {
   margin: 1rem;
   text-align: center;
   box-shadow: 0 12px 40px rgba(0,0,0,.25);
+}
+
+/* Fechar (§2.8 A2): o painel cobre a viewport inteira, então precisa de uma
+   saída visível — Esc e clique-fora fazem o mesmo, mas nenhum dos dois é
+   descobrível sem affordance. Alvo de 32px para o toque em 360px (NFR-04). */
+.lesson-completed-close {
+  position: absolute;
+  top: .6rem;
+  right: .6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--gray, #7f8c8d);
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+
+.lesson-completed-close:hover {
+  background: var(--bg-light, #f7f4ee);
+  color: var(--dark);
+}
+
+.lesson-completed-close:focus-visible {
+  outline: 2px solid var(--primary, #008ea8);
+  outline-offset: 2px;
 }
 
 .lesson-completed-check {
