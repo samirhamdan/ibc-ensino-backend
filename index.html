@@ -1036,7 +1036,7 @@ function renderAulaPage(){
   let videoCardHtml = '';
   if(hasVideo){
     videoCardHtml = `
-    <div class="lesson-section-card">
+    <div class="lesson-section-card" id="lesson-card-video">
       <div class="lesson-section-header${videoWatched?' done':''}">
         <span class="lesson-section-icon">${videoWatched?icon('checkmark-circle','20'):icon('play-circle','20')}</span>
         <h2 class="lesson-section-title">VÍDEO DA AULA</h2>
@@ -1086,7 +1086,7 @@ function renderAulaPage(){
             <p class="material-reward-hint">Libera o exercício e você ganha <strong>+10 pontos</strong> ${icon('points','12','icon--gold')}</p>`}`;
 
   const materialCardHtml = `
-    <div class="lesson-section-card">
+    <div class="lesson-section-card" id="lesson-card-material">
       <div class="lesson-section-header${matRead?' done':''}">
         <span class="lesson-section-icon">${matRead?icon('checkmark-circle','20'):icon('edit','20')}</span>
         <h2 class="lesson-section-title">MATERIAL DA AULA</h2>
@@ -1158,7 +1158,7 @@ function renderAulaPage(){
 
   const quizHeaderDone = passed;
   const exerciseCardHtml = `
-    <div class="lesson-section-card">
+    <div class="lesson-section-card" id="lesson-card-exercicio">
       <div class="lesson-section-header${quizHeaderDone?' done':quizLocked?' ':''}">
         <span class="lesson-section-icon">${quizHeaderDone?icon('checkmark-circle','20'):quizLocked?icon('lock','20'):icon('edit','20')}</span>
         <h2 class="lesson-section-title">EXERCÍCIO</h2>
@@ -1189,6 +1189,56 @@ function renderAulaPage(){
     ? `<button class="btn btn-primary" style="${passed?'':'opacity:.55;cursor:not-allowed'}" ${passed?'':'disabled title="Conclua o exercício para avançar"'} onclick="loadAula(${a.course.id},${num+1})">Próxima Aula →</button>`
     : `<button class="btn btn-primary" style="${passed?'':'opacity:.55;cursor:not-allowed'}" ${passed?'':'disabled title="Conclua o exercício para avançar"'} onclick="renderConclusion()">${icon('certificates','18')} Concluir Curso</button>`;
 
+  // ── Rail de progresso da aula (ROADMAP §2.8 A1) ────────────────────────
+  // Os 3 cards continuam empilhados no palco; o que faltava era o aluno
+  // saber ONDE está dentro da aula e QUANTO falta sem rolar a página até o
+  // fim. O rail deriva tudo do estado que já existia (videoWatched, matRead,
+  // passed, quizLocked) — nenhuma fonte de verdade nova.
+  //
+  // Passos são <button> com aria-current, não <div onclick> (§2.4): o rail é
+  // navegação real e precisa ser alcançável por teclado.
+  const railSteps = [];
+  if(hasVideo) railSteps.push({key:'video', label:'Vídeo da aula', meta:'Vídeo', done:videoWatched});
+  railSteps.push({key:'material', label:'Material da aula',
+                  meta: hasMat ? 'Leitura' : 'Confirmação', done:matRead});
+  railSteps.push({key:'exercicio', label:'Exercício',
+                  meta:`${a.quiz.length} questão(ões)`, done:passed, locked:quizLocked});
+  const currentStepIdx = railSteps.findIndex(s => !s.done);
+
+  const railStepsHtml = railSteps.map((s, i)=>{
+    const isCurrent = i === currentStepIdx;
+    const cls = ['lesson-rail-step', s.done?'done':'', isCurrent?'current':'', s.locked&&!s.done?'locked':'']
+      .filter(Boolean).join(' ');
+    const marker = s.done ? icon('check','13')
+                 : (s.locked ? icon('lock','12','icon--disabled') : String(i+1));
+    return `<li>
+      <button type="button" class="${cls}" ${isCurrent?'aria-current="step"':''}
+              onclick="focusLessonSection('${s.key}')">
+        <span class="lesson-rail-marker">${marker}</span>
+        <span class="lesson-rail-step-text">
+          <span class="lesson-rail-step-label">${s.label}</span>
+          <span class="lesson-rail-step-meta">${s.done?'Concluído':(s.locked?'Bloqueado':s.meta)}</span>
+        </span>
+      </button>
+    </li>`;
+  }).join('');
+
+  const railHtml = `
+    <aside class="lesson-rail" aria-label="Progresso da aula">
+      <div class="lesson-rail-head">
+        <span class="lesson-rail-eyebrow">Aula ${num} de ${total}</span>
+        <span class="lesson-rail-course">${escapeHtml(a.course.name)}</span>
+        <div class="lesson-rail-bar" role="progressbar" aria-valuenow="${coursePct}"
+             aria-valuemin="0" aria-valuemax="100" aria-label="Progresso do curso">
+          <div class="lesson-rail-bar-fill" style="width:${coursePct}%"></div>
+        </div>
+        <span class="lesson-rail-pct">${coursePct}% do curso concluído</span>
+      </div>
+      <ol class="lesson-rail-steps">${railStepsHtml}</ol>
+      <button type="button" class="btn btn-outline lesson-rail-later"
+              onclick="selectCourse(${a.course.id})">← Continuar mais tarde</button>
+    </aside>`;
+
   document.getElementById('main-content').innerHTML=`
     <nav class="breadcrumb">
       <a onclick="detectarPerfilEAtualizarDashboard()">${icon('home','14')} Meu Painel</a>
@@ -1202,22 +1252,33 @@ function renderAulaPage(){
       <div class="course-meta">${a.dur?`<span>${icon('clock','14')} ${a.dur}</span>`:''}</div>
     </div>
     ${stepperHtml}
-    <div class="progress-section">
-      <div class="progress-header">
-        <span class="course-progress-label">Progresso do curso: <strong>${coursePct}%</strong></span>
+    <div class="lesson-focus-layout">
+      ${railHtml}
+      <div class="lesson-focus-stage">
+        <div class="lesson-sections-container">
+          ${videoCardHtml}
+          ${materialCardHtml}
+          ${exerciseCardHtml}
+        </div>
+        <div class="lesson-navigation">
+          <button class="btn btn-outline" ${num<=1?'disabled':''} onclick="loadAula(${a.course.id},${num-1})">← Voltar</button>
+          <button class="btn btn-outline" onclick="openAskQuestionModal(${a.course.id})">${icon('message','16')} Fazer Pergunta</button>
+          ${nextBtn}
+        </div>
       </div>
-      <div class="progress-bar"><div class="progress-fill" style="width:${coursePct}%"></div></div>
-    </div>
-    <div class="lesson-sections-container">
-      ${videoCardHtml}
-      ${materialCardHtml}
-      ${exerciseCardHtml}
-    </div>
-    <div class="lesson-navigation">
-      <button class="btn btn-outline" ${num<=1?'disabled':''} onclick="loadAula(${a.course.id},${num-1})">← Voltar</button>
-      <button class="btn btn-outline" onclick="openAskQuestionModal(${a.course.id})">${icon('message','16')} Fazer Pergunta</button>
-      ${nextBtn}
     </div>`;
+}
+
+// Leva o aluno ao passo escolhido no rail (§2.8 A1). Respeita
+// prefers-reduced-motion: rolagem suave é exatamente o tipo de animação que
+// a media query existe para desligar (§2.4 / NFR-08).
+function focusLessonSection(key){
+  const el = document.getElementById('lesson-card-'+key);
+  if(!el) return;
+  const reduz = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  el.scrollIntoView({behavior: reduz ? 'auto' : 'smooth', block: 'start'});
+  el.classList.add('lesson-section-card--flash');
+  setTimeout(()=>el.classList.remove('lesson-section-card--flash'), 900);
 }
 
 function confirmMaterialRead(moduleId){

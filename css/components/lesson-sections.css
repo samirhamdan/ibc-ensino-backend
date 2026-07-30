@@ -191,3 +191,203 @@
   .material-item-actions { width: 100%; }
   .material-item-actions .btn { flex: 1; }
 }
+
+/* ─── Modo foco: rail de progresso da aula (ROADMAP §2.8 A1) ─────────────
+   Duas colunas: rail sticky à esquerda, palco (os 3 cards) à direita. O rail
+   responde "onde estou e quanto falta" sem o aluno rolar a página até o fim.
+   ------------------------------------------------------------------------ */
+
+.lesson-focus-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: var(--space-xl);
+  align-items: start;
+}
+
+/* minmax(0,1fr) acima: sem isso o palco não encolhe abaixo do conteúdo
+   intrínseco (iframe de vídeo, tabelas) e estoura o grid horizontalmente. */
+
+.lesson-focus-stage { min-width: 0; }
+
+.lesson-focus-stage .lesson-sections-container { margin-top: 0; }
+
+.lesson-rail {
+  position: sticky;
+  top: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  background: var(--white);
+  border: 1px solid var(--gray-light);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin: var(--space-xl) 0;
+  box-shadow: var(--shadow-sm);
+}
+
+.lesson-rail-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lesson-rail-eyebrow {
+  font-size: var(--text-xs, .72rem);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--primary, #008ea8);
+}
+
+.lesson-rail-course {
+  font-size: var(--text-sm, .85rem);
+  font-weight: 600;
+  color: var(--navy, #2c3e50);
+  line-height: 1.3;
+}
+
+.lesson-rail-bar {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--gray-light, #e8e0d4);
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.lesson-rail-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary, #008ea8);
+  transition: width .3s ease;
+}
+
+.lesson-rail-pct {
+  font-size: var(--text-xs, .72rem);
+  color: var(--muted, #7f8c8d);
+}
+
+.lesson-rail-steps {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+}
+
+.lesson-rail-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: var(--radius, 8px);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+
+.lesson-rail-step:hover { background: var(--cream, #f7f4ee); }
+
+.lesson-rail-step:focus-visible {
+  outline: 2px solid var(--primary, #008ea8);
+  outline-offset: 1px;
+}
+
+.lesson-rail-step.current {
+  background: var(--cream, #f7f4ee);
+  border-left-color: var(--primary, #008ea8);
+}
+
+.lesson-rail-marker {
+  flex: 0 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--gray-light, #e8e0d4);
+  color: var(--muted, #7f8c8d);
+  font-size: var(--text-xs, .72rem);
+  font-weight: 700;
+}
+
+.lesson-rail-step.current .lesson-rail-marker {
+  background: var(--primary, #008ea8);
+  color: #fff;
+}
+
+.lesson-rail-step.done .lesson-rail-marker {
+  background: var(--success-500, #1fa96a);
+  color: #fff;
+}
+
+.lesson-rail-step-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lesson-rail-step-label {
+  font-size: var(--text-sm, .85rem);
+  font-weight: 600;
+  color: var(--navy, #2c3e50);
+}
+
+.lesson-rail-step.locked .lesson-rail-step-label { color: var(--muted, #7f8c8d); }
+
+.lesson-rail-step-meta {
+  font-size: var(--text-xs, .72rem);
+  color: var(--muted, #7f8c8d);
+}
+
+.lesson-rail-step.done .lesson-rail-step-meta { color: var(--success-700, #0f7a4a); }
+
+/* "Continuar mais tarde" — a saída explícita que o player não tinha. */
+.lesson-rail-later { width: 100%; }
+
+/* Destaque momentâneo do card ao chegar por clique no rail. */
+.lesson-section-card--flash {
+  box-shadow: 0 0 0 2px var(--primary, #008ea8), var(--shadow-md);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lesson-rail-bar-fill,
+  .lesson-rail-step { transition: none; }
+}
+
+/* Abaixo de 900px o rail não cabe ao lado do palco: vira uma faixa
+   horizontal acima do conteúdo, com os passos roláveis (NFR-04: usável em
+   360px). Sem sticky — em telas baixas ele roubaria altura útil do vídeo. */
+@media (max-width: 900px) {
+  .lesson-focus-layout { grid-template-columns: minmax(0, 1fr); gap: 0; }
+
+  .lesson-rail {
+    position: static;
+    margin-bottom: 0;
+  }
+
+  .lesson-rail-steps {
+    flex-direction: row;
+    gap: var(--space-sm, .5rem);
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .lesson-rail-steps > li { flex: 0 0 auto; }
+
+  .lesson-rail-step {
+    border-left: 0;
+    border-bottom: 3px solid transparent;
+  }
+
+  .lesson-rail-step.current {
+    border-left-color: transparent;
+    border-bottom-color: var(--primary, #008ea8);
+  }
+}
