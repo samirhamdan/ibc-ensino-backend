@@ -59,11 +59,15 @@ def get_embed_url(video_url):
     # YouTube: watch?v=ID or youtu.be/ID or youtube.com/embed/ID
     yt = re.search(r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([A-Za-z0-9_-]{11})', video_url)
     if yt:
-        return f'https://www.youtube.com/embed/{yt.group(1)}', 'youtube'
+        # cc_load_policy=1: legendas ligadas por padrão (acessibilidade §2.4/NFR-08)
+        # rel=0: sem vídeos sugeridos de fora do canal ao final
+        return f'https://www.youtube.com/embed/{yt.group(1)}?cc_load_policy=1&rel=0', 'youtube'
     # Vimeo: vimeo.com/ID or player.vimeo.com/video/ID
     vm = re.search(r'(?:vimeo\.com/|player\.vimeo\.com/video/)(\d+)', video_url)
     if vm:
-        return f'https://player.vimeo.com/video/{vm.group(1)}', 'vimeo'
+        # texttrack: legendas em pt-BR ligadas por padrão se disponíveis
+        # speed: controle de velocidade visível (Vimeo desliga por padrão)
+        return f'https://player.vimeo.com/video/{vm.group(1)}?texttrack=pt-BR&speed=1', 'vimeo'
     return None, None
 
 
