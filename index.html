@@ -958,43 +958,52 @@ async function renderCourseResume(){
   const nextIdx = currentAulas.findIndex(a=>!(a.progress&&a.progress.passed));
   const continueNum = nextIdx===-1 ? total : nextIdx+1;
 
+  const ctaLabel = allDone ? `${icon('checkmark-circle','18')} Revisar curso`
+                 : passedCount > 0 ? `Continuar aula ${continueNum} de ${total} →`
+                 : `${icon('play-circle','18')} Começar curso`;
+  const nextAulaTitle = !allDone && currentAulas[continueNum-1]
+    ? escapeHtml(currentAulas[continueNum-1].nome) : '';
+
   document.getElementById('main-content').innerHTML=`
-    <div class="course-header">
-      <span class="course-tag">${escapeHtml(c.tag)}</span>
-      <h1 class="course-title">${c.icon} ${escapeHtml(c.name)}</h1>
-      <div class="course-meta">
-        <span>${icon('user-check','14')} ${c.tutor_id&&currentCourse.tutor_name?currentCourse.tutor_name:'Professor IBC'}</span>
+    <div class="course-hero" style="--course-color:${c.color||'var(--primary)'}">
+      <span class="course-hero-tag">${escapeHtml(c.tag)}</span>
+      <h1 class="course-hero-title">${escapeHtml(c.name)}</h1>
+      ${c.resumo?`<p class="course-hero-desc">${escapeHtml(c.resumo)}</p>`:''}
+      <div class="course-hero-meta">
+        <span>${icon('user-check','14')} ${c.tutor_id&&currentCourse.tutor_name?escapeHtml(currentCourse.tutor_name):'Professor IBC'}</span>
         ${c.duracao?`<span>${icon('clock','14')} ${c.duracao}</span>`:''}
         <span>${icon('play-circle','14')} ${total} aula(s)</span>
         <span>${icon('target','14')} Nota mínima: 60%</span>
       </div>
-    </div>
-    <div class="progress-section">
-      <div class="progress-header">
-        <span class="progress-label">Seu progresso</span>
-        <span class="progress-pct">${pct}%</span>
+      <div class="course-hero-cta-row">
+        <button class="btn btn-primary course-hero-cta" onclick="loadAula(${c.id},${continueNum||1})">
+          ${ctaLabel}
+        </button>
+        ${nextAulaTitle?`<span class="course-hero-next">${nextAulaTitle}</span>`:''}
       </div>
-      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="course-hero-progress" role="progressbar" aria-valuenow="${pct}"
+           aria-valuemin="0" aria-valuemax="100" aria-label="Progresso do curso">
+        <div class="course-hero-progress-fill" style="width:${pct}%"></div>
+      </div>
+      <span class="course-hero-pct">${passedCount} de ${total} aulas concluídas · ${pct}%</span>
     </div>
-    <div class="resumo-box">
-      <div class="resumo-desc">${c.resumo||'<em style="color:var(--muted)">Nenhuma descrição cadastrada.</em>'}</div>
-    </div>
-    <div class="modulo-list" style="margin-bottom:1.2rem">
-      ${currentAulas.map((a,i)=>`
-        <div class="modulo-item" style="${a.unlocked?'cursor:pointer':'opacity:.6'}" ${a.unlocked?`onclick="loadAula(${c.id},${i+1})"`:''}>
-          <div class="modulo-num">${a.progress&&a.progress.passed?icon('check','14'):(i+1)}</div>
+    <div class="modulo-list">
+      ${currentAulas.map((a,i)=>{
+        const done = a.progress && a.progress.passed;
+        const isCurrent = i+1 === continueNum && !allDone;
+        return `
+        <div class="modulo-item ${done?'modulo-done':''} ${isCurrent?'modulo-current':''}"
+             ${a.unlocked?`onclick="loadAula(${c.id},${i+1})" role="button" tabindex="0"`:''}
+             ${!a.unlocked?'aria-disabled="true"':''}>
+          <div class="modulo-num">${done?icon('check','14'):(i+1)}</div>
           <div class="modulo-name">${escapeHtml(a.nome)}</div>
           ${a.dur?`<div class="modulo-dur">${icon('clock','12')} ${a.dur}</div>`:''}
-          ${!a.unlocked?`<span style="font-size:.8rem">${icon('lock','14')}</span>`:''}
-        </div>`).join('')}
+          ${!a.unlocked?`<span class="modulo-lock">${icon('lock','14','icon--disabled')}</span>`:''}
+        </div>`;
+      }).join('')}
     </div>
-    <div style="text-align:center">
-      <button class="btn-primary" style="max-width:260px" onclick="loadAula(${c.id},${continueNum||1})">
-        ${allDone?'Revisar curso':(passedCount>0?'Continuar de onde parei →':'COMECE AGORA →')}
-      </button>
-      <div style="margin-top:.8rem">
-        <button class="btn-secondary" onclick="openAskQuestionModal(${c.id})">${icon('message','16')} Fazer Pergunta</button>
-      </div>
+    <div class="course-hero-footer">
+      <button class="btn btn-outline" onclick="openAskQuestionModal(${c.id})">${icon('message','16')} Fazer Pergunta</button>
     </div>`;
 }
 
@@ -1677,11 +1686,11 @@ function renderCourse(){
       <span class="course-tag">${escapeHtml(c.tag)}</span>
       <h1 class="course-title">${c.icon} ${escapeHtml(c.name)}</h1>
       <div class="course-meta">
-        <span>📋 ${(c.modules||[]).length} módulos</span>
-        ${c.duracao?`<span>⏱ ${c.duracao}</span>`:''}
-        <span>📄 ${mats.length} material(is)</span>
-        <span>❓ ${(c.quiz||[]).length} questões</span>
-        ${nPerg?`<span>💬 ${nPerg} pergunta(s)${nPendente?' · '+nPendente+' pendente(s)':''}</span>`:''}
+        <span>${icon('catalog','14')} ${(c.modules||[]).length} módulos</span>
+        ${c.duracao?`<span>${icon('clock','14')} ${c.duracao}</span>`:''}
+        <span>${icon('file','14')} ${mats.length} material(is)</span>
+        <span>${icon('edit','14')} ${(c.quiz||[]).length} questões</span>
+        ${nPerg?`<span>${icon('message','14')} ${nPerg} pergunta(s)${nPendente?' · '+nPendente+' pendente(s)':''}</span>`:''}
       </div>
     </div>
     <div class="progress-section">
@@ -1696,10 +1705,10 @@ function renderCourse(){
       </div>
     </div>
     <div class="tabs tabs-5">
-      <button class="tab ${activeTab==='resumo'?'active':''}" id="tab-btn-resumo" onclick="setTab('resumo')">📋 Resumo</button>
+      <button class="tab ${activeTab==='resumo'?'active':''}" id="tab-btn-resumo" onclick="setTab('resumo')">${icon('document-text','14')} Resumo</button>
       <button class="tab ${activeTab==='modulos'?'active':''}" id="tab-btn-modulos" onclick="setTab('modulos')">${icon('catalog','14')} Módulos</button>
-      <button class="tab ${activeTab==='material'?'active':''}" id="tab-btn-material" onclick="setTab('material')">📄 Material</button>
-      <button class="tab ${activeTab==='quiz'?'active':''}" id="tab-btn-quiz" onclick="setTab('quiz')">📝 Exercícios</button>
+      <button class="tab ${activeTab==='material'?'active':''}" id="tab-btn-material" onclick="setTab('material')">${icon('file','14')} Material</button>
+      <button class="tab ${activeTab==='quiz'?'active':''}" id="tab-btn-quiz" onclick="setTab('quiz')">${icon('edit','14')} Exercícios</button>
       <button class="tab ${activeTab==='perguntas'?'active':''}" id="tab-btn-perguntas" onclick="setTab('perguntas')">${icon('message','14')} Perguntas${nPendente&&canManageCourse(currentUser,c.id)?' ('+nPendente+')':''}</button>
     </div>
     <div id="tab-content"></div>`;

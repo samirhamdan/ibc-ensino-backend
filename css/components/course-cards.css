@@ -338,3 +338,141 @@
   /* Sem :hover no toque — CTA sempre visível para não ficar inacessível */
   .course-card-v2-cta { opacity: 1; transform: none; }
 }
+
+/* ─── Hero de retomada do curso — visão do aluno (ROADMAP §2.8 C1) ──────
+   Substitui o antigo course-header+progress-section por um hero com a cor
+   do curso, CTA único de retomada e contexto ("aula N de M").
+   --------------------------------------------------------------------- */
+
+.course-hero {
+  background: linear-gradient(135deg, var(--course-color, var(--primary)), color-mix(in srgb, var(--course-color, var(--primary)), #000 25%));
+  color: #fff;
+  border-radius: var(--radius-lg, 14px);
+  padding: var(--space-xl, 1.5rem) var(--space-xl, 1.5rem) var(--space-lg, 1.2rem);
+  margin-bottom: var(--space-xl, 1.5rem);
+}
+
+.course-hero-tag {
+  display: inline-block;
+  background: rgba(255,255,255,.2);
+  font-size: var(--text-xs, .72rem);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: .2rem .6rem;
+  border-radius: 999px;
+  margin-bottom: var(--space-sm, .5rem);
+}
+
+.course-hero-title {
+  font-family: var(--font-display, inherit);
+  font-size: clamp(1.3rem, 3vw, 1.8rem);
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: var(--space-sm, .5rem);
+}
+
+.course-hero-desc {
+  font-size: var(--text-sm, .85rem);
+  opacity: .85;
+  line-height: 1.5;
+  max-width: 52ch;
+  margin-bottom: var(--space-md, .8rem);
+}
+
+.course-hero-meta {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: var(--text-xs, .72rem);
+  opacity: .75;
+  margin-bottom: var(--space-lg, 1.2rem);
+}
+
+.course-hero-meta .icon { color: rgba(255,255,255,.8); }
+
+.course-hero-cta-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md, .8rem);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-lg, 1.2rem);
+}
+
+.course-hero-cta {
+  font-size: 1rem;
+  font-weight: 700;
+  padding: .7rem 1.6rem;
+  border-radius: var(--radius, 8px);
+  background: #fff;
+  color: var(--course-color, var(--primary));
+  border: 0;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+
+.course-hero-cta:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,.2); }
+.course-hero-cta:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+.course-hero-next {
+  font-size: var(--text-sm, .85rem);
+  opacity: .75;
+}
+
+.course-hero-progress {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.2);
+  overflow: hidden;
+}
+
+.course-hero-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #fff;
+  transition: width .4s ease;
+}
+
+.course-hero-pct {
+  display: block;
+  font-size: var(--text-xs, .72rem);
+  opacity: .65;
+  margin-top: 6px;
+}
+
+/* Linha de ações abaixo da lista */
+.course-hero-footer {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-md, .8rem);
+  padding: var(--space-lg, 1.2rem) 0 0;
+}
+
+/* Módulos na visão de retomada: item clicável com destaque no atual */
+.modulo-item.modulo-current {
+  border-left: 3px solid var(--primary, #008ea8);
+  background: var(--cream, #f7f4ee);
+}
+
+.modulo-item.modulo-done .modulo-num {
+  background: var(--success-500, #1fa96a);
+  color: #fff;
+}
+
+.modulo-item[aria-disabled="true"] { opacity: .55; cursor: default; }
+
+.modulo-lock {
+  font-size: var(--text-sm, .85rem);
+}
+
+@media (max-width: 640px) {
+  .course-hero { padding: var(--space-lg, 1.2rem); }
+  .course-hero-title { font-size: 1.3rem; }
+  .course-hero-cta { width: 100%; text-align: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .course-hero-progress-fill,
+  .course-hero-cta { transition: none; }
+}
