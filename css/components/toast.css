@@ -28,6 +28,7 @@
 }
 
 .toast-container .toast.toast-xp { border-left-color: #f1c40f; }
+.toast-container .toast.toast-error { border-left-color: #e74c3c; color: #c0392b; }
 .toast-container .toast.toast-out { animation: toastOut 0.3s ease forwards; }
 
 @keyframes toastIn {

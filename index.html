@@ -392,9 +392,34 @@ function roleDesc(role){
 async function api(method, path, body){
   const opts = {method, headers:{'Content-Type':'application/json'}, credentials:'same-origin'};
   if(body) opts.body=JSON.stringify(body);
-  const res = await fetch('/api'+path, opts);
+  let res;
+  try {
+    res = await fetch('/api'+path, opts);
+  } catch(e) {
+    showToast('Sem conexão com o servidor. Verifique sua internet.', 'error', 5000);
+    return new Response(JSON.stringify({error:'network'}), {status:0});
+  }
+  if(res.status === 401 && !path.includes('/auth/')){
+    showToast('Sessão expirada. Redirecionando ao login…', 'error', 3000);
+    setTimeout(()=>{ currentUser=null; renderLogin(); }, 1500);
+  }
+  if(res.status >= 500){
+    showToast('Erro no servidor. Tente novamente em instantes.', 'error', 4000);
+  }
   return res;
 }
+
+window.addEventListener('unhandledrejection', function(e){
+  if(e.reason && e.reason.name === 'AbortError') return;
+  console.error('Unhandled rejection:', e.reason);
+  if(typeof showToast === 'function') showToast('Algo deu errado. Tente recarregar a página.', 'error', 5000);
+});
+
+window.onerror = function(msg, src, line){
+  console.error('Global error:', msg, src, line);
+  if(typeof showToast === 'function') showToast('Erro inesperado. Tente recarregar a página.', 'error', 5000);
+  return true;
+};
 
 async function loadLoginConfig(){
   try{
@@ -903,7 +928,7 @@ async function selectCourse(id){
     api('GET',`/questions/${id}`),
   ]);
   if(courseRes.ok) currentCourse = await courseRes.json();
-  else { alert('Erro ao carregar curso.'); return; }
+  else { showToast('Erro ao carregar curso.','error'); return; }
   currentCourse.tag = currentCourse.category || 'Geral';
   currentProgress = progRes.ok ? await progRes.json() : {material_done:false,quiz_score:0,quiz_total:0};
   currentQuestions = questRes.ok ? await questRes.json() : [];
@@ -1163,7 +1188,7 @@ async function loadAula(courseId, aulaNum){
   const res = await api('GET',`/courses/${courseId}/aulas/${aulaNum}`);
   if(!res.ok){
     const d=await res.json().catch(()=>({}));
-    alert(d.error||'Não foi possível carregar esta aula.');
+    showToast(d.error||'Não foi possível carregar esta aula.','error');
     return;
   }
   currentAula = await res.json();
@@ -1478,7 +1503,7 @@ let pdfViewerState = null;
 
 async function openPdfViewer(materialId, materialName){
   const res = await api('GET', `/materiais/${materialId}`);
-  if(!res.ok){ alert('Não foi possível carregar o material.'); return; }
+  if(!res.ok){ showToast('Não foi possível carregar o material.','error'); return; }
   const meta = await res.json();
 
   const existing=document.getElementById('pdf-viewer-modal');
@@ -1613,9 +1638,9 @@ function retakeAulaQuiz(){
 
 async function submitAulaQuiz(){
   const quiz=currentAula.quiz||[];
-  if(Object.keys(aulaQuizAnswers).length<quiz.length){alert('Responda todas as questões antes de enviar.');return;}
+  if(Object.keys(aulaQuizAnswers).length<quiz.length){showToast('Responda todas as questões antes de enviar.');return;}
   const moduleId = currentAula.id;
-  if(getAttempts(moduleId) >= MAX_QUIZ_ATTEMPTS){ alert('Você esgotou suas tentativas para esta aula.'); return; }
+  if(getAttempts(moduleId) >= MAX_QUIZ_ATTEMPTS){ showToast('Você esgotou suas tentativas para esta aula.','error'); return; }
   const answers=quiz.map((_,i)=>aulaQuizAnswers[i]??null);
   const res=await api('POST',`/courses/${currentAula.course.id}/aulas/${currentAula.aula_num}/submit-quiz`,{answers});
   if(res.ok){
@@ -1653,7 +1678,7 @@ async function submitAulaQuiz(){
       }, 1300);
     }
   } else {
-    alert('Erro ao enviar respostas.');
+    showToast('Erro ao enviar respostas.','error');
   }
 }
 
@@ -1987,7 +2012,7 @@ async function saveResumo(){
     currentCourse = {...currentCourse, resumo, duracao, acesso};
     renderCourse(); setTab('resumo');
   } else {
-    alert('Erro ao salvar.');
+    showToast('Erro ao salvar.','error');
   }
 }
 
@@ -2024,13 +2049,13 @@ function renderModulos(){
 async function addModulo(){
   const nome=document.getElementById('mod-nome').value.trim();
   const dur=document.getElementById('mod-dur').value.trim();
-  if(!nome){alert('Informe o nome do módulo.');return;}
+  if(!nome){showToast('Informe o nome do módulo.');return;}
   const res=await api('POST',`/courses/${currentCourse.id}/modulos`,{nome,dur});
   if(res.ok){
     const mod=await res.json();
     currentCourse.modules=[...(currentCourse.modules||[]),mod];
     renderTabContent();
-  } else { alert('Erro ao adicionar módulo.'); }
+  } else { showToast('Erro ao adicionar módulo.','error'); }
 }
 
 async function removeModulo(moduleId){
@@ -2039,7 +2064,7 @@ async function removeModulo(moduleId){
   if(res.ok){
     currentCourse.modules=currentCourse.modules.filter(m=>m.id!==moduleId);
     renderTabContent();
-  } else { alert('Erro ao remover módulo.'); }
+  } else { showToast('Erro ao remover módulo.','error'); }
 }
 
 // ── Material ──
@@ -2139,19 +2164,19 @@ function toggleMatType(t){
 
 async function addMaterial(){
   const name=document.getElementById('mat-name-input').value.trim();
-  if(!name){alert('Informe um nome.');return;}
+  if(!name){showToast('Informe um nome.');return;}
   let url='', tipo=currentMatType, size='';
 
   if(tipo==='link'){
     url=document.getElementById('mat-link-input').value.trim();
-    if(!url){alert('Informe a URL.');return;}
+    if(!url){showToast('Informe a URL.');return;}
   } else {
     // Upload real do PDF
     const fileEl=document.getElementById('pdf-file-input');
     const file=fileEl?fileEl.files[0]:null;
-    if(!file){alert('Selecione um arquivo PDF.');return;}
-    if(!file.name.toLowerCase().endsWith('.pdf')){alert('Apenas arquivos PDF são permitidos.');return;}
-    if(file.size>20*1024*1024){alert('Arquivo muito grande. Máximo 20 MB.');return;}
+    if(!file){showToast('Selecione um arquivo PDF.');return;}
+    if(!file.name.toLowerCase().endsWith('.pdf')){showToast('Apenas arquivos PDF são permitidos.');return;}
+    if(file.size>20*1024*1024){showToast('Arquivo muito grande. Máximo 20 MB.');return;}
 
     const statusEl=document.getElementById('pdf-upload-status');
     if(statusEl) statusEl.textContent='Enviando arquivo...';
@@ -2161,7 +2186,7 @@ async function addMaterial(){
     const uploadRes=await fetch('/api/upload',{method:'POST',body:formData,credentials:'same-origin'});
     if(!uploadRes.ok){
       const d=await uploadRes.json();
-      alert(d.error||'Erro ao fazer upload.');
+      showToast(d.error||'Erro ao fazer upload.','error');
       if(statusEl) statusEl.textContent='';
       return;
     }
@@ -2180,7 +2205,7 @@ async function addMaterial(){
     if(document.getElementById('mat-link-input')) document.getElementById('mat-link-input').value='';
     if(document.getElementById('pdf-file-input')) document.getElementById('pdf-file-input').value='';
     renderTabContent();
-  } else { alert('Erro ao adicionar material.'); }
+  } else { showToast('Erro ao adicionar material.','error'); }
 }
 
 async function deleteMaterial(matId){
@@ -2189,7 +2214,7 @@ async function deleteMaterial(matId){
   if(res.ok){
     currentCourse.materiais=currentCourse.materiais.filter(m=>m.id!==matId);
     renderTabContent();
-  } else { alert('Erro ao remover material.'); }
+  } else { showToast('Erro ao remover material.','error'); }
 }
 
 async function markMaterialDone(cid){
@@ -2282,7 +2307,7 @@ function selectOpt(qi,oi){
 
 async function submitQuiz(){
   const quiz=currentCourse.quiz||[];
-  if(Object.keys(quizAnswers).length<quiz.length){alert('Responda todas as questões antes de enviar.');return;}
+  if(Object.keys(quizAnswers).length<quiz.length){showToast('Responda todas as questões antes de enviar.');return;}
   const answers=quiz.map((_,i)=>quizAnswers[i]??null);
   const res=await api('POST',`/progress/quiz/${currentCourse.id}/submit`,{answers});
   if(res.ok){
@@ -2291,7 +2316,7 @@ async function submitQuiz(){
     currentProgress={...currentProgress,quiz_score:quizFeedback.score,quiz_total:quizFeedback.total};
     updateCourseNavProgress(currentCourse.id,currentProgress);
     renderCourse(); setTab('quiz');
-  } else { alert('Erro ao enviar respostas.'); }
+  } else { showToast('Erro ao enviar respostas.','error'); }
 }
 
 function retakeQuiz(){
@@ -2350,7 +2375,7 @@ function renderPerguntas(){
 
 async function enviarPergunta(){
   const texto=document.getElementById('nova-pergunta').value.trim();
-  if(!texto){alert('Digite uma pergunta.');return;}
+  if(!texto){showToast('Digite uma pergunta.');return;}
   const res=await api('POST',`/questions/${currentCourse.id}`,{texto});
   if(res.ok){
     const q=await res.json();
@@ -2359,18 +2384,18 @@ async function enviarPergunta(){
     if(q.new_achievements && q.new_achievements.length){
       setTimeout(()=>showAchievementPopups(q.new_achievements), 400);
     }
-  } else { alert('Erro ao enviar pergunta.'); }
+  } else { showToast('Erro ao enviar pergunta.','error'); }
 }
 
 async function responderPergunta(qid){
   const txt=document.getElementById('resp-input-'+qid).value.trim();
-  if(!txt){alert('Digite uma resposta.');return;}
+  if(!txt){showToast('Digite uma resposta.');return;}
   const res=await api('POST',`/questions/${qid}/responder`,{resposta:txt});
   if(res.ok){
     const updated=await res.json();
     currentQuestions=currentQuestions.map(q=>q.id===qid?updated:q);
     renderTabContent();
-  } else { alert('Erro ao responder.'); }
+  } else { showToast('Erro ao responder.','error'); }
 }
 
 // ── Admin panel ──
@@ -2476,13 +2501,13 @@ async function addUser(){
   const email=document.getElementById('new-email').value.trim();
   const password=document.getElementById('new-pass').value.trim();
   const role=document.getElementById('new-role').value;
-  if(!name||!email||!password){alert('Preencha todos os campos.');return;}
+  if(!name||!email||!password){showToast('Preencha todos os campos.');return;}
   const res=await api('POST','/auth/signup',{name,email,password,role});
   if(res.ok){
     renderAdminUsers();
   } else {
     const d=await res.json();
-    alert(d.error||'Erro ao cadastrar usuário.');
+    showToast(d.error||'Erro ao cadastrar usuário.','error');
   }
 }
 
@@ -2493,7 +2518,7 @@ async function removeUser(id){
     renderAdminUsers();
   } else {
     const d=await res.json();
-    alert(d.error||'Erro ao remover usuário.');
+    showToast(d.error||'Erro ao remover usuário.','error');
   }
 }
 
@@ -3286,7 +3311,7 @@ async function removeCourse(id){
     await loadCourses();
     renderCourseList();
     renderAdminCourses();
-  } else { alert('Erro ao remover curso.'); }
+  } else { showToast('Erro ao remover curso.','error'); }
 }
 
 // ── Admin: Tutors (Sprint 4 Part 2) ──
@@ -3386,14 +3411,14 @@ async function adminAssignCourse(tutorId) {
     renderAdminTutors();
   } else {
     const d = await res.json();
-    alert(d.error || 'Erro ao atribuir curso.');
+    showToast(d.error||'Erro ao atribuir curso.','error');
   }
 }
 
 async function adminUnassignCourse(tutorId, courseId) {
   const res = await api('DELETE', `/admin/tutors/${tutorId}/assign-course/${courseId}`);
   if (res.ok) renderAdminTutors();
-  else alert('Erro ao remover atribuição.');
+  else showToast('Erro ao remover atribuição.','error');
 }
 
 async function adminAssignQuestion(questionId) {
@@ -3405,7 +3430,7 @@ async function adminAssignQuestion(questionId) {
     const item = document.getElementById('qqueue-'+questionId);
     if (item) item.remove();
   } else {
-    alert('Erro ao atribuir tutor.');
+    showToast('Erro ao atribuir tutor.','error');
   }
 }
 
@@ -3561,7 +3586,7 @@ function adminClearSelection() {
 
 async function adminBulkEnroll() {
   const trailId = parseInt(document.getElementById('bulk-trail-sel').value);
-  if (!trailId) { alert('Selecione uma trilha.'); return; }
+  if (!trailId) { showToast('Selecione uma trilha.'); return; }
   const res = await api('POST', '/admin/users/bulk-action', {
     action: 'enroll_trail',
     user_ids: [..._adminUsersSelected],
@@ -3569,11 +3594,11 @@ async function adminBulkEnroll() {
   });
   if (res.ok) {
     const d = await res.json();
-    alert(`${d.enrolled} usuário(s) matriculado(s) com sucesso.`);
+    showToast(`${d.enrolled} usuário(s) matriculado(s) com sucesso.`);
     adminClearSelection();
   } else {
     const d = await res.json();
-    alert(d.error || 'Erro ao matricular usuários.');
+    showToast(d.error||'Erro ao matricular usuários.','error');
   }
 }
 
@@ -3644,19 +3669,19 @@ function closeUserProfile() {
 async function adminSetActiveTrail(userId, trailId) {
   const res = await api('PUT', `/admin/users/${userId}/trail`, {trail_id: trailId});
   if (res.ok) openUserProfile(userId);
-  else alert('Erro ao alterar trilha ativa.');
+  else showToast('Erro ao alterar trilha ativa.','error');
 }
 
 async function adminResetUserProgress(userId, userName) {
   if (!confirm('Zerar TODO o progresso de '+userName+'? Esta ação não pode ser desfeita. Certificados serão mantidos.')) return;
   const res = await api('POST', `/admin/users/${userId}/reset-progress`);
   if (res.ok) {
-    alert('Progresso zerado com sucesso.');
+    showToast('Progresso zerado com sucesso.');
     closeUserProfile();
     adminUsersLoad();
   } else {
     const d = await res.json();
-    alert(d.error || 'Erro ao zerar progresso.');
+    showToast(d.error||'Erro ao zerar progresso.','error');
   }
 }
 
@@ -5195,19 +5220,19 @@ async function renderAdminCategories(){
 
 async function addCategory(){
   const name=document.getElementById('new-cat-name').value.trim();
-  if(!name){alert('Informe um nome.');return;}
+  if(!name){showToast('Informe um nome.');return;}
   // Create a dummy course with that category to auto-create it, or just track locally
   // Categories are auto-created when a course uses them; here we just add to local list
-  if(categories.includes(name)){alert('Categoria já existe.');return;}
+  if(categories.includes(name)){showToast('Categoria já existe.');return;}
   // We call create a placeholder — for now just refresh after creating via course creation
   // Better: add a dedicated category endpoint
-  alert('Crie um curso usando essa categoria para cadastrá-la automaticamente.');
+  showToast('Crie um curso usando essa categoria para cadastrá-la automaticamente.');
 }
 
 async function removeCategory(i){
   if(!confirm('Remover esta categoria?')) return;
   // Not currently supported via API without deleting the category model
-  alert('Remoção de categorias não suportada via API nesta versão.');
+  showToast('Remoção de categorias não suportada via API nesta versão.');
 }
 // ── Sprint 1: Micro-interactions ──
 
@@ -5263,7 +5288,7 @@ function showToast(message, type = 'default', duration = 3000){
   const container = document.getElementById('toastContainer');
   if(!container) return;
   const toast = document.createElement('div');
-  toast.className = 'toast' + (type === 'xp' ? ' toast-xp' : '');
+  toast.className = 'toast' + (type === 'xp' ? ' toast-xp' : type === 'error' ? ' toast-error' : '');
   toast.innerHTML = message;
   container.appendChild(toast);
   setTimeout(()=>{
