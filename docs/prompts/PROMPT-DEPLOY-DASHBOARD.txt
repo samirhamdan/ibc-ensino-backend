@@ -1,0 +1,41 @@
+Duas coisas, em ordem — pare entre elas para eu decidir.
+
+## Parte 1 — Resumo do SEC-remaining-audit-items
+
+Resuma em bullets o que é fix/SEC-remaining-audit-items
+(H1/H2/M1) — o que cada item corrige, gravidade, e se algo ali
+bloqueia o deploy do dashboard (GAM-04) que acabou de ser
+mergeado, ou é completamente independente. Não corrija nada
+ainda, só resuma para eu decidir prioridade.
+
+Aguarde minha confirmação antes de seguir para a Parte 2.
+
+## Parte 2 — Deploy do dashboard em produção (só após minha OK)
+
+Assumindo que o SEC-items não bloqueia, prepare o deploy do
+dashboard (claude/zen-hopper-SeRac, que já inclui GAM-04
+mergeado) em produção:
+
+1. Confirme que claude/zen-hopper-SeRac é a branch conectada
+   ao Railway em produção (a que faz redeploy automático).
+
+2. Rode a suíte completa + lint + audit uma última vez antes
+   do push, para garantir que nada regrediu desde o merge.
+
+3. Faça push para o remote que dispara o deploy do Railway.
+
+4. Depois que o Railway terminar o deploy (você vai poder ver
+   pelo status), rode um smoke test contra produção:
+   - Home carrega (curl na home, como fizemos na Fase 6)
+   - Login funciona
+   - Dashboard novo renderiza (confirme visualmente que os
+     5 grupos aparecem, não a versão antiga)
+   - Tema do IBC (teal #008ea8) aplicado corretamente
+   - Console do browser sem erros JS na carga do dashboard
+
+5. Não faça rollback automaticamente se algo falhar — reporte
+   o problema exato e aguarde minha decisão.
+
+6. Ao final, resumo: o que está em produção agora, URL para eu
+   conferir visualmente, e qualquer observação relevante para
+   os próximos dias de monitoramento.

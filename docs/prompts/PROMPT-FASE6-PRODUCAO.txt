@@ -1,0 +1,48 @@
+Vamos executar a Fase 6 do playbook — migração de produção
+(docs/PLAYBOOK-MIGRACAO-0.9.md). Staging já validado na Fase 5
+(dump/restore, migrações, smoke tests, ciclo downgrade/upgrade,
+tenant demo isolado confirmado — incluindo a correção do bug de
+badges duplicados na migração 0005).
+
+Faça o seguinte, nesta ordem, parando e me avisando se qualquer
+etapa falhar:
+
+1. CRIE uma página de manutenção estática simples (HTML puro,
+   sem dependências) em templates/maintenance.html — mensagem
+   clara tipo "Estamos em manutenção programada, voltamos em
+   breve" com o design system do IBC (teal #008ea8, sem emojis).
+
+2. Adicione um modo de manutenção controlável por variável de
+   ambiente (MAINTENANCE_MODE=true) que:
+   - Serve maintenance.html para todas as rotas exceto /health
+   - Retorna 503 com Retry-After
+   - Não precisa de deploy para ativar/desativar — só a env var
+
+3. Crie scripts/pre_producao_backup.sh que:
+   - Faz pg_dump de produção com timestamp no nome do arquivo
+   - Valida que o dump não está vazio/corrompido
+     (verifica se o arquivo tem tamanho razoável e contém
+     ao menos um CREATE TABLE)
+   - Imprime o caminho do arquivo gerado
+
+4. Crie scripts/producao_migrate.sh que:
+   - Confirma que MAINTENANCE_MODE está ativo antes de prosseguir
+     (aborta se não estiver — proteção contra rodar sem manutenção)
+   - Roda alembic upgrade head com output completo
+   - Roda um smoke test mínimo pós-migração (pytest -m smoke
+     apontando para produção, só leitura + 1 usuário de teste
+     dedicado, nunca ações destrutivas)
+   - Se qualquer etapa falhar, imprime o comando exato de rollback
+     (alembic downgrade <revisão pré-0.9>) e para — não tenta
+     rollback automático, isso é decisão manual
+
+5. Documente em docs/OPS-PRODUCAO-0.9.md o passo a passo manual
+   completo: ativar manutenção, rodar backup, rodar migração,
+   smoke test, desativar manutenção, critério de rollback
+   (vazamento entre tenants = rollback imediato sem debate;
+   >5% erro por >15min = rollback). Inclua os comandos exatos
+   a copiar/colar no console do Railway.
+
+Não rode nada contra produção agora — apenas prepare os scripts
+e a documentação. A execução real eu faço manualmente no console
+do Railway quando decidir a janela de manutenção.

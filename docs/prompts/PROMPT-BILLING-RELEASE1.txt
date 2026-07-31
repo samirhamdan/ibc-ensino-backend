@@ -1,0 +1,129 @@
+Iniciando a Release 1.0. Leia docs/01-PRD.md (seção BIL),
+docs/02-ARQUITETURA.md §4 (modelo de dados) e §7 (eventos
+de domínio) antes de começar. Trabalhe na branch
+feat/BIL-01-asaas, criada a partir de claude/zen-hopper-SeRac.
+Não faça merge sem minha aprovação explícita.
+
+## Objetivo
+
+Implementar o módulo app/billing/ completo: planos, integração
+Asaas, medição de consumo por tenant, régua de inadimplência
+automática e painel de billing no painel do operador (stub —
+a UI completa vem depois, mas os dados precisam existir).
+
+## Entregáveis
+
+### 1. Modelo de dados (migração Alembic reversível)
+
+Tabelas novas (conforme doc 02 §4):
+- subscriptions(id, tenant_id, plano, asaas_customer_id,
+  asaas_subscription_id, status, ciclo, proximo_vencimento,
+  criado_em, atualizado_em)
+- ai_usage(id, tenant_id, periodo, interacoes, tokens_entrada,
+  tokens_saida, custo_estimado, criado_em) — stub por ora,
+  preenchido pelo módulo ai/ na Release 1.0
+
+Alterar tabela tenants:
+- Adicionar coluna billing_status: 'ativo'|'leitura'|'suspenso'
+  (default 'ativo') — separada do status geral, que pode ser
+  ativo operacionalmente mas em leitura por inadimplência.
+
+### 2. Planos e configuração
+
+Arquivo app/billing/plans.py com os 4 planos do PRD §6:
+- Semente: R$149/mês, 50 alunos ativos, cota IA básica
+- Crescimento: R$349/mês, 250 alunos ativos, cota IA padrão
+- Comunidade: R$699/mês, 1000 alunos ativos, cota IA avançada
+- Enterprise: sob consulta, ilimitado
+
+Cada plano define: limite_alunos, cota_interacoes_ia_mes,
+preco_mensal_brl. Planos são configuração, não banco de dados
+— um dict/dataclass versionado em código.
+
+### 3. Integração Asaas (BIL-01, BIL-02)
+
+Criar app/billing/asaas.py com cliente HTTP para a API Asaas:
+- Criar customer (tenant → customer Asaas)
+- Criar subscription recorrente (mensal, Pix/boleto/cartão)
+- Cancelar subscription
+- Todas as chamadas com retry (3×, backoff exponencial) e
+  timeout (10s) — chamadas de billing nunca podem travar
+  a request do usuário; rodar via worker RQ quando possível.
+
+Webhook handler: POST /billing/webhook/asaas
+- Validar assinatura do webhook (header Asaas-Access-Token)
+- Processar eventos: PAYMENT_CONFIRMED → ativo,
+  PAYMENT_OVERDUE → registrar, PAYMENT_DELETED → verificar
+  régua (BIL-02)
+- Publicar domain event correspondente (outbox em
+  domain_events) → worker processa e atualiza billing_status
+- Idempotente: processar o mesmo webhook 2× não muda estado
+
+Régua automática (BIL-02), executada pelo scheduler diário:
+- D+10 sem pagamento: billing_status → 'leitura'
+  (usuários do tenant podem VER mas não CRIAR/EDITAR)
+- D+30 sem pagamento: billing_status → 'suspenso'
+  (login bloqueado, página de suspensão por inadimplência)
+- Cada transição: e-mail automático ao admin do tenant +
+  linha no audit_log
+
+Middleware de billing: adicionar ao request pipeline (APÓS o
+middleware de tenant, ANTES dos blueprints de conteúdo):
+verificar billing_status do tenant — 'leitura' bloqueia
+mutations (POST/PUT/DELETE) retornando 402 com mensagem
+clara; 'suspenso' redireciona para página de suspensão.
+Exceções: /billing/*, /health, /api/theme (sempre passam).
+
+### 4. Medição de consumo (BIL-03) — stub
+
+Função app/billing/metering.py:
+- registrar_interacao_ia(tenant_id, tokens_in, tokens_out,
+  custo_estimado): insere/atualiza ai_usage do período atual
+- consumo_do_tenant(tenant_id): retorna uso do mês corrente
+  vs. cota do plano (0.0–1.0)
+- checar_cota(tenant_id): retorna True se dentro da cota,
+  False se estourou; emite domain event 'ai.cota_80pct'
+  quando atingir 80% (alerta ao operador)
+
+O módulo ai/ vai chamar essas funções — por ora são stubs
+que apenas gravam no banco sem chamada real à API de IA.
+
+### 5. Testes
+
+- Unitários: planos, cálculo de período, régua de inadimplência
+  (mock do clock), idempotência do webhook handler
+- Integração: webhook → domain event → worker → billing_status
+  (usando Postgres real, não mock de ORM)
+- Isolamento: billing_status de tenant A não vaza para tenant B;
+  middleware de billing aplica corretamente por tenant
+- E2E: fluxo completo de inadimplência (D+10 leitura, D+30
+  suspenso) com clock mockado
+
+### 6. Documentação
+
+- docs/OPS-BILLING.md: como criar uma subscription manual
+  no Asaas para o primeiro tenant, como processar reembolso,
+  como pausar a régua para negociação (override via operador),
+  variáveis de ambiente necessárias (ASAAS_API_KEY,
+  ASAAS_WEBHOOK_TOKEN, ASAAS_SANDBOX=true para dev)
+- .env.example atualizado com as novas variáveis
+
+## Critérios de aceite
+
+- Webhook idempotente validado por teste (mesmo payload 2×
+  não altera estado)
+- Régua de inadimplência testada com clock mockado
+- Middleware de billing não quebra nenhum teste existente
+  (suíte completa verde)
+- Em modo sandbox (ASAAS_SANDBOX=true), a integração roda
+  end-to-end sem credencial real
+- Fable 5 sem Critical/High antes do commit final
+
+## O que fica para depois
+
+- UI do painel do operador para billing (feat/OPS-01)
+- White-label com domínio próprio (Release 1.1)
+- Módulo ai/ usando metering.py (Release 1.0, próxima etapa)
+
+Padrão estabelecido: Sonnet escreve, Fable 5 revisa cada PR
+antes do commit. Não faça merge sem minha aprovação.
