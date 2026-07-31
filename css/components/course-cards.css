@@ -476,3 +476,129 @@
   .course-hero-progress-fill,
   .course-hero-cta { transition: none; }
 }
+
+/* ─── Accordion de aulas — visão do aluno (ROADMAP §2.8 C2) ──────────────
+   Cada Module vira um item do accordion com header clicável e painel
+   expansível mostrando os passos internos (Vídeo / Material / Exercício).
+   --------------------------------------------------------------------- */
+
+.lesson-accordion { gap: 0; }
+
+.lesson-acc-item {
+  border-radius: 0;
+  border-bottom: 0;
+}
+
+.lesson-acc-item:first-child { border-radius: var(--radius, 8px) var(--radius, 8px) 0 0; }
+.lesson-acc-item:last-child  { border-radius: 0 0 var(--radius, 8px) var(--radius, 8px); border-bottom: 1px solid #e8e0d4; }
+.lesson-acc-item:only-child  { border-radius: var(--radius, 8px); border-bottom: 1px solid #e8e0d4; }
+
+.lesson-acc-header {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  width: 100%;
+  padding: .7rem .9rem;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.lesson-acc-header:disabled { cursor: default; }
+
+.lesson-acc-header:focus-visible {
+  outline: 2px solid var(--primary, #008ea8);
+  outline-offset: -2px;
+}
+
+.lesson-acc-title-group {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lesson-acc-meta {
+  display: flex;
+  gap: .6rem;
+  font-size: var(--text-xs, .72rem);
+  color: var(--muted, #7f8c8d);
+  flex-wrap: wrap;
+}
+
+.lesson-acc-meta .icon { vertical-align: -2px; }
+
+.lesson-acc-chevron {
+  flex: 0 0 auto;
+  transition: transform .2s ease;
+  color: var(--muted, #7f8c8d);
+}
+
+.lesson-acc-header[aria-expanded="true"] .lesson-acc-chevron {
+  transform: rotate(180deg);
+}
+
+/* Painel expansível */
+.lesson-acc-panel[hidden] { display: none; }
+
+.lesson-acc-body {
+  padding: 0 .9rem .8rem calc(.9rem + 24px + .7rem);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Passos internos da aula */
+.lesson-acc-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm, 6px);
+  font-size: var(--text-sm, .85rem);
+}
+
+.lesson-acc-step-marker {
+  flex: 0 0 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--gray-light, #e8e0d4);
+  color: var(--muted, #7f8c8d);
+}
+
+.lesson-acc-step.done .lesson-acc-step-marker {
+  background: var(--success-500, #1fa96a);
+  color: #fff;
+}
+
+.lesson-acc-step-label {
+  flex: 1;
+  font-weight: 500;
+  color: var(--navy, #2c3e50);
+}
+
+.lesson-acc-step.done .lesson-acc-step-label { color: var(--success-700, #0f7a4a); }
+.lesson-acc-step.locked .lesson-acc-step-label { color: var(--muted, #7f8c8d); }
+
+.lesson-acc-step-status {
+  font-size: var(--text-xs, .72rem);
+  color: var(--muted, #7f8c8d);
+}
+
+.lesson-acc-step.done .lesson-acc-step-status { color: var(--success-700, #0f7a4a); }
+
+.lesson-acc-action {
+  padding-top: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lesson-acc-chevron { transition: none; }
+}

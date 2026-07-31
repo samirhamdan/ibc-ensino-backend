@@ -833,6 +833,16 @@ function getCourseProgressPct(prog){
   return Math.round((done/2)*100);
 }
 
+// ── Accordion de aulas (ROADMAP §2.8 C2) ──────────────────────────────────
+function toggleAccordion(panelId, headerId){
+  const panel = document.getElementById(panelId);
+  const header = document.getElementById(headerId);
+  if(!panel || !header) return;
+  const open = !panel.hidden;
+  panel.hidden = open;
+  header.setAttribute('aria-expanded', String(!open));
+}
+
 function renderCourseList(){
   const el=document.getElementById('course-list');
   el.innerHTML='';
@@ -987,18 +997,64 @@ async function renderCourseResume(){
       </div>
       <span class="course-hero-pct">${passedCount} de ${total} aulas concluídas · ${pct}%</span>
     </div>
-    <div class="modulo-list">
+    <div class="modulo-list lesson-accordion" role="list">
       ${currentAulas.map((a,i)=>{
         const done = a.progress && a.progress.passed;
         const isCurrent = i+1 === continueNum && !allDone;
+        const locked = !a.unlocked;
+        const hasVid = !!a.video_url;
+        const hasMat = a.materiais && a.materiais.length > 0;
+        const vidDone = a.progress && a.progress.video_watched;
+        const matDone = done;
+        const accordionId = 'acc-aula-'+(i+1);
+        const headerId = 'acc-head-'+(i+1);
         return `
-        <div class="modulo-item ${done?'modulo-done':''} ${isCurrent?'modulo-current':''}"
-             ${a.unlocked?`onclick="loadAula(${c.id},${i+1})" role="button" tabindex="0"`:''}
-             ${!a.unlocked?'aria-disabled="true"':''}>
-          <div class="modulo-num">${done?icon('check','14'):(i+1)}</div>
-          <div class="modulo-name">${escapeHtml(a.nome)}</div>
-          ${a.dur?`<div class="modulo-dur">${icon('clock','12')} ${a.dur}</div>`:''}
-          ${!a.unlocked?`<span class="modulo-lock">${icon('lock','14','icon--disabled')}</span>`:''}
+        <div class="modulo-item lesson-acc-item ${done?'modulo-done':''} ${isCurrent?'modulo-current':''}"
+             ${locked?'aria-disabled="true"':''} role="listitem">
+          <button type="button" class="lesson-acc-header" id="${headerId}"
+                  aria-expanded="false" aria-controls="${accordionId}"
+                  onclick="toggleAccordion('${accordionId}','${headerId}')"
+                  ${locked?'disabled':''}>
+            <div class="modulo-num">${done?icon('check','14'):(i+1)}</div>
+            <div class="lesson-acc-title-group">
+              <span class="modulo-name">${escapeHtml(a.nome)}</span>
+              <span class="lesson-acc-meta">
+                ${a.dur?icon('clock','12')+' '+a.dur:''}
+                ${hasVid?icon('play-circle','12')+' Vídeo':''}
+                ${hasMat?icon('file','12')+' Material':''}
+                ${a.quiz&&a.quiz.length?icon('edit','12')+' '+a.quiz.length+' questão(ões)':''}
+              </span>
+            </div>
+            ${locked
+              ?`<span class="modulo-lock">${icon('lock','14','icon--disabled')}</span>`
+              :`<span class="lesson-acc-chevron">${icon('chevron-down','16')}</span>`}
+          </button>
+          <div class="lesson-acc-panel" id="${accordionId}" role="region"
+               aria-labelledby="${headerId}" hidden>
+            <div class="lesson-acc-body">
+              ${hasVid?`
+              <div class="lesson-acc-step ${vidDone?'done':''}">
+                <span class="lesson-acc-step-marker">${vidDone?icon('check','13'):icon('play-circle','13')}</span>
+                <span class="lesson-acc-step-label">Vídeo da aula</span>
+                <span class="lesson-acc-step-status">${vidDone?'Concluído':''}</span>
+              </div>`:''}
+              <div class="lesson-acc-step ${matDone?'done':''}">
+                <span class="lesson-acc-step-marker">${matDone?icon('check','13'):icon('file','13')}</span>
+                <span class="lesson-acc-step-label">Material</span>
+                <span class="lesson-acc-step-status">${matDone?'Concluído':(hasMat?a.materiais.length+' arquivo(s)':'—')}</span>
+              </div>
+              <div class="lesson-acc-step ${done?'done':(!locked&&!done?'':'locked')}">
+                <span class="lesson-acc-step-marker">${done?icon('check','13'):icon('edit','13')}</span>
+                <span class="lesson-acc-step-label">Exercício</span>
+                <span class="lesson-acc-step-status">${done?'Aprovado':(a.quiz&&a.quiz.length?a.quiz.length+' questão(ões)':'—')}</span>
+              </div>
+              <div class="lesson-acc-action">
+                <button class="btn btn-primary btn-sm" onclick="loadAula(${c.id},${i+1})">
+                  ${done?'Revisar aula':'Iniciar aula'} ${icon('arrow-right','14')}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>`;
       }).join('')}
     </div>
