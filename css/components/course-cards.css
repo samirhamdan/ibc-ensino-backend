@@ -477,6 +477,135 @@
   .course-hero-cta { transition: none; }
 }
 
+/* ─── Course page layout with info rail (§2.8 C3) ───────────────────────── */
+.course-page-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: var(--space-xl);
+  align-items: start;
+}
+
+.course-page-main { min-width: 0; }
+
+.course-info-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  position: sticky;
+  top: var(--space-xl);
+}
+
+.course-rail-card {
+  background: var(--white);
+  border: 1px solid var(--gray-light, #e8e0d4);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.course-rail-cert {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.course-rail-cert-icon { margin-bottom: var(--space-xs, 4px); }
+
+.course-rail-cert-title {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  color: var(--navy, #2c3e50);
+}
+
+.course-rail-cert-desc {
+  font-size: var(--text-sm, .85rem);
+  color: var(--muted, #7f8c8d);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.course-rail-cert-bar {
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--gray-light, #e8e0d4);
+  overflow: hidden;
+  margin-top: var(--space-xs, 4px);
+}
+
+.course-rail-cert-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary, #008ea8);
+  transition: width .3s ease;
+}
+
+.course-rail-cert-pct {
+  font-size: var(--text-xs, .72rem);
+  color: var(--muted, #7f8c8d);
+}
+
+.course-rail-heading {
+  font-family: var(--font-display);
+  font-size: var(--text-sm, .85rem);
+  font-weight: 700;
+  color: var(--navy, #2c3e50);
+  margin: 0 0 var(--space-sm);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.course-rail-details {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: var(--text-sm, .85rem);
+  color: var(--dark, #34495e);
+}
+
+.course-rail-details li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.course-rail-details strong {
+  color: var(--navy, #2c3e50);
+  min-width: 80px;
+}
+
+.course-rail-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.course-rail-chip {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: var(--text-xs, .72rem);
+  font-weight: 600;
+  background: rgba(0, 142, 168, 0.1);
+  color: var(--primary-700, #006b85);
+  border-radius: 999px;
+  letter-spacing: .02em;
+}
+
+@media (max-width: 900px) {
+  .course-page-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .course-info-rail {
+    position: static;
+    order: -1;
+  }
+}
+
 /* ─── Accordion de aulas — visão do aluno (ROADMAP §2.8 C2) ──────────────
    Cada Module vira um item do accordion com header clicável e painel
    expansível mostrando os passos internos (Vídeo / Material / Exercício).

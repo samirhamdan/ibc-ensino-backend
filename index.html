@@ -1836,12 +1836,47 @@ function renderCourse(){
   const mats=(c.materiais||[]);
   const nPerg=currentQuestions.length;
   const nPendente=currentQuestions.filter(q=>!q.resposta).length;
+  const nModulos=(c.modules||[]).length;
+  const isComplete = pct >= 100;
+  const levelIcon = c.level==='Avançado'?'rocket':(c.level==='Intermediário'?'bar-chart':'graduation-cap');
+  const skillsHtml = (c.skills||[]).map(s=>`<span class="course-rail-chip">${escapeHtml(s)}</span>`).join('');
+  const updStr = c.updated_at ? new Date(c.updated_at).toLocaleDateString('pt-BR',{month:'short',year:'numeric'}) : '';
+
+  const railHtml = `
+    <aside class="course-info-rail" aria-label="Informações do curso">
+      <div class="course-rail-card course-rail-cert">
+        <div class="course-rail-cert-icon">${icon('certificates','32', isComplete?'icon--gold':'icon--disabled')}</div>
+        <strong class="course-rail-cert-title">${isComplete?'Certificado disponível':'Certificado'}</strong>
+        <p class="course-rail-cert-desc">${isComplete?'Você concluiu este curso!':'Conclua todas as aulas para obter seu certificado.'}</p>
+        ${isComplete?`<button class="btn btn-primary btn-sm btn-full" onclick="renderConclusion()">${icon('certificates','14')} Receber certificado</button>`
+          :`<div class="course-rail-cert-bar"><div class="course-rail-cert-fill" style="width:${pct}%"></div></div>
+            <span class="course-rail-cert-pct">${pct}% concluído</span>`}
+      </div>
+      <div class="course-rail-card">
+        <h3 class="course-rail-heading">Detalhes</h3>
+        <ul class="course-rail-details">
+          <li>${icon(levelIcon,'14')} <strong>Nível:</strong> ${escapeHtml(c.level||'Iniciante')}</li>
+          <li>${icon('catalog','14')} <strong>Aulas:</strong> ${nModulos}</li>
+          ${c.duracao?`<li>${icon('clock','14')} <strong>Duração:</strong> ${escapeHtml(c.duracao)}</li>`:''}
+          <li>${icon('file','14')} <strong>Materiais:</strong> ${mats.length}</li>
+          <li>${icon('edit','14')} <strong>Questões:</strong> ${(c.quiz||[]).length}</li>
+          ${c.tutor_name?`<li>${icon('user-check','14')} <strong>Tutor:</strong> ${escapeHtml(c.tutor_name)}</li>`:''}
+          ${c.enrolled_count!=null?`<li>${icon('users','14')} <strong>Participantes:</strong> ${c.enrolled_count}</li>`:''}
+          ${updStr?`<li>${icon('clock','14')} <strong>Atualizado:</strong> ${updStr}</li>`:''}
+        </ul>
+      </div>
+      ${skillsHtml?`<div class="course-rail-card">
+        <h3 class="course-rail-heading">Habilidades</h3>
+        <div class="course-rail-chips">${skillsHtml}</div>
+      </div>`:''}
+    </aside>`;
+
   document.getElementById('main-content').innerHTML=`
     <div class="course-header">
       <span class="course-tag">${escapeHtml(c.tag)}</span>
       <h1 class="course-title">${c.icon} ${escapeHtml(c.name)}</h1>
       <div class="course-meta">
-        <span>${icon('catalog','14')} ${(c.modules||[]).length} módulos</span>
+        <span>${icon('catalog','14')} ${nModulos} módulos</span>
         ${c.duracao?`<span>${icon('clock','14')} ${c.duracao}</span>`:''}
         <span>${icon('file','14')} ${mats.length} material(is)</span>
         <span>${icon('edit','14')} ${(c.quiz||[]).length} questões</span>
@@ -1859,14 +1894,19 @@ function renderCourse(){
         <div class="step-dot ${prog.quiz_total>0?'done':(prog.material_done?'current':'')}" title="Exercícios"></div>
       </div>
     </div>
-    <div class="tabs tabs-5">
-      <button class="tab ${activeTab==='resumo'?'active':''}" id="tab-btn-resumo" onclick="setTab('resumo')">${icon('document-text','14')} Resumo</button>
-      <button class="tab ${activeTab==='modulos'?'active':''}" id="tab-btn-modulos" onclick="setTab('modulos')">${icon('catalog','14')} Módulos</button>
-      <button class="tab ${activeTab==='material'?'active':''}" id="tab-btn-material" onclick="setTab('material')">${icon('file','14')} Material</button>
-      <button class="tab ${activeTab==='quiz'?'active':''}" id="tab-btn-quiz" onclick="setTab('quiz')">${icon('edit','14')} Exercícios</button>
-      <button class="tab ${activeTab==='perguntas'?'active':''}" id="tab-btn-perguntas" onclick="setTab('perguntas')">${icon('message','14')} Perguntas${nPendente&&canManageCourse(currentUser,c.id)?' ('+nPendente+')':''}</button>
-    </div>
-    <div id="tab-content"></div>`;
+    <div class="course-page-layout">
+      <div class="course-page-main">
+        <div class="tabs tabs-5">
+          <button class="tab ${activeTab==='resumo'?'active':''}" id="tab-btn-resumo" onclick="setTab('resumo')">${icon('document-text','14')} Resumo</button>
+          <button class="tab ${activeTab==='modulos'?'active':''}" id="tab-btn-modulos" onclick="setTab('modulos')">${icon('catalog','14')} Módulos</button>
+          <button class="tab ${activeTab==='material'?'active':''}" id="tab-btn-material" onclick="setTab('material')">${icon('file','14')} Material</button>
+          <button class="tab ${activeTab==='quiz'?'active':''}" id="tab-btn-quiz" onclick="setTab('quiz')">${icon('edit','14')} Exercícios</button>
+          <button class="tab ${activeTab==='perguntas'?'active':''}" id="tab-btn-perguntas" onclick="setTab('perguntas')">${icon('message','14')} Perguntas${nPendente&&canManageCourse(currentUser,c.id)?' ('+nPendente+')':''}</button>
+        </div>
+        <div id="tab-content"></div>
+      </div>
+      ${railHtml}
+    </div>`;
   renderTabContent();
 }
 

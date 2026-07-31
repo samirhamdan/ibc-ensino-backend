@@ -90,6 +90,9 @@ class Course(TenantScopedModel, db.Model):
     description = db.Column(db.Text, default='')
     status = db.Column(db.String(20), default='published')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=True, onupdate=datetime.utcnow)
+    level = db.Column(db.String(50), default='Iniciante')
+    skills = db.Column(db.JSON, nullable=True)
 
     tutor = db.relationship('User', foreign_keys=[tutor_id])
     modules = db.relationship('Module', backref='course', lazy=True, cascade='all, delete-orphan',
@@ -114,12 +117,19 @@ class Course(TenantScopedModel, db.Model):
             'category': self.category_rel.name if self.category_rel else None,
             'category_id': self.category_id,
             'tutor_id': self.tutor_id,
+            'tutor_name': self.tutor.name if self.tutor else None,
             'status': self.status or 'published',
+            'color': self.color,
+            'level': self.level or 'Iniciante',
+            'skills': self.skills or [],
+            'updated_at': self.updated_at.isoformat() if self.updated_at else (self.created_at.isoformat() if self.created_at else None),
+            'created_at': self.created_at.isoformat() if self.created_at else None,
         }
         if include_details:
             data['modules'] = [m.to_dict() for m in self.modules]
             data['materiais'] = [m.to_dict() for m in self.materials]
             data['quiz'] = [q.to_dict() for q in self.quiz]
+            data['enrolled_count'] = len(self.progress)
         return data
 
 
