@@ -198,6 +198,7 @@ class LessonProgress(TenantScopedModel, db.Model):
     material_read_at = db.Column(db.DateTime, nullable=True)
     material_percentage = db.Column(db.Float, default=0.0)
     video_watched = db.Column(db.Boolean, default=False)
+    video_percent = db.Column(db.Float, default=0.0)
 
     # cascade nos backrefs: sem isso, DELETE de user/curso/módulo com progresso
     # registrado viola FK (colunas nullable=False) e retorna 500 no Postgres.
@@ -219,6 +220,7 @@ class LessonProgress(TenantScopedModel, db.Model):
             'material_read_at': self.material_read_at.isoformat() if self.material_read_at else None,
             'material_percentage': self.material_percentage or 0.0,
             'video_watched': bool(self.video_watched),
+            'video_percent': self.video_percent or 0.0,
             'score': self.score,
             'total': self.total,
             'passed': self.passed,

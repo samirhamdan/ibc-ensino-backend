@@ -939,13 +939,16 @@ function markVideoWatched(moduleId){ localStorage.setItem(_videoWatchedKey(modul
 function getAttempts(moduleId){ return parseInt(localStorage.getItem(_attemptsKey(moduleId))||'0',10); }
 function incAttempts(moduleId){ const n=getAttempts(moduleId)+1; localStorage.setItem(_attemptsKey(moduleId),String(n)); return n; }
 
-async function marcarVideoAssistido(){
+let _videoPlayerCleanup = null;
+let _videoReportedPercent = 0;
+
+async function marcarVideoAssistido(percent){
   const a = currentAula;
   if(!a) return;
   markVideoWatched(a.id);
-  // Call server
   try{
-    const r = await api('POST',`/courses/${a.course.id}/aulas/${a.aula_num}/video-watched`);
+    const body = percent != null ? {percent: Math.round(percent)} : {};
+    const r = await api('POST',`/courses/${a.course.id}/aulas/${a.aula_num}/video-watched`, body);
     if(r.ok){
       const d = await r.json();
       if(d.points && !d.already_watched) showToast('⭐ +10 pontos!', 'xp');
@@ -954,6 +957,98 @@ async function marcarVideoAssistido(){
     }
   }catch(e){}
   renderAulaPage();
+}
+
+function _initVideoTracking(){
+  if(_videoPlayerCleanup){ _videoPlayerCleanup(); _videoPlayerCleanup=null; }
+  _videoReportedPercent = 0;
+  const a = currentAula;
+  if(!a || !a.video_embed_url) return;
+  const videoWatched = (a.progress && a.progress.video_watched) || isVideoWatched(a.id);
+  if(videoWatched) return;
+
+  const iframe = document.querySelector('#lesson-card-video iframe');
+  if(!iframe) return;
+
+  const provider = a.video_provider || (a.video_embed_url.includes('youtube') ? 'youtube' : 'vimeo');
+
+  if(provider === 'youtube') _initYouTubeTracking(iframe);
+  else if(provider === 'vimeo') _initVimeoTracking(iframe);
+}
+
+function _updateVideoProgress(pct){
+  _videoReportedPercent = Math.max(_videoReportedPercent, pct);
+  const bar = document.getElementById('videoProgressFill');
+  const label = document.getElementById('videoProgressLabel');
+  if(bar) bar.style.width = Math.min(100, Math.round(_videoReportedPercent)) + '%';
+  if(label) label.textContent = Math.min(100, Math.round(_videoReportedPercent)) + '%';
+  if(_videoReportedPercent >= 90 && currentAula && !isVideoWatched(currentAula.id)){
+    marcarVideoAssistido(_videoReportedPercent);
+  }
+}
+
+function _initYouTubeTracking(iframe){
+  iframe.id = iframe.id || 'ytPlayerFrame';
+  const tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  if(document.querySelector('script[src*="youtube.com/iframe_api"]')){
+    _createYTPlayer(iframe);
+  } else {
+    const prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = function(){
+      if(prev) prev();
+      _createYTPlayer(iframe);
+    };
+    document.head.appendChild(tag);
+  }
+}
+
+function _createYTPlayer(iframe){
+  if(typeof YT === 'undefined' || !YT.Player) return;
+  let interval = null;
+  const player = new YT.Player(iframe.id, {
+    events: {
+      onStateChange: function(e){
+        if(e.data === YT.PlayerState.PLAYING && !interval){
+          interval = setInterval(function(){
+            if(!player.getDuration) return;
+            const dur = player.getDuration();
+            if(dur > 0) _updateVideoProgress((player.getCurrentTime()/dur)*100);
+          }, 3000);
+        }
+        if(e.data === YT.PlayerState.ENDED){
+          _updateVideoProgress(100);
+          if(interval){ clearInterval(interval); interval=null; }
+        }
+      }
+    }
+  });
+  _videoPlayerCleanup = function(){
+    if(interval) clearInterval(interval);
+    try{ player.destroy(); }catch(e){}
+  };
+}
+
+function _initVimeoTracking(iframe){
+  if(typeof Vimeo !== 'undefined' && Vimeo.Player){
+    _createVimeoPlayer(iframe);
+    return;
+  }
+  const tag = document.createElement('script');
+  tag.src = 'https://player.vimeo.com/api/player.js';
+  tag.onload = function(){ _createVimeoPlayer(iframe); };
+  document.head.appendChild(tag);
+}
+
+function _createVimeoPlayer(iframe){
+  const player = new Vimeo.Player(iframe);
+  player.on('timeupdate', function(data){
+    _updateVideoProgress(data.percent * 100);
+  });
+  player.on('ended', function(){ _updateVideoProgress(100); });
+  _videoPlayerCleanup = function(){
+    try{ player.off('timeupdate'); player.off('ended'); }catch(e){}
+  };
 }
 function resetAttempts(moduleId){ localStorage.removeItem(_attemptsKey(moduleId)); }
 
@@ -1115,8 +1210,11 @@ function renderAulaPage(){
         </div>
         ${videoWatched
           ? `<div class="material-done-badge">${icon('checkmark','16','icon--success')} Vídeo concluído · +10 pontos</div>`
-          : `<button class="btn btn-success btn-lg btn-full" id="btnVideoAssistido" onclick="marcarVideoAssistido()">${icon('checkmark-circle','16')} JÁ ASSISTI O VÍDEO</button>
-             <p class="material-reward-hint">Você ganha <strong>+10 pontos</strong> ${icon('points','12','icon--gold')}</p>`}
+          : `<div class="video-auto-progress">
+               <div class="video-auto-progress-bar"><div class="video-auto-progress-fill" id="videoProgressFill"></div></div>
+               <span class="video-auto-progress-text">${icon('play-circle','14')} Assista o vídeo — conclusão automática em 90% · <span id="videoProgressLabel">0%</span></span>
+               <p class="material-reward-hint">Você ganha <strong>+10 pontos</strong> ${icon('points','12','icon--gold')}</p>
+             </div>`}
       </div>
     </div>`;
   }
@@ -1166,7 +1264,7 @@ function renderAulaPage(){
     const lockMsg = hasVideo && hasMat
       ? 'Assista ao vídeo e leia o material para desbloquear o exercício.'
       : hasVideo
-        ? 'Assista ao vídeo e clique em <strong>"Já assisti o vídeo"</strong> para desbloquear.'
+        ? 'Assista ao vídeo (90% de progresso) para desbloquear o exercício.'
         : 'Leia o material e clique em <strong>"Já li o material"</strong> para desbloquear.';
     exerciseBody = `
       <div class="locked-exercise-hint">
@@ -1332,6 +1430,7 @@ function renderAulaPage(){
         </div>
       </div>
     </div>`;
+  setTimeout(_initVideoTracking, 200);
 }
 
 // Leva o aluno ao passo escolhido no rail (§2.8 A1). Respeita

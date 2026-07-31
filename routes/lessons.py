@@ -61,7 +61,7 @@ def get_embed_url(video_url):
     if yt:
         # cc_load_policy=1: legendas ligadas por padrão (acessibilidade §2.4/NFR-08)
         # rel=0: sem vídeos sugeridos de fora do canal ao final
-        return f'https://www.youtube.com/embed/{yt.group(1)}?cc_load_policy=1&rel=0', 'youtube'
+        return f'https://www.youtube.com/embed/{yt.group(1)}?cc_load_policy=1&rel=0&enablejsapi=1', 'youtube'
     # Vimeo: vimeo.com/ID or player.vimeo.com/video/ID
     vm = re.search(r'(?:vimeo\.com/|player\.vimeo\.com/video/)(\d+)', video_url)
     if vm:
@@ -363,6 +363,9 @@ def mark_video_watched(course_id, aula_num):
         prog = LessonProgress(user_id=user.id, course_id=course_id, module_id=module.id)
         db.session.add(prog)
 
+    data = request.get_json(silent=True) or {}
+    percent = min(100.0, max(0.0, float(data.get('percent', 100))))
+    prog.video_percent = max(prog.video_percent or 0, percent)
     prog.video_watched = True
     db.session.commit()
 
