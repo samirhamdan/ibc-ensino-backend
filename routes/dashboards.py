@@ -135,8 +135,57 @@ def admin_dashboard():
         'admins': round(admins / total_users * 100) if total_users else 0,
     }
 
-    alerts = []
+    # ── Pulso: sparklines de 8 semanas ──
     tid = current_tenant_id()
+    pulso_weeks = []
+    now = datetime.utcnow()
+    for w in range(7, -1, -1):
+        week_end = now - timedelta(weeks=w)
+        week_start = week_end - timedelta(days=7)
+        active = db.session.query(db.func.count(db.func.distinct(LessonProgress.user_id))).filter(
+            LessonProgress.tenant_id == tid,
+            LessonProgress.completed_at >= week_start,
+            LessonProgress.completed_at < week_end).scalar() or 0
+        completions = LessonProgress.query.filter(
+            LessonProgress.tenant_id == tid,
+            LessonProgress.passed == True,
+            LessonProgress.completed_at >= week_start,
+            LessonProgress.completed_at < week_end).count()
+        signups_w = TenantUser.query.filter(
+            TenantUser.tenant_id == tid,
+            TenantUser.criado_em >= week_start,
+            TenantUser.criado_em < week_end).count()
+        pulso_weeks.append({
+            'label': week_end.strftime('%d/%m'),
+            'active': active,
+            'completions': completions,
+            'signups': signups_w,
+        })
+
+    this_week = pulso_weeks[-1] if pulso_weeks else {}
+    prev_week = pulso_weeks[-2] if len(pulso_weeks) >= 2 else {}
+    enrolled_total = alunos
+    engagement_rate = round(this_week.get('active', 0) / enrolled_total * 100) if enrolled_total else 0
+
+    pulso = {
+        'alunos_ativos_7d': this_week.get('active', 0),
+        'alunos_ativos_prev': prev_week.get('active', 0),
+        'conclusoes_semana': this_week.get('completions', 0),
+        'conclusoes_prev': prev_week.get('completions', 0),
+        'engajamento_pct': engagement_rate,
+        'engajamento_prev': round(prev_week.get('active', 0) / enrolled_total * 100) if enrolled_total else 0,
+        'novos_semana': this_week.get('signups', 0),
+        'novos_prev': prev_week.get('signups', 0),
+        'sparklines': {
+            'active': [w['active'] for w in pulso_weeks],
+            'completions': [w['completions'] for w in pulso_weeks],
+            'signups': [w['signups'] for w in pulso_weeks],
+        },
+        'labels': [w['label'] for w in pulso_weeks],
+    }
+
+    # ── Fila de Atencao (alerts priorizados com acao) ──
+    alerts = []
     all_courses = Course.query.filter_by(tenant_id=tid).all()
     course_map = {c.id: c for c in all_courses}
     course_ids = list(course_map.keys())
@@ -153,19 +202,81 @@ def admin_dashboard():
         dropout = round((students - completed) / students * 100)
         if dropout >= 35:
             c = course_map.get(cid)
-            alerts.append({'type': 'dropout', 'message': f'Curso "{c.name if c else cid}" com {dropout}% abandono (ALTO!)', 'severity': 'high'})
-    if new_users_7d:
-        alerts.append({'type': 'signup', 'message': f'{new_users_7d} novos alunos inscritos nos últimos 7 dias', 'severity': 'info'})
-    if not alerts:
-        alerts.append({'type': 'ok', 'message': 'Nenhum alerta no momento. Tudo funcionando bem! ✅', 'severity': 'info'})
+            alerts.append({
+                'type': 'dropout',
+                'message': f'Curso "{c.name if c else cid}" com {dropout}% de abandono',
+                'severity': 'high',
+                'action_label': 'Ver ponto de abandono',
+                'action_target': f'courses:{cid}',
+            })
 
+    inactive_7d = db.session.query(db.func.count(db.func.distinct(TenantUser.user_id))).filter(
+        TenantUser.tenant_id == tid,
+        TenantUser.papel == 'aluno',
+        ~TenantUser.user_id.in_(
+            db.session.query(db.func.distinct(LessonProgress.user_id)).filter(
+                LessonProgress.tenant_id == tid,
+                LessonProgress.completed_at >= now - timedelta(days=7))
+        )
+    ).scalar() or 0
+    if inactive_7d > 0:
+        alerts.append({
+            'type': 'inactivity',
+            'message': f'{inactive_7d} alunos sem atividade nos ultimos 7 dias',
+            'severity': 'warn',
+            'action_label': 'Ver alunos',
+            'action_target': 'users',
+        })
+
+    pending_questions = Question.query.filter(
+        Question.tenant_id == tid,
+        Question.resposta == '',
+        Question.created_at <= now - timedelta(days=5)
+    ).count()
+    if pending_questions > 0:
+        alerts.append({
+            'type': 'pending_questions',
+            'message': f'{pending_questions} perguntas aguardando resposta ha mais de 5 dias',
+            'severity': 'warn',
+            'action_label': 'Responder agora',
+            'action_target': 'users',
+        })
+
+    if new_users_7d:
+        alerts.append({
+            'type': 'signup',
+            'message': f'{new_users_7d} novos alunos inscritos nos ultimos 7 dias',
+            'severity': 'info',
+            'action_label': 'Ver alunos',
+            'action_target': 'users',
+        })
+
+    # ── Atividade recente (24h, max 8) ──
     recent_activities = []
-    for q in Question.query.filter_by(tenant_id=current_tenant_id()).order_by(Question.created_at.desc()).limit(3).all():
-        recent_activities.append({'user': q.author.name if q.author else '—', 'action': f'fez uma pergunta em "{q.course.name if q.course else ""}"', 'timestamp': q.created_at.isoformat()})
-    for p in LessonProgress.query.filter_by(passed=True, tenant_id=current_tenant_id()).order_by(LessonProgress.completed_at.desc()).limit(3).all():
-        recent_activities.append({'user': p.user.name if p.user else '—', 'action': f'concluiu uma aula em "{p.course.name if p.course else ""}"', 'timestamp': p.completed_at.isoformat() if p.completed_at else ''})
+    day_ago = now - timedelta(hours=24)
+    for q in Question.query.filter(
+            Question.tenant_id == tid,
+            Question.created_at >= day_ago
+    ).order_by(Question.created_at.desc()).limit(4).all():
+        recent_activities.append({
+            'user': q.author.name if q.author else '',
+            'action': f'perguntou em "{q.course.name if q.course else ""}"',
+            'type': 'question',
+            'timestamp': q.created_at.isoformat(),
+        })
+    for p in LessonProgress.query.filter(
+            LessonProgress.tenant_id == tid,
+            LessonProgress.passed == True,
+            LessonProgress.completed_at >= day_ago
+    ).order_by(LessonProgress.completed_at.desc()).limit(4).all():
+        recent_activities.append({
+            'user': p.user.name if p.user else '',
+            'action': f'concluiu aula em "{p.course.name if p.course else ""}"',
+            'type': 'completion',
+            'timestamp': p.completed_at.isoformat() if p.completed_at else '',
+        })
     recent_activities.sort(key=lambda a: a['timestamp'], reverse=True)
-    recent_activities = recent_activities[:6]
+    recent_activities = recent_activities[:8]
 
     return jsonify({
         'total_users': {'alunos': alunos, 'tutores': tutores, 'admins': admins, 'total': total_users},
@@ -176,6 +287,7 @@ def admin_dashboard():
         'user_distribution': user_distribution,
         'alerts': alerts,
         'recent_activities': recent_activities,
+        'pulso': pulso,
     }), 200
 
 

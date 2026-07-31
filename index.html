@@ -62,6 +62,7 @@
 <link rel="stylesheet" href="css/components/login.css">
 <link rel="stylesheet" href="css/components/micro.css">
 <link rel="stylesheet" href="css/components/toast.css">
+<link rel="stylesheet" href="css/components/admin-dashboard.css">
 <link rel="stylesheet" href="css/components/hero.css">
 <link rel="stylesheet" href="css/components/trails.css">
 <link rel="stylesheet" href="css/components/onboarding.css">
@@ -284,45 +285,37 @@
       </div>
       <div class="sidebar-section" id="admin-nav-section" style="display:none">
         <div class="sidebar-label">Administração</div>
-        <div class="course-item" id="nav-admin-dashboard" onclick="detectarPerfilEAtualizarDashboard()" style="display:none">
+        <div class="course-item" id="nav-admin-hoje" onclick="showAdminPanel('hoje')" style="display:none">
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-home"></use></svg></span>
+          <div class="ci-text"><div class="ci-name">Hoje</div></div>
+        </div>
+        <div class="course-item" id="nav-admin-users" onclick="showAdminPanel('users')">
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-users"></use></svg></span>
+          <div class="ci-text"><div class="ci-name">Pessoas</div></div>
+        </div>
+        <div class="course-item" id="nav-admin-catalog" onclick="showAdminPanel('catalog')">
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-books"></use></svg></span>
+          <div class="ci-text"><div class="ci-name">Cursos</div></div>
+        </div>
+        <div class="course-item" id="nav-admin-trails" onclick="showAdminPanel('trails')" style="display:none">
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-graduation-cap"></use></svg></span>
+          <div class="ci-text"><div class="ci-name">Turmas</div></div>
+        </div>
+        <div class="course-item" id="nav-admin-dashboard" onclick="showAdminPanel('dashboard')" style="display:none">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-bar-chart"></use></svg></span>
-          <div class="ci-text"><div class="ci-name">Dashboard</div></div>
+          <div class="ci-text"><div class="ci-name">Relatorios</div></div>
+        </div>
+        <div class="course-item" id="nav-admin-announcements" onclick="showAdminPanel('announcements')" style="display:none">
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-megaphone"></use></svg></span>
+          <div class="ci-text"><div class="ci-name">Comunicacao</div></div>
+        </div>
+        <div class="course-item" id="nav-admin-settings" onclick="showAdminPanel('settings')" style="display:none">
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-settings"></use></svg></span>
+          <div class="ci-text"><div class="ci-name">Configuracoes</div></div>
         </div>
         <div class="course-item" id="nav-tutor-dash" onclick="detectarPerfilEAtualizarDashboard()" style="display:none">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-bar-chart"></use></svg></span>
           <div class="ci-text"><div class="ci-name">Painel do Tutor</div></div>
-        </div>
-        <div class="course-item" id="nav-admin-catalog" onclick="showAdminPanel('catalog')">
-          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-catalog"></use></svg></span>
-          <div class="ci-text"><div class="ci-name">Catálogo de Cursos</div></div>
-        </div>
-        <div class="course-item" id="nav-admin-categories" onclick="showAdminPanel('categories')" style="display:none">
-          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-tag"></use></svg></span>
-          <div class="ci-text"><div class="ci-name">Categorias</div></div>
-        </div>
-        <div class="course-item" id="nav-admin-trails" onclick="showAdminPanel('trails')" style="display:none">
-          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-trails"></use></svg></span>
-          <div class="ci-text"><div class="ci-name">Gerenciar Trilhas</div></div>
-        </div>
-        <div class="course-item" id="nav-admin-courses" onclick="showAdminPanel('courses')" style="display:none">
-          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-books"></use></svg></span>
-          <div class="ci-text"><div class="ci-name">Gerenciar Cursos</div></div>
-        </div>
-        <div class="course-item" id="nav-admin-tutors" onclick="showAdminPanel('tutors')" style="display:none">
-          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-user-check"></use></svg></span>
-          <div class="ci-text"><div class="ci-name">Tutores</div></div>
-        </div>
-        <div class="course-item" id="nav-admin-users" onclick="showAdminPanel('users')">
-          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-users"></use></svg></span>
-          <div class="ci-text"><div class="ci-name">Usuários</div></div>
-        </div>
-        <div class="course-item" id="nav-admin-announcements" onclick="showAdminPanel('announcements')" style="display:none">
-          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-megaphone"></use></svg></span>
-          <div class="ci-text"><div class="ci-name">Comunicação</div></div>
-        </div>
-        <div class="course-item" id="nav-admin-settings" onclick="showAdminPanel('settings')" style="display:none">
-          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-settings"></use></svg></span>
-          <div class="ci-text"><div class="ci-name">Configurações</div></div>
         </div>
       </div>
     </div>
@@ -774,7 +767,7 @@ function detectarPerfilEAtualizarDashboard(){
   if(!currentUser){ console.log('[DEBUG] sem currentUser → renderAlunoDashboard'); renderAlunoDashboard(); return; }
   console.log('[DEBUG] role:', currentUser.role, 'isAdmin:', isAdmin(), 'isTutor:', isTutor(), 'isAluno:', isAluno());
   try {
-    if(isAdmin()) { console.log('[DEBUG] → renderAdminDashboard'); renderAdminDashboard(); }
+    if(isAdmin()) { console.log('[DEBUG] → renderAdminHoje'); renderAdminHoje(); }
     else if(isTutor()) { console.log('[DEBUG] → renderTutorPanelDashboard'); renderTutorPanelDashboard(); }
     else { console.log('[DEBUG] → renderAlunoDashboard'); renderAlunoDashboard(); }
   } catch(e){
@@ -2404,7 +2397,8 @@ function showAdminPanel(panel){
   const navEl=document.getElementById('nav-admin-'+panel);
   if(navEl) navEl.classList.add('active');
   if(currentCourse){document.querySelectorAll('.course-item[id^=course-nav]').forEach(x=>x.classList.remove('active'));currentCourse=null;}
-  if(panel==='users') renderAdminUsersV2();
+  if(panel==='hoje') renderAdminHoje();
+  else if(panel==='users') renderAdminUsersV2();
   else if(panel==='tutors') renderAdminTutors();
   else if(panel==='dashboard') renderDashboard();
   else if(panel==='catalog') renderAdminCatalog();
@@ -4516,6 +4510,118 @@ async function _renderAdminDashboardInner(){
     new Chart(document.getElementById('admin-chart-pie'),{type:'pie',data:{labels:['Alunos','Tutores','Admins'],datasets:[{data:[userDistribution.alunos,userDistribution.tutores,userDistribution.admins],backgroundColor:['#008ea8','#27ae60','#f39c12'],borderWidth:0}]},options:{plugins:{legend:{position:'bottom',labels:{padding:16,font:{size:12}}}}}});
   }
   console.log('[DEBUG] _renderAdminDashboardInner: concluído com sucesso');
+}
+
+// ── Admin: Tela "Hoje" (UX_ADMIN_SAAS §2) ──
+async function renderAdminHoje(){
+  const el=document.getElementById('main-content');
+  if(!el) return;
+  el.innerHTML=`<div class="admin-hoje">
+    <div class="admin-hoje-heading">${icon('home','20')} Hoje</div>
+    <div id="admin-hoje-body"><div class="alert alert-info"><span class="alert-icon">${icon('clock','16')}</span><div class="alert-body">Carregando...</div></div></div>
+  </div>`;
+  try {
+  const res=await api('GET','/admin/dashboard');
+  if(!res.ok){
+    document.getElementById('admin-hoje-body').innerHTML=`<div class="alert alert-danger"><span class="alert-icon">${icon('x-circle','16')}</span><div class="alert-body">Nao foi possivel carregar o painel.</div></div><button class="btn btn-outline" onclick="renderAdminHoje()" style="margin-top:var(--space-sm)">Tentar de novo</button>`;
+    return;
+  }
+  const d=await res.json();
+  const alerts=d.alerts||[];
+  const pulso=d.pulso||{};
+  const recent=d.recent_activities||[];
+  const body=document.getElementById('admin-hoje-body');
+  body.innerHTML=`
+    <div class="admin-hoje-grid">
+      <div>
+        ${_renderFilaAtencao(alerts)}
+        ${_renderAtividadeRecente(recent)}
+      </div>
+      <div>
+        ${_renderPulso(pulso)}
+      </div>
+    </div>`;
+  } catch(e){ console.error('[ERRO] renderAdminHoje:', e); _renderDashboardError(e, 'painel admin'); }
+}
+
+function _renderFilaAtencao(alerts){
+  const severityIcon={high:'x-circle',warn:'lightbulb',info:'checkmark-circle'};
+  if(!alerts.length){
+    return `<div class="admin-fila">
+      <div class="admin-fila-title">${icon('target','16')} Fila de Atencao</div>
+      <div class="admin-fila-empty">${icon('checkmark-circle','16')} Tudo em dia. Nenhuma acao pendente.</div>
+    </div>`;
+  }
+  const highFirst=[...alerts].sort((a,b)=>{
+    const ord={high:0,warn:1,info:2};
+    return (ord[a.severity]||2)-(ord[b.severity]||2);
+  });
+  return `<div class="admin-fila">
+    <div class="admin-fila-title">${icon('target','16')} Fila de Atencao</div>
+    <div class="admin-fila-list">
+      ${highFirst.map(a=>`<div class="admin-fila-item" data-severity="${a.severity||'info'}">
+        <span class="admin-fila-icon">${icon(severityIcon[a.severity]||'checkmark-circle','16')}</span>
+        <span class="admin-fila-msg">${escapeHtml(a.message)}</span>
+        ${a.action_label?`<a class="admin-fila-action" onclick="showAdminPanel('${(a.action_target||'').split(':')[0]||'users'}')">${escapeHtml(a.action_label)}</a>`:''}
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function _renderPulso(p){
+  const cards=[
+    {label:'Alunos ativos (7d)',value:p.alunos_ativos_7d||0,prev:p.alunos_ativos_prev||0,spark:p.sparklines?.active},
+    {label:'Conclusoes da semana',value:p.conclusoes_semana||0,prev:p.conclusoes_prev||0,spark:p.sparklines?.completions},
+    {label:'Engajamento',value:(p.engajamento_pct||0)+'%',prev:p.engajamento_prev||0,spark:null},
+    {label:'Novos alunos',value:p.novos_semana||0,prev:p.novos_prev||0,spark:p.sparklines?.signups},
+  ];
+  return `<div class="admin-fila-title" style="margin-bottom:var(--space-sm)">${icon('bar-chart','16')} Pulso da Semana</div>
+    <div class="admin-pulso">
+      ${cards.map(c=>{
+        const numVal=typeof c.value==='string'?parseInt(c.value):c.value;
+        const numPrev=typeof c.prev==='string'?parseInt(c.prev):c.prev;
+        const diff=numVal-numPrev;
+        const cls=diff>0?'up':diff<0?'down':'neutral';
+        const diffStr=diff>0?'+'+diff:diff===0?'=':''+diff;
+        return `<div class="admin-pulso-card">
+          <div class="admin-pulso-label">${escapeHtml(c.label)}</div>
+          <div class="admin-pulso-value">${c.value}</div>
+          <div class="admin-pulso-delta ${cls}">${diffStr} vs. semana anterior</div>
+          ${c.spark?`<div class="admin-pulso-sparkline">${_svgSparkline(c.spark)}</div>`:''}
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function _svgSparkline(data){
+  if(!data||!data.length) return '';
+  const max=Math.max(...data,1);
+  const h=24,w=100;
+  const pts=data.map((v,i)=>{
+    const x=(i/(data.length-1))*w;
+    const y=h-(v/max)*h*0.85-2;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}"/></svg>`;
+}
+
+function _renderAtividadeRecente(activities){
+  if(!activities.length){
+    return `<div class="admin-atividade">
+      <div class="admin-atividade-title">${icon('clock','16')} Atividade Recente</div>
+      <div class="admin-atividade-list"><div class="admin-atividade-empty">Nenhuma atividade nas ultimas 24 horas.</div></div>
+    </div>`;
+  }
+  return `<div class="admin-atividade">
+    <div class="admin-atividade-title">${icon('clock','16')} Atividade Recente</div>
+    <div class="admin-atividade-list">
+      ${activities.map(a=>`<div class="admin-atividade-item">
+        <span class="admin-atividade-dot" data-type="${a.type||''}"></span>
+        <span class="admin-atividade-text"><strong>${escapeHtml(a.user||'')}</strong> ${escapeHtml(a.action||'')}</span>
+        <span class="admin-atividade-time">${a.timestamp?new Date(a.timestamp).toLocaleString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''}</span>
+      </div>`).join('')}
+    </div>
+  </div>`;
 }
 
 async function renderTutorPanelDashboard(){
