@@ -169,17 +169,9 @@ def _badge_progress(user_id, code):
 
 
 def _completed_courses_count(user_id):
-    """Count courses where user passed all modules"""
-    count = 0
-    for course in Course.query.filter_by(tenant_id=current_tenant_id()).all():
-        modules = Module.query.filter_by(tenant_id=current_tenant_id(), course_id=course.id).all()
-        if not modules:
-            continue
-        progresses = {p.module_id: p for p in
-                      LessonProgress.query.filter_by(user_id=user_id, course_id=course.id, tenant_id=current_tenant_id()).all()}
-        if all(progresses.get(m.id) and progresses[m.id].passed for m in modules):
-            count += 1
-    return count
+    """Count courses where user passed all modules (2 queries total)."""
+    from routes.trails import _completed_course_ids
+    return len(_completed_course_ids(user_id))
 
 
 def _consecutive_days(user_points):

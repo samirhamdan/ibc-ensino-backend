@@ -55,14 +55,37 @@ def _current_user():
     return None
 
 
-def _completed_pct(course, user_id):
-    modules = Module.query.filter_by(tenant_id=current_tenant_id(), course_id=course.id).all()
-    if not modules:
-        return 0
-    progresses = {p.module_id: p for p in
-                  LessonProgress.query.filter_by(user_id=user_id, course_id=course.id, tenant_id=current_tenant_id()).all()}
-    passed = sum(1 for m in modules if progresses.get(m.id) and progresses[m.id].passed)
-    return round(passed / len(modules) * 100)
+def _batch_completion(tenant_id, course_ids=None, user_ids=None):
+    """Batch completion stats: {(course_id, user_id): pct}.
+
+    2 queries total regardless of course/user count:
+    one for module counts per course, one for passed counts per (course, user).
+    """
+    mod_q = db.session.query(Module.course_id, db.func.count(Module.id)) \
+        .filter_by(tenant_id=tenant_id)
+    if course_ids:
+        mod_q = mod_q.filter(Module.course_id.in_(course_ids))
+    mod_counts = dict(mod_q.group_by(Module.course_id).all())
+
+    prog_q = db.session.query(
+        LessonProgress.course_id, LessonProgress.user_id,
+        db.func.count(LessonProgress.id)
+    ).filter(
+        LessonProgress.tenant_id == tenant_id,
+        LessonProgress.passed.is_(True),
+    )
+    if course_ids:
+        prog_q = prog_q.filter(LessonProgress.course_id.in_(course_ids))
+    if user_ids:
+        prog_q = prog_q.filter(LessonProgress.user_id.in_(user_ids))
+    passed_counts = {(cid, uid): cnt for cid, uid, cnt in
+                     prog_q.group_by(LessonProgress.course_id, LessonProgress.user_id).all()}
+
+    result = {}
+    for (cid, uid), passed in passed_counts.items():
+        total = mod_counts.get(cid, 0)
+        result[(cid, uid)] = round(passed / total * 100) if total else 0
+    return result, mod_counts
 
 
 # ── Admin ────────────────────────────────────────────────────────────────
@@ -87,8 +110,9 @@ def admin_dashboard():
 
     total_courses = Course.query.filter_by(tenant_id=current_tenant_id()).count()
 
-    all_progress = LessonProgress.query.filter_by(tenant_id=current_tenant_id()).all()
-    completion_rate = round(sum(1 for p in all_progress if p.passed) / len(all_progress) * 100, 1) if all_progress else 0.0
+    total_lp = LessonProgress.query.filter_by(tenant_id=current_tenant_id()).count()
+    passed_lp = LessonProgress.query.filter_by(tenant_id=current_tenant_id(), passed=True).count()
+    completion_rate = round(passed_lp / total_lp * 100, 1) if total_lp else 0.0
 
     week_ago = datetime.utcnow() - timedelta(days=7)
     # Novos vínculos neste tenant nos últimos 7 dias (não novas contas
@@ -112,17 +136,24 @@ def admin_dashboard():
     }
 
     alerts = []
-    for course in Course.query.filter_by(tenant_id=current_tenant_id()).all():
-        modules = Module.query.filter_by(tenant_id=current_tenant_id(), course_id=course.id).all()
-        if not modules:
+    tid = current_tenant_id()
+    all_courses = Course.query.filter_by(tenant_id=tid).all()
+    course_map = {c.id: c for c in all_courses}
+    course_ids = list(course_map.keys())
+    completion, mod_counts = _batch_completion(tid, course_ids=course_ids)
+    student_counts = dict(
+        db.session.query(LessonProgress.course_id, db.func.count(db.func.distinct(LessonProgress.user_id)))
+        .filter(LessonProgress.course_id.in_(course_ids), LessonProgress.tenant_id == tid)
+        .group_by(LessonProgress.course_id).all()
+    ) if course_ids else {}
+    for cid, students in student_counts.items():
+        if students < 3:
             continue
-        students = db.session.query(LessonProgress.user_id).filter_by(course_id=course.id).distinct().count()
-        completed = sum(1 for uid, in db.session.query(LessonProgress.user_id).filter_by(course_id=course.id).distinct()
-                        if _completed_pct(course, uid) == 100)
-        if students >= 3:
-            dropout = round((students - completed) / students * 100)
-            if dropout >= 35:
-                alerts.append({'type': 'dropout', 'message': f'Curso "{course.name}" com {dropout}% abandono (ALTO!)', 'severity': 'high'})
+        completed = sum(1 for (c2, u2), pct in completion.items() if c2 == cid and pct == 100)
+        dropout = round((students - completed) / students * 100)
+        if dropout >= 35:
+            c = course_map.get(cid)
+            alerts.append({'type': 'dropout', 'message': f'Curso "{c.name if c else cid}" com {dropout}% abandono (ALTO!)', 'severity': 'high'})
     if new_users_7d:
         alerts.append({'type': 'signup', 'message': f'{new_users_7d} novos alunos inscritos nos últimos 7 dias', 'severity': 'info'})
     if not alerts:
@@ -168,15 +199,21 @@ def tutor_dashboard():
     } for q in pending]
 
     my_courses = []
+    tid = current_tenant_id()
+    completion_tutor, mod_counts_tutor = _batch_completion(tid, course_ids=course_ids)
+    student_counts_tutor = dict(
+        db.session.query(LessonProgress.course_id, db.func.count(db.func.distinct(LessonProgress.user_id)))
+        .filter(LessonProgress.course_id.in_(course_ids), LessonProgress.tenant_id == tid)
+        .group_by(LessonProgress.course_id).all()
+    ) if course_ids else {}
     for c in my_courses_list:
-        modules = Module.query.filter_by(tenant_id=current_tenant_id(), course_id=c.id).all()
-        student_ids = [uid for uid, in db.session.query(LessonProgress.user_id).filter_by(course_id=c.id).distinct()]
-        completed = sum(1 for uid in student_ids if modules and _completed_pct(c, uid) == 100)
-        rate = round(completed / len(student_ids) * 100) if student_ids else 0
+        students = student_counts_tutor.get(c.id, 0)
+        completed = sum(1 for (c2, u2), pct in completion_tutor.items() if c2 == c.id and pct == 100)
+        rate = round(completed / students * 100) if students else 0
         my_courses.append({
             'id': c.id, 'name': c.name, 'icon': c.icon,
-            'students': len(student_ids), 'completed': completed, 'completion_rate': rate,
-            'alerts': [] if rate >= 50 or not student_ids else [f'Atenção: taxa de conclusão baixa ({rate}%)'],
+            'students': students, 'completed': completed, 'completion_rate': rate,
+            'alerts': [] if rate >= 50 or not students else [f'Atenção: taxa de conclusão baixa ({rate}%)'],
         })
 
     week_ago = datetime.utcnow() - timedelta(days=7)
@@ -227,17 +264,21 @@ def aluno_dashboard():
                          'date': ub.unlocked_at.isoformat() + 'Z'} for ub in user_badges]
 
     enrolled_courses = []
-    for c in Course.query.filter_by(tenant_id=current_tenant_id()).all():
-        modules = Module.query.filter_by(tenant_id=current_tenant_id(), course_id=c.id).order_by(Module.position).all()
-        progresses = {p.module_id: p for p in LessonProgress.query.filter_by(user_id=user.id, course_id=c.id, tenant_id=current_tenant_id()).all()}
-        if not progresses or not modules:
+    tid = current_tenant_id()
+    all_courses_aluno = Course.query.filter_by(tenant_id=tid).all()
+    course_map_aluno = {c.id: c for c in all_courses_aluno}
+    cids_aluno = list(course_map_aluno.keys())
+    completion_aluno, mod_counts_aluno = _batch_completion(tid, course_ids=cids_aluno, user_ids=[user.id])
+    for cid, c in course_map_aluno.items():
+        pct = completion_aluno.get((cid, user.id), 0)
+        total = mod_counts_aluno.get(cid, 0)
+        if not total or (cid, user.id) not in completion_aluno:
             continue
-        passed_count = sum(1 for m in modules if progresses.get(m.id) and progresses[m.id].passed)
-        pct = round(passed_count / len(modules) * 100) if modules else 0
-        aula_atual = min(passed_count + 1, len(modules))
+        passed_count = round(pct * total / 100) if total else 0
+        aula_atual = min(passed_count + 1, total)
         enrolled_courses.append({
             'id': c.id, 'name': c.name, 'icon': c.icon,
-            'aula_atual': aula_atual, 'total_aulas': len(modules), 'percentage': pct,
+            'aula_atual': aula_atual, 'total_aulas': total, 'percentage': pct,
             'status': 'concluido' if pct == 100 else 'em_andamento',
         })
 
@@ -307,32 +348,42 @@ def aluno_externo_dashboard():
         user_badges = UserBadge.query.filter_by(user_id=user.id, tenant_id=current_tenant_id()).order_by(UserBadge.unlocked_at.desc()).all()
         trofeus_unlocked = [{'icon': ub.badge.icon, 'name': ub.badge.name, 'description': ub.badge.description, 'date': ub.unlocked_at.isoformat()} for ub in user_badges]
 
-        for c in Course.query.filter_by(tenant_id=current_tenant_id(), acesso='publico').all():
-            modules = Module.query.filter_by(tenant_id=current_tenant_id(), course_id=c.id).order_by(Module.position).all()
-            progresses = {p.module_id: p for p in LessonProgress.query.filter_by(user_id=user.id, course_id=c.id, tenant_id=current_tenant_id()).all()}
-            if not progresses or not modules:
+        tid_ext = current_tenant_id()
+        pub_courses = Course.query.filter_by(tenant_id=tid_ext, acesso='publico').all()
+        pub_cids = [c.id for c in pub_courses]
+        comp_ext, mod_ext = _batch_completion(tid_ext, course_ids=pub_cids, user_ids=[user.id])
+        for c in pub_courses:
+            pct = comp_ext.get((c.id, user.id), 0)
+            total = mod_ext.get(c.id, 0)
+            if not total or (c.id, user.id) not in comp_ext:
                 continue
-            passed_count = sum(1 for m in modules if progresses.get(m.id) and progresses[m.id].passed)
-            pct = round(passed_count / len(modules) * 100)
             if pct < 100:
+                passed_n = round(pct * total / 100) if total else 0
                 in_progress = {'id': c.id, 'name': c.name, 'icon': c.icon,
-                               'aula': min(passed_count + 1, len(modules)), 'total': len(modules), 'percentage': pct}
+                               'aula': min(passed_n + 1, total), 'total': total, 'percentage': pct}
                 break
 
     featured_courses = []
-    for c in Course.query.filter_by(tenant_id=current_tenant_id(), acesso='publico').limit(4).all():
-        n_modules = Module.query.filter_by(tenant_id=current_tenant_id(), course_id=c.id).count()
+    feat_list = Course.query.filter_by(tenant_id=current_tenant_id(), acesso='publico').limit(4).all()
+    feat_cids = [c.id for c in feat_list]
+    feat_mod_counts = dict(
+        db.session.query(Module.course_id, db.func.count(Module.id))
+        .filter(Module.course_id.in_(feat_cids), Module.tenant_id == current_tenant_id())
+        .group_by(Module.course_id).all()
+    ) if feat_cids else {}
+    for c in feat_list:
         featured_courses.append({
             'id': c.id, 'name': c.name, 'icon': c.icon, 'category': c.category_rel.name if c.category_rel else '',
-            'rating': 4.8, 'review_count': 50 + c.id * 37, 'lessons': n_modules,
+            'rating': 4.8, 'review_count': 50 + c.id * 37, 'lessons': feat_mod_counts.get(c.id, 0),
         })
 
     # "Comunidade" é a comunidade DESTE tenant — contagem global vazava o
     # tamanho da base de outros tenants para qualquer aluno autenticado.
     total_users = TenantUser.query.filter_by(tenant_id=current_tenant_id()).count()
     total_courses = Course.query.filter_by(tenant_id=current_tenant_id()).count()
-    all_progress = LessonProgress.query.filter_by(tenant_id=current_tenant_id()).all()
-    completion_rate = round(sum(1 for p in all_progress if p.passed) / len(all_progress) * 100) if all_progress else 0
+    total_lp_ext = LessonProgress.query.filter_by(tenant_id=current_tenant_id()).count()
+    passed_lp_ext = LessonProgress.query.filter_by(tenant_id=current_tenant_id(), passed=True).count()
+    completion_rate = round(passed_lp_ext / total_lp_ext * 100) if total_lp_ext else 0
 
     return jsonify({
         'user_stats': user_stats,
