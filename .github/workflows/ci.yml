@@ -49,7 +49,7 @@ jobs:
           POSTGRES_DB: ibc_test
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U ibc"
+          --health-cmd "pg_isready -U ibc -d ibc_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -76,7 +76,7 @@ jobs:
           POSTGRES_DB: ibc_migrations
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U ibc"
+          --health-cmd "pg_isready -U ibc -d ibc_migrations"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -117,7 +117,7 @@ jobs:
           POSTGRES_DB: ibc_isolation
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U ibc"
+          --health-cmd "pg_isready -U ibc -d ibc_isolation"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10

@@ -39,9 +39,10 @@ def trilha_com_badge(app, seeded):
         trail_id = trail.id
     yield trail_id
     with app.app_context():
-        from models import Trail, TrailCourse, UserTrail, UserBadge, Badge
+        from models import User, Trail, TrailCourse, UserTrail, UserBadge, Badge
         from core.tenancy import default_tenant_id
         tid = default_tenant_id()
+        User.query.filter_by(active_trail_id=trail_id).update({'active_trail_id': None})
         UserTrail.query.filter_by(trail_id=trail_id).delete()
         TrailCourse.query.filter_by(trail_id=trail_id).delete()
         badge = Badge.query.filter_by(tenant_id=tid, code='trilha_teste_badge').first()
@@ -265,7 +266,9 @@ def trilha_com_curso_interno(app, seeded):
         ids = {'trail_id': trail.id, 'interno_id': curso_interno.id, 'rascunho_id': curso_rascunho.id}
     yield ids
     with app.app_context():
-        from models import Trail, TrailCourse, Course
+        from models import User, Trail, TrailCourse, UserTrail, Course
+        User.query.filter_by(active_trail_id=ids['trail_id']).update({'active_trail_id': None})
+        UserTrail.query.filter_by(trail_id=ids['trail_id']).delete()
         TrailCourse.query.filter_by(trail_id=ids['trail_id']).delete()
         Trail.query.filter_by(id=ids['trail_id']).delete()
         Course.query.filter(Course.id.in_([ids['interno_id'], ids['rascunho_id']])).delete(synchronize_session=False)
