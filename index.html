@@ -315,15 +315,15 @@
         </div>
         <div class="course-item" id="nav-admin-dashboard" onclick="showAdminPanel('dashboard')" style="display:none">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-bar-chart"></use></svg></span>
-          <div class="ci-text"><div class="ci-name">Relatorios</div></div>
+          <div class="ci-text"><div class="ci-name">Relatórios</div></div>
         </div>
         <div class="course-item" id="nav-admin-announcements" onclick="showAdminPanel('announcements')" style="display:none">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-megaphone"></use></svg></span>
-          <div class="ci-text"><div class="ci-name">Comunicacao</div></div>
+          <div class="ci-text"><div class="ci-name">Comunicação</div></div>
         </div>
         <div class="course-item" id="nav-admin-settings" onclick="showAdminPanel('settings')" style="display:none">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-settings"></use></svg></span>
-          <div class="ci-text"><div class="ci-name">Configuracoes</div></div>
+          <div class="ci-text"><div class="ci-name">Configurações</div></div>
         </div>
         <div class="course-item" id="nav-tutor-dash" onclick="detectarPerfilEAtualizarDashboard()" style="display:none">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-bar-chart"></use></svg></span>
@@ -4542,7 +4542,6 @@ async function renderAdminHoje(){
     <div class="admin-hoje-search-wrap">
       ${icon('search','16')}
       <input type="text" class="admin-hoje-search" id="admin-global-search" placeholder="Buscar aluno por nome ou e-mail..." onkeydown="if(event.key==='Enter')_adminGlobalSearch()">
-      <button class="btn btn-primary btn-sm" onclick="_adminGlobalSearch()" style="padding:4px 12px;font-size:.82rem">Buscar</button>
     </div>
     <div id="admin-hoje-body"><div class="alert alert-info"><span class="alert-icon">${icon('clock','16')}</span><div class="alert-body">Carregando...</div></div></div>
   </div>`;
@@ -4558,13 +4557,13 @@ async function renderAdminHoje(){
   const recent=d.recent_activities||[];
   const body=document.getElementById('admin-hoje-body');
   body.innerHTML=`
+    ${_renderPulso(pulso)}
     <div class="admin-hoje-grid">
       <div>
         ${_renderFilaAtencao(alerts)}
-        ${_renderAtividadeRecente(recent)}
       </div>
       <div>
-        ${_renderPulso(pulso)}
+        ${_renderAtividadeRecente(recent)}
       </div>
     </div>`;
   } catch(e){ console.error('[ERRO] renderAdminHoje:', e); _renderDashboardError(e, 'painel admin'); }
@@ -4574,8 +4573,8 @@ function _renderFilaAtencao(alerts){
   const severityIcon={high:'x-circle',warn:'lightbulb',info:'checkmark-circle'};
   if(!alerts.length){
     return `<div class="admin-fila">
-      <div class="admin-fila-title">${icon('target','16')} Fila de Atencao</div>
-      <div class="admin-fila-empty">${icon('checkmark-circle','16')} Tudo em dia. Nenhuma acao pendente.</div>
+      <div class="admin-fila-title">${icon('target','16')} Fila de Atenção</div>
+      <div class="admin-fila-empty">${icon('checkmark-circle','16')} Tudo em dia. Nenhuma ação pendente.</div>
     </div>`;
   }
   const highFirst=[...alerts].sort((a,b)=>{
@@ -4583,7 +4582,7 @@ function _renderFilaAtencao(alerts){
     return (ord[a.severity]||2)-(ord[b.severity]||2);
   });
   return `<div class="admin-fila">
-    <div class="admin-fila-title">${icon('target','16')} Fila de Atencao</div>
+    <div class="admin-fila-title">${icon('target','16')} Fila de Atenção</div>
     <div class="admin-fila-list">
       ${highFirst.map(a=>`<div class="admin-fila-item" data-severity="${a.severity||'info'}">
         <span class="admin-fila-icon">${icon(severityIcon[a.severity]||'checkmark-circle','16')}</span>
@@ -4597,7 +4596,7 @@ function _renderFilaAtencao(alerts){
 function _renderPulso(p){
   const cards=[
     {label:'Alunos ativos (7d)',value:p.alunos_ativos_7d||0,prev:p.alunos_ativos_prev||0,spark:p.sparklines?.active},
-    {label:'Conclusoes da semana',value:p.conclusoes_semana||0,prev:p.conclusoes_prev||0,spark:p.sparklines?.completions},
+    {label:'Conclusões da semana',value:p.conclusoes_semana||0,prev:p.conclusoes_prev||0,spark:p.sparklines?.completions},
     {label:'Engajamento',value:(p.engajamento_pct||0)+'%',prev:p.engajamento_prev||0,spark:null},
     {label:'Novos alunos',value:p.novos_semana||0,prev:p.novos_prev||0,spark:p.sparklines?.signups},
   ];
@@ -4645,7 +4644,7 @@ function _renderAtividadeRecente(activities){
   if(!activities.length){
     return `<div class="admin-atividade">
       <div class="admin-atividade-title">${icon('clock','16')} Atividade Recente</div>
-      <div class="admin-atividade-list"><div class="admin-atividade-empty">Nenhuma atividade nas ultimas 24 horas.</div></div>
+      <div class="admin-atividade-list"><div class="admin-atividade-empty">Nenhuma atividade nas últimas 24 horas.</div></div>
     </div>`;
   }
   return `<div class="admin-atividade">

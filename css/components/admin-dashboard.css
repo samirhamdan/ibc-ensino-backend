@@ -15,11 +15,16 @@
   align-items: center;
   gap: var(--space-xs, .5rem);
   background: var(--bg-surface, #fff);
+  border: 1px solid var(--border, #e2e8f0);
   border-radius: var(--radius-button, 8px);
   padding: 6px 12px;
   margin-bottom: var(--space-lg);
-  box-shadow: 0 1px 3px rgb(0 0 0 / .06);
-  max-width: 480px;
+  max-width: 420px;
+  cursor: text;
+}
+.admin-hoje-search-wrap:focus-within {
+  border-color: var(--brand-primary, #008ea8);
+  box-shadow: 0 0 0 2px rgba(0, 142, 168, .15);
 }
 .admin-hoje-search-wrap .icon { color: var(--gray, #94a3b8); flex-shrink: 0; }
 .admin-hoje-search {
