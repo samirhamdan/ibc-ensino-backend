@@ -43,8 +43,8 @@ from flask import request, jsonify, Response
 from core.tenancy.context import current_tenant, default_tenant_id
 from core.tenancy.models import Tenant
 
-_ROTAS_SEMPRE_LIVRES_PREFIXOS = ('/billing/', '/api/theme')
-_ROTAS_SEMPRE_LIVRES_EXATAS = {'/health'}
+_ROTAS_SEMPRE_LIVRES_PREFIXOS = ('/billing/', '/api/theme', '/api/auth/', '/api/config/')
+_ROTAS_SEMPRE_LIVRES_EXATAS = {'/health', '/', '/index.html', '/favicon.svg'}
 
 _METODOS_MUTANTES = {'POST', 'PUT', 'DELETE', 'PATCH'}
 
@@ -72,6 +72,8 @@ restabelecer o acesso.</p>
 
 def _rota_livre():
     if request.path in _ROTAS_SEMPRE_LIVRES_EXATAS:
+        return True
+    if request.path.startswith(('/css/', '/images/', '/uploads/')):
         return True
     return request.path.startswith(_ROTAS_SEMPRE_LIVRES_PREFIXOS)
 
@@ -102,11 +104,14 @@ def init_billing_middleware(app):
         if _rota_livre():
             return None
 
-        tenant = _tenant_efetivo()
+        try:
+            tenant = _tenant_efetivo()
+        except Exception:
+            return None
         if tenant is None:
             return None
 
-        status = tenant.billing_status
+        status = getattr(tenant, 'billing_status', 'ativo') or 'ativo'
 
         if status == 'suspenso':
             if _quer_json():

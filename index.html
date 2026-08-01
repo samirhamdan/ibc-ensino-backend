@@ -417,12 +417,12 @@ async function api(method, path, body){
 window.addEventListener('unhandledrejection', function(e){
   if(e.reason && e.reason.name === 'AbortError') return;
   console.error('Unhandled rejection:', e.reason);
-  if(typeof showToast === 'function') showToast('Algo deu errado. Tente recarregar a página.', 'error', 5000);
+  if(typeof showToast === 'function' && currentUser) showToast('Algo deu errado. Tente recarregar a página.', 'error', 5000);
 });
 
 window.onerror = function(msg, src, line){
   console.error('Global error:', msg, src, line);
-  if(typeof showToast === 'function') showToast('Erro inesperado. Tente recarregar a página.', 'error', 5000);
+  if(typeof showToast === 'function' && currentUser) showToast('Erro inesperado. Tente recarregar a página.', 'error', 5000);
   return true;
 };
 
