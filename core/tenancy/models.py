@@ -36,8 +36,12 @@ class Tenant(db.Model):
     nome = db.Column(db.String(200), nullable=False)
     subdominio = db.Column(db.String(63), unique=True, nullable=False)
     plano = db.Column(db.String(20), nullable=False, default='semente')
-    # status: active | read_only | suspended (TEN-04)
+    # status: active | read_only | suspended (TEN-04) — status OPERACIONAL
     status = db.Column(db.String(20), nullable=False, default='active')
+    # billing_status: ativo | leitura | suspenso (BIL-02) — separado de
+    # `status`: reflete exclusivamente o estado de pagamento (webhooks Asaas),
+    # enquanto `status` é o estado operacional definido pelo operador (TEN-04).
+    billing_status = db.Column(db.String(20), nullable=False, default='ativo')
     tema_json = db.Column(db.JSON, default=dict)   # TEN-03: logo, cor, nome exibido
     criado_em = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
@@ -49,6 +53,7 @@ class Tenant(db.Model):
             'subdominio': self.subdominio,
             'plano': self.plano,
             'status': self.status,
+            'billing_status': self.billing_status,
             'tema': self.tema_json or {},
         }
 

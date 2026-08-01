@@ -113,6 +113,16 @@ def create_app(config_name='development'):
         # existentes) até o schema legado ser baselineado na Fase 3.
         from core.tenancy import Tenant, TenantUser, init_tenant_middleware
 
+        # BIL-01 (Release 1.0, primeiro módulo do novo layout — doc 02 §3):
+        # mesmo racional acima, registrar aqui faz o create_all de dev/teste
+        # criar domain_events/audit_log/subscriptions/ai_usage também.
+        # Vive em shared/ e core/billing/ (não app/shared, app/core/billing)
+        # pelo mesmo motivo de core/__init__.py: `app.py` ainda existe como
+        # módulo legado e um pacote `app/` sombrearia `app:create_app`.
+        from shared.events import DomainEvent
+        from shared.audit import AuditLog
+        from core.billing.models import Subscription, AiUsage
+
         # Fase 6 do playbook: registrado ANTES de tudo — em manutenção,
         # nenhuma rota (nem a resolução de tenant) deve rodar contra um
         # schema potencialmente a meio caminho de `alembic upgrade head`.
@@ -129,14 +139,13 @@ def create_app(config_name='development'):
         # vira defesa real após o runbook docs/RUNBOOK-RLS.md.
         from core.tenancy.rls import init_rls
         init_rls()
-        
-        # Criar tabelas — só fora de produção. Em produção o schema é
-        # responsabilidade exclusiva do Alembic (`alembic upgrade head` no
-        # preDeployCommand do railway.json); um create_all() aqui mascararia
-        # silenciosamente uma migração esquecida em vez de falhar o boot.
+
+        from core.billing.middleware import init_billing_middleware
+        init_billing_middleware(app)
+
         if not is_production:
             db.create_all()
-        
+
         # Registrar blueprints (rotas)
         from routes.auth import auth_bp
         from routes.courses import courses_bp
@@ -152,6 +161,7 @@ def create_app(config_name='development'):
         from routes.notifications import notifications_bp
         from routes.aluno import aluno_bp
         from routes.theme import theme_bp
+        from core.billing.routes import billing_bp
 
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
         app.register_blueprint(courses_bp, url_prefix='/api/courses')
@@ -168,6 +178,7 @@ def create_app(config_name='development'):
         app.register_blueprint(notifications_bp, url_prefix='/api')
         app.register_blueprint(aluno_bp, url_prefix='/api/aluno')
         app.register_blueprint(theme_bp, url_prefix='/api')
+        app.register_blueprint(billing_bp, url_prefix='/billing')
 
         # Convenience alias so GET /api/user works alongside /api/auth/user
         @app.route('/api/user', methods=['GET'])
