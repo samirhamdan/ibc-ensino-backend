@@ -49,7 +49,7 @@ def test_ativo_e_no_op(app, tenant_ativo):
 
 def test_leitura_bloqueia_post_com_402(app, tenant_leitura):
     client = app.test_client()
-    resp = client.post('/api/auth/login', json={'email': 'x@x.com', 'password': 'x'},
+    resp = client.post('/api/courses', json={},
                         headers={'X-Tenant-Slug': tenant_leitura})
     assert resp.status_code == 402
     assert 'error' in resp.get_json()
@@ -64,19 +64,19 @@ def test_leitura_permite_get(app, tenant_leitura):
 def test_leitura_bloqueia_put_delete_patch(app, tenant_leitura):
     client = app.test_client()
     for metodo in ('put', 'delete', 'patch'):
-        resp = getattr(client, metodo)('/api/auth/profile', headers={'X-Tenant-Slug': tenant_leitura})
+        resp = getattr(client, metodo)('/api/courses/1', headers={'X-Tenant-Slug': tenant_leitura})
         assert resp.status_code == 402, metodo
 
 
 def test_suspenso_bloqueia_get_tambem(app, tenant_suspenso):
     client = app.test_client()
-    resp = client.get('/api/auth/user', headers={'X-Tenant-Slug': tenant_suspenso})
+    resp = client.get('/api/courses', headers={'X-Tenant-Slug': tenant_suspenso})
     assert resp.status_code == 402
 
 
 def test_suspenso_bloqueia_post(app, tenant_suspenso):
     client = app.test_client()
-    resp = client.post('/api/auth/login', json={'email': 'x@x.com', 'password': 'x'},
+    resp = client.post('/api/courses', json={},
                         headers={'X-Tenant-Slug': tenant_suspenso})
     assert resp.status_code == 402
 

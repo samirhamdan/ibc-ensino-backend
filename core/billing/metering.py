@@ -43,6 +43,7 @@ from extensions import db
 from core.billing.models import AiUsage, Subscription
 from core.billing.plans import get_plan
 from core.tenancy.context import set_current_tenant
+from core.tenancy.middleware import TenantContext, _to_context
 from core.tenancy.models import Tenant
 from shared.events import publish_event
 
@@ -77,7 +78,7 @@ def _ativar_tenant(tenant_id):
     tenant = Tenant.query.get(tenant_id)
     if tenant is None:
         return None
-    set_current_tenant(tenant)
+    set_current_tenant(_to_context(tenant))
     db.session.rollback()
     return tenant
 

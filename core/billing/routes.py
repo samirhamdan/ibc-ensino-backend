@@ -22,6 +22,7 @@ from extensions import db
 from core.billing.models import Subscription, WebhookEvent
 from core.tenancy import Tenant
 from core.tenancy.context import set_current_tenant
+from core.tenancy.middleware import _to_context
 from shared.events import publish_event
 
 billing_bp = Blueprint('billing', __name__)
@@ -184,7 +185,7 @@ def webhook_asaas():
     # g.tenant, que core/tenancy/rls.py::_tenant_id_para_transacao lê na
     # abertura da próxima transação da Session (correção do Critical da
     # revisão Fable 5: antes disso, essas consultas caíam no tenant padrão).
-    set_current_tenant(tenant)
+    set_current_tenant(_to_context(tenant))
     # A consulta acima (Tenant.query.get) já abriu uma transação na Session
     # ANTES de g.tenant existir — SET LOCAL é por transação, então o GUC já
     # ficou fixado (errado/ausente) pra essa transação e set_current_tenant

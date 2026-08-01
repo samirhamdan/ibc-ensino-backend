@@ -57,6 +57,7 @@ from extensions import db
 from core.billing.models import Subscription
 from core.tenancy.models import Tenant, TenantUser
 from core.tenancy.context import set_current_tenant
+from core.tenancy.middleware import _to_context
 from shared.audit import registrar_auditoria
 from shared.events import publish_event
 
@@ -104,7 +105,7 @@ def pausar_regua(tenant_id, pausar=True):
     tenant = Tenant.query.get(tenant_id)   # tenants não tem RLS — seguro direto
     if tenant is None:
         return None
-    set_current_tenant(tenant)
+    set_current_tenant(_to_context(tenant))
     db.session.rollback()
 
     sub = Subscription.query.filter_by(tenant_id=tenant_id).first()

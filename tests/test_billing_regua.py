@@ -284,7 +284,7 @@ def test_regua_e_middleware_fim_a_fim_via_tenant_padrao(app):
         resp_get = client.get('/health')
         assert resp_get.status_code == 200   # exceção da lista, sempre livre
 
-        resp_post = client.post('/api/auth/login', json={'email': 'x@x.com', 'password': 'x'})
+        resp_post = client.post('/api/courses', json={})
         assert resp_post.status_code == 402
 
         # D+30: tudo bloqueado
@@ -301,7 +301,7 @@ def test_regua_e_middleware_fim_a_fim_via_tenant_padrao(app):
             db.session.expire_all()
             assert Tenant.query.get(default_tenant_id()).billing_status == 'suspenso'
 
-        resp_get_bloqueado = client.get('/api/auth/user')
+        resp_get_bloqueado = client.get('/api/courses')
         assert resp_get_bloqueado.status_code == 402
 
         resp_theme_livre = client.get('/api/theme')
