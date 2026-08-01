@@ -19,30 +19,6 @@
 <!-- App legacy styles (load first so design system can override) -->
 <link rel="stylesheet" href="css/app.css">
 
-<!-- Tema do tenant (UX_ALUNO_SAAS.md §2.2): XHR SÍNCRONO de propósito —
-     precisa terminar antes do <style id="tenant-theme"> existir e antes de
-     design-system.css ler --brand-primary, senão o primeiro paint usa o
-     fallback errado e pisca ao trocar (flash de tema errado). É pequeno
-     (poucas linhas de CSS) e roda uma vez no boot, então o bloqueio é
-     imperceptível; se a chamada falhar (rede, /api fora do ar), os
-     fallbacks fixos em design-system.css garantem que a página renderiza
-     igual — nunca quebra o boot por causa do tema. -->
-<script>
-(function () {
-  try {
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', '/api/theme', false);
-    xhr.send(null);
-    if (xhr.status === 200 && xhr.responseText) {
-      var style = document.createElement('style');
-      style.id = 'tenant-theme';
-      style.textContent = xhr.responseText;
-      document.head.appendChild(style);
-    }
-  } catch (e) { /* sem tema resolvido — segue com os fallbacks fixos */ }
-})();
-</script>
-
 <!-- Design System CSS -->
 <link rel="stylesheet" href="css/design-system.css">
 <link rel="stylesheet" href="css/reset.css">
@@ -63,6 +39,7 @@
 <link rel="stylesheet" href="css/components/micro.css">
 <link rel="stylesheet" href="css/components/toast.css">
 <link rel="stylesheet" href="css/components/admin-dashboard.css">
+<link rel="stylesheet" href="css/components/tooltip.css">
 <link rel="stylesheet" href="css/components/hero.css">
 <link rel="stylesheet" href="css/components/trails.css">
 <link rel="stylesheet" href="css/components/onboarding.css">
@@ -77,6 +54,41 @@
 <link rel="stylesheet" href="css/pages/meu-perfil.css">
 <link rel="stylesheet" href="css/pages/sprint62.css">
 <link rel="stylesheet" href="css/pages/mobile-nav.css">
+
+<!-- Tema do tenant (UX_ALUNO_SAAS.md §2.2): XHR SÍNCRONO de propósito —
+     precisa terminar e o <style id="tenant-theme"> ser inserido no DOM
+     antes do primeiro paint, senão pisca ao trocar (flash de tema
+     errado). É pequeno (poucas linhas de CSS) e roda uma vez no boot,
+     então o bloqueio é imperceptível; se a chamada falhar (rede, /api
+     fora do ar), os fallbacks fixos em design-system.css garantem que a
+     página renderiza igual — nunca quebra o boot por causa do tema.
+
+     ORDEM IMPORTA (bug real corrigido aqui, achado na auditoria de
+     release): este bloco tem que vir DEPOIS de todos os <link
+     rel="stylesheet">, não antes. design-system.css declara
+     --brand-primary com fallback fixo (#008ea8) em :root — mesma
+     especificidade do <style id="tenant-theme">. Em CSS, empate de
+     especificidade é resolvido por ORDEM NO DOCUMENTO, não por ordem de
+     término de rede: com o script ANTES dos <link>, o <style> injetado
+     entrava primeiro no <head> e design-system.css (carregando depois)
+     sempre vencia o empate — a cor do tenant nunca chegava a aparecer na
+     tela, mesmo com o valor certo dentro do <style>. Com o script DEPOIS
+     dos <link>, o tenant sempre vence. -->
+<script>
+(function () {
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/theme', false);
+    xhr.send(null);
+    if (xhr.status === 200 && xhr.responseText) {
+      var style = document.createElement('style');
+      style.id = 'tenant-theme';
+      style.textContent = xhr.responseText;
+      document.head.appendChild(style);
+    }
+  } catch (e) { /* sem tema resolvido — segue com os fallbacks fixos */ }
+})();
+</script>
 
 <!-- Scripts -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -211,7 +223,7 @@
 <div id="screen-main" class="screen" style="flex-direction:column">
   <div class="topbar">
     <div class="topbar-left">
-      <button class="sidebar-hamburger" id="sidebarHamburger" onclick="toggleSidebar()" aria-label="Abrir menu" title="Menu">
+      <button class="sidebar-hamburger" id="sidebarHamburger" onclick="toggleSidebar()" aria-label="Abrir menu" title="Menu" data-tooltip="Menu">
         <svg class="icon" width="22" height="22" viewBox="0 0 24 24"><use href="#icon-menu"></use></svg>
       </button>
       <div class="topbar-logo-box"><img src="images/logo-ibc.png" alt="Escola da IBC"></div>
@@ -222,14 +234,14 @@
     <div class="topbar-user">
       <button id="continueBtn" class="btn-gold" style="display:none;padding:.35rem .9rem;font-size:.78rem;border-radius:6px" onclick="continueLastLesson()"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-play"></use></svg> Continuar</button>
       <span id="timerDisplay" class="timer-display" style="display:none" title="Tempo de estudo nesta aula">00:00</span>
-      <button class="topbar-icon-btn" id="studyTimerToggle" onclick="toggleStudyTimer()" title="Cronômetro de estudo">
+      <button class="topbar-icon-btn" id="studyTimerToggle" onclick="toggleStudyTimer()" title="Cronômetro de estudo" data-tooltip="Cronômetro de estudo" aria-label="Cronômetro de estudo">
         <svg class="icon" width="22" height="22" viewBox="0 0 24 24"><use href="#icon-clock"></use></svg>
       </button>
-      <button class="topbar-icon-btn" id="focusToggle" onclick="toggleFocusMode()" title="Modo foco">
+      <button class="topbar-icon-btn" id="focusToggle" onclick="toggleFocusMode()" title="Modo foco" data-tooltip="Modo foco" aria-label="Ativar modo foco">
         <svg class="icon" width="22" height="22" viewBox="0 0 24 24"><use href="#icon-eye"></use></svg>
       </button>
       <div style="position:relative">
-        <button class="topbar-bell" id="topbar-bell-btn" onclick="toggleNotificationsDropdown()" title="Notificações">
+        <button class="topbar-bell" id="topbar-bell-btn" onclick="toggleNotificationsDropdown()" title="Notificações" data-tooltip="Notificações" aria-label="Ver notificações" aria-haspopup="true">
           <svg class="icon" width="20" height="20" viewBox="0 0 24 24"><use href="#icon-bell"></use></svg>
           <span class="bell-badge hidden" id="bell-badge-count">0</span>
         </button>
@@ -322,7 +334,7 @@
     <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar(false)"></div>
     <div class="content">
       <div id="announcements-banner-area"></div>
-      <div id="main-content"></div>
+      <div id="main-content" role="main"></div>
     </div>
   </div>
 </div>
@@ -4757,12 +4769,41 @@ function _dashSaasSkeleton(){
           <div class="dash-saas-skeleton dash-saas-skeleton--bloco"></div>`;
 }
 
+// P1.1 (GAM-05 PR 3): helper único pro estado "vazio" dos 5 grupos —
+// antes cada grupo duplicava a mesma estrutura de markup (dash-saas-vazio
+// + msg + cta opcional) com tom variando de "convidativo" a puramente
+// informativo/robótico. Centraliza aqui pra manter tom e estrutura
+// consistentes; grupos que precisam de um ícone silhueta (ex.: conquista
+// bloqueada) passam `iconeClasse`.
+function _dashSaasVazio(iconeNome, msgHtml, ctaHtml, iconeClasse){
+  const iconeHtml = iconeNome
+    ? `<div class="dash-saas-vazio-icone${iconeClasse ? ' ' + iconeClasse : ''}">${icon(iconeNome,'28')}</div>`
+    : '';
+  return `<div class="dash-saas-vazio">
+      ${iconeHtml}
+      <div class="dash-saas-vazio-msg">${msgHtml}</div>
+      ${ctaHtml || ''}
+    </div>`;
+}
+
 function _dashSaasErro(retryFn){
   return `<div class="dash-saas-erro">
       <div>${icon('x-circle','24','icon--x-circle')}</div>
       <div class="dash-saas-erro-msg">Não foi possível carregar esta seção.</div>
       <button class="btn btn-outline btn-sm" onclick="${retryFn}">${icon('target','14')} Tentar de novo</button>
     </div>`;
+}
+
+// UX_ALUNO_SAAS.md §5 (gate de aceite): "carrossel operável por setas" —
+// achado da auditoria de release, faltava inteiramente. Rola por um card
+// inteiro por vez (não a viewport toda) pra manter o card seguinte sempre
+// visível como pista de que dá pra continuar navegando.
+function _dashSaasCarrosselKeydown(ev, el){
+  if(ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+  ev.preventDefault();
+  const card = el.querySelector('.dash-saas-netflix-card');
+  const passo = card ? (card.getBoundingClientRect().width + 12) : el.clientWidth * 0.8;
+  el.scrollBy({ left: ev.key === 'ArrowRight' ? passo : -passo, behavior: 'smooth' });
 }
 
 async function _renderAlunoDashboardInner(){
@@ -4774,7 +4815,7 @@ async function _renderAlunoDashboardInner(){
         <div class="dash-saas-grupo" id="dash-saas-continuar">${_dashSaasSkeleton()}</div>
       </div>
       <div class="dash-saas-col-lateral">
-        <div class="dash-saas-grupo" id="dash-saas-pontuacao">${_dashSaasSkeleton()}</div>
+        <div class="dash-saas-grupo dash-saas-grupo--pontuacao" id="dash-saas-pontuacao">${_dashSaasSkeleton()}</div>
         <div class="dash-saas-grupo" id="dash-saas-metas">${_dashSaasSkeleton()}</div>
       </div>
       <div class="dash-saas-grupo dash-saas-full" id="dash-saas-recomendacoes">${_dashSaasSkeleton()}</div>
@@ -4837,26 +4878,38 @@ function _dashSaasRenderSaudacao(d){
   const nome = (currentUser && currentUser.name ? currentUser.name.split(' ')[0] : 'aluno');
   const ip = d.in_progress_course;
   const stats = d.user_stats || {};
-  // Prioridade da frase de contexto (§3 Grupo 1): (a) streak em risco —
-  // GAM-02, Etapa 3; (b) revisões pendentes — LRN-02 real é Release 1.0;
-  // (c) progresso — sempre disponível hoje, é o fallback.
+  // Prioridade da frase de contexto (§3 Grupo 1, GAM-05 PR 2): (1) streak em
+  // risco — GAM-02, Etapa 3; (2) revisão pendente — LRN-02 real é Release
+  // 1.0, ainda SEM fonte de dados nenhuma no payload do dashboard hoje
+  // (nada em `d` descreve "revisão pendente"), então este tier não tem
+  // condição real pra checar ainda — fica documentado aqui como o lugar
+  // onde ela entra quando LRN-02 existir, sem inventar dado nem placeholder
+  // fake; (3) progresso do curso em andamento — fallback real disponível
+  // hoje. O fallback antigo ("+90 pontos para o próximo nível", vindo de
+  // next_metas[0] quando não havia curso em andamento) foi REMOVIDO daqui
+  // de propósito — essa frase deve viver só no Grupo 4 (Próximas Metas),
+  // nunca duplicada na saudação.
   let contexto = 'Pronto para continuar sua jornada de estudos?';
   if(stats.streak_em_risco && stats.current_streak){
     const dias = stats.current_streak === 1 ? '1 dia' : `${stats.current_streak} dias`;
     contexto = `Sua sequência de ${dias} vence hoje — estude um pouco para mantê-la!`;
   } else if(ip){
-    contexto = `Você está a ${Math.max(0, ip.total_aulas - ip.aula_atual + 1)} aula(s) de concluir "${escapeHtml(ip.name)}".`;
-  } else if(d.next_metas && d.next_metas.length){
-    contexto = d.next_metas[0].description;
+    contexto = `Você está a ${Math.max(0, ip.total_aulas - ip.aula_atual + 1)} aula(s) de concluir "${_dashSaasEscAttr(ip.name)}".`;
   }
 
+  // XSS (achado H1 da revisão Fable 5): nome/contexto acabam em innerHTML
+  // (não em atributo) — mas _dashSaasEscAttr também escapa &/</>, então
+  // serve pros dois contextos; `nome` vem de currentUser.name (próprio
+  // usuário logado, mas escapado por defesa em profundidade mesmo assim).
+  // GAM-05 PR 2 (P0.3): o chip de streak SAIU daqui — agora vive só dentro
+  // do card "Sua pontuação" (_dashSaasRenderPontuacao), pra não duplicar o
+  // número de dias em dois lugares da tela.
   elx.innerHTML = `
     <div class="dash-saas-saudacao">
       <div class="dash-saas-saudacao-texto">
-        <h1>${_dashSaasSaudacaoPorHorario()}, ${nome}</h1>
+        <h1>${_dashSaasSaudacaoPorHorario()}, ${_dashSaasEscAttr(nome)}</h1>
         <div class="dash-saas-saudacao-contexto">${contexto}</div>
       </div>
-      ${_dashSaasStreakChip(stats)}
     </div>`;
 }
 
@@ -4869,18 +4922,16 @@ function _dashSaasRenderContinuar(d){
   if(!ip){
     elx.innerHTML = `
       <div class="dash-saas-grupo-titulo">${icon('target','14')} Continue seus estudos</div>
-      <div class="dash-saas-vazio">
-        <div class="dash-saas-vazio-icone">${icon('book','28')}</div>
-        <div class="dash-saas-vazio-msg">Você ainda não começou nenhum curso.</div>
-        <button class="btn btn-primary btn-sm" onclick="showPanel('courses')">${icon('catalog','14')} Ver catálogo</button>
-      </div>`;
+      ${_dashSaasVazio('book',
+        'Sua jornada começa aqui — escolha um curso do catálogo e dê o primeiro passo.',
+        `<button class="btn btn-primary btn-sm" onclick="showPanel('courses')">${icon('catalog','14')} Ver catálogo</button>`)}`;
     return;
   }
 
   elx.innerHTML = `
     <div class="dash-saas-grupo-titulo">${icon('target','14')} Continue seus estudos</div>
     <div class="dash-saas-hero-card">
-      <div class="dash-saas-hero-curso">${ip.icon||''} ${escapeHtml(ip.name)}</div>
+      <div class="dash-saas-hero-curso">${_dashSaasEscAttr(ip.icon)||''} ${_dashSaasEscAttr(ip.name)}</div>
       <h3>Aula ${ip.aula_atual}/${ip.total_aulas}</h3>
       <div class="dash-saas-hero-progress"><div style="width:${ip.percentage}%"></div></div>
       <div style="font-size:var(--text-xs);opacity:.85">${ip.percentage}% concluído</div>
@@ -4888,7 +4939,7 @@ function _dashSaasRenderContinuar(d){
     </div>
     ${secundarios.length ? `<div class="dash-saas-secundarios">${secundarios.map(c=>`
       <div class="dash-saas-secundario-card" onclick="selectCourse(${c.id})">
-        <div class="nome">${c.icon||''} ${escapeHtml(c.name)}</div>
+        <div class="nome">${_dashSaasEscAttr(c.icon)||''} ${_dashSaasEscAttr(c.name)}</div>
         <div class="meta">${c.percentage}% concluído</div>
       </div>`).join('')}</div>` : ''}
     <div class="dash-saas-slot-tutor">
@@ -4920,21 +4971,29 @@ function _dashSaasRenderPontuacao(d){
   const s = d.user_stats || {};
   const recentes = (d.recent_trofeus||[]).slice(0,3);
 
+  // GAM-05 PR 2 (P0.2/P0.3): redesenho do card — vira o ponto focal do
+  // dashboard (fundo --brand-gradient, número de pontos é o MAIOR texto da
+  // página) e absorve o chip de streak que antes vivia duplicado na
+  // Saudação (_dashSaasRenderSaudacao). Nível ganha um chip visual próprio
+  // em vez de texto plano ao lado dos pontos.
   elx.innerHTML = `
     <div class="dash-saas-grupo-titulo">${icon('bar-chart','14')} Sua pontuação</div>
-    <div class="dash-saas-pontuacao-linha1">
+    <div class="dash-saas-pontuacao-linha1" aria-live="polite">
       <span class="dash-saas-pontuacao-total">${s.total_points||0}</span>
-      <span class="dash-saas-pontuacao-nivel">pts · Nível ${s.level||1}${s.level_name?` (${s.level_name})`:''}</span>
+      <span class="dash-saas-pontuacao-nivel">pts</span>
     </div>
-    <div style="display:flex;justify-content:center;margin-bottom:var(--space-sm)">${_dashSaasStreakChip(s)}</div>
-    ${s.longest_streak ? `<div style="text-align:center;font-size:var(--text-xs);color:var(--gray);margin-bottom:var(--space-sm)">Recorde: ${s.longest_streak} dia(s)</div>` : ''}
+    <div class="dash-saas-pontuacao-meta-linha" aria-live="polite">
+      <span class="dash-saas-nivel-chip">Nível ${s.level||1}${s.level_name?` · ${_dashSaasEscAttr(s.level_name)}`:''}</span>
+      ${_dashSaasStreakChip(s)}
+    </div>
+    ${s.longest_streak ? `<div class="dash-saas-pontuacao-recorde">Recorde: ${s.longest_streak} dia(s)</div>` : ''}
     ${recentes.length ? `<div class="dash-saas-badges-recentes">${recentes.map(t=>`
       <div class="dash-saas-badge-recente${_dashSaasBadgeEhNova(t.date)?' dash-saas-badge-recente--nova':''}" title="${_dashSaasEscAttr(t.name)}">
-        <div class="emoji">${t.icon||'🏅'}</div>
-        <span class="nome">${escapeHtml(t.name)}</span>
-      </div>`).join('')}</div>` : `<div class="dash-saas-vazio" style="padding:var(--space-md) 0">
-        <div class="dash-saas-vazio-msg">Suas conquistas aparecem aqui.</div>
-      </div>`}`;
+        <div class="emoji">${_dashSaasEscAttr(t.icon)||'🏅'}</div>
+        <span class="nome">${_dashSaasEscAttr(t.name)}</span>
+      </div>`).join('')}</div>` : _dashSaasVazio('achievements',
+        'Complete sua primeira lição para ganhar a conquista <strong>Primeiro Passo</strong>.',
+        '', 'dash-saas-vazio-icone--conquista')}`;
 }
 
 function _dashSaasRenderMetas(d){
@@ -4942,20 +5001,19 @@ function _dashSaasRenderMetas(d){
   if(!elx) return;
   const metas = d.next_metas || [];
 
+  // Quando a IA de revisão ainda não está habilitada para o tenant, o slot
+  // não renderiza nada (nem placeholder) — evita expor um recurso que ainda
+  // não existe para o usuário final (GAM-05).
   const revisaoHtml = DASH_SAAS_FLAGS.revisao_ia_enabled
-    ? '' // Release 1.0: card real de revisão do dia (LRN-02)
-    : `<div class="dash-saas-meta-revisao">
-         <div style="font-weight:var(--fw-semibold);font-size:var(--text-sm)">${icon('lightbulb','14')} Revisão do dia</div>
-         <div style="font-size:var(--text-xs);color:var(--gray)">Chega na Release 1.0 — vai te ajudar a fixar o que você já aprendeu.</div>
-       </div>`;
+    ? '' // TODO (LRN-02): card real de revisão do dia quando a flag for ligada
+    : '';
 
   if(!metas.length){
     elx.innerHTML = `
       <div class="dash-saas-grupo-titulo">${icon('lightbulb','14','icon--lightbulb')} Próximas metas</div>
       ${revisaoHtml}
-      <div class="dash-saas-vazio">
-        <div class="dash-saas-vazio-msg">Nenhuma meta pendente — explore as recomendações abaixo.</div>
-      </div>`;
+      ${_dashSaasVazio('lightbulb',
+        'Nenhuma meta pendente por aqui — dê uma olhada nas recomendações abaixo para continuar avançando.')}`;
     return;
   }
 
@@ -4964,7 +5022,7 @@ function _dashSaasRenderMetas(d){
     ${revisaoHtml}
     ${metas.map(m=>`<div class="dash-saas-meta-item">
         <span>${icon(m.type==='xp'?'points':m.type==='trofeu'?'achievements':m.type==='duvida'?'chat':'book','16')}</span>
-        <span style="font-size:var(--text-sm)">${escapeHtml(m.description)}</span>
+        <span style="font-size:var(--text-sm)">${_dashSaasEscAttr(m.description)}</span>
       </div>`).join('')}`;
 }
 
@@ -4987,15 +5045,15 @@ function _dashSaasRenderRecomendacoes(d){
   if(!cursos.length){
     elx.innerHTML = `
       <div class="dash-saas-grupo-titulo">${icon('catalog','14')} Recomendações</div>
-      <div class="dash-saas-vazio">
-        <div class="dash-saas-vazio-msg">Novos cursos aparecem aqui assim que forem publicados.</div>
-      </div>`;
+      ${_dashSaasVazio('catalog',
+        'Novidades chegando em breve — volte aqui assim que novos cursos forem publicados.')}`;
     return;
   }
 
   elx.innerHTML = `
     <div class="dash-saas-grupo-titulo">${icon('catalog','14')} Recomendações</div>
-    <div class="dash-saas-carrossel">${cursos.map(c=>{
+    <div class="dash-saas-carrossel" role="region" aria-label="Recomendações de cursos"
+        tabindex="0" onkeydown="_dashSaasCarrosselKeydown(event, this)">${cursos.map(c=>{
       const hue = _dashSaasHashHue(c.name || '');
       const progresso = c.status==='em_andamento'
         ? `<div class="dash-saas-netflix-progress"><div style="width:${c.percentage}%"></div></div>` : '';
@@ -5038,10 +5096,10 @@ async function renderActivityFeed(){
           <div class="activity-feed-list">
             ${items.map(a => `
               <div class="activity-item">
-                <span class="activity-avatar">${a.user_initial}</span>
+                <span class="activity-avatar">${escapeHtml(a.user_initial)}</span>
                 <div class="activity-content">
                   <span class="activity-text"><strong>${escapeHtml(a.user_name)}</strong> concluiu o curso <strong>${escapeHtml(a.course_name)}</strong></span>
-                  <span class="activity-time">${a.time_ago}</span>
+                  <span class="activity-time">${escapeHtml(a.time_ago)}</span>
                 </div>
               </div>`).join('')}
           </div>
@@ -5714,14 +5772,23 @@ async function renderSidebarTrails(){
       el.innerHTML = `<div class="sidebar-empty">Nenhuma trilha iniciada<br><a onclick="navigateToTrilhas()">Conhecer trilhas →</a></div>`;
       return;
     }
-    el.innerHTML = all.map(t=>`
+    el.innerHTML = all.map(t=>{
+      // P1.2 (GAM-05 PR 3): nome completo (sem truncar em 1 linha) vira
+      // tooltip via title= — precisa do MESMO escape usado em atributo
+      // (_dashSaasEscAttr, aspas quebram o atributo mesmo sem `<`/`>`), e o
+      // texto visível some do line-clamp de 2 linhas via CSS, não corta o
+      // nome inteiro num único onclick de leitura.
+      const nomeCurto = t.name.replace(/^Trilha (de |do |da )?/i,'');
+      const nomeEscapado = _dashSaasEscAttr(`${t.icon} ${nomeCurto}`);
+      return `
       <div class="sidebar-trail-item ${t.id===my.focused_trail_id?'focused':''}" onclick="focusTrail(${t.id})">
-        <span class="sidebar-trail-name">${t.icon} ${t.name.replace(/^Trilha (de |do |da )?/i,'')}</span>
+        <span class="sidebar-trail-name" title="${nomeEscapado}">${nomeEscapado}</span>
         <div class="sidebar-trail-progress">
           <div class="progress progress-sm"><div class="progress-bar" style="width:${t.percentage}%"></div></div>
           <span class="sidebar-trail-pct">${t.percentage}%</span>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   } catch(e){}
 }
 

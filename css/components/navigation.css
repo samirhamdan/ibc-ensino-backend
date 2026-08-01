@@ -93,6 +93,15 @@
   padding: var(--space-md) var(--space-md) 0;
 }
 
+/* P1.2 (GAM-05 PR 3): separação visual mais forte entre "Menu" (navegação
+   fixa) e as seções seguintes (Minhas Trilhas / Meus Cursos / Admin) —
+   reaproveita a escala 8pt já existente (--space-lg), não um pixel novo. */
+.sidebar-section + .sidebar-section {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--gray-lighter);
+}
+
 .sidebar-label {
   font-size: var(--text-xs);
   font-weight: var(--fw-semibold);

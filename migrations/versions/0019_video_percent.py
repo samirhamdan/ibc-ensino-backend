@@ -1,7 +1,7 @@
 """feat(GAM-01): video_percent em lesson_progress (§2.8 A3)
 
 Revision ID: 0015_video_pct
-Revises: 0014_streak
+Revises: 0018_billing_metering_columns
 Create Date: 2026-07-31
 
 Armazena o percentual real de vídeo assistido (0.0–100.0) reportado pela
@@ -12,7 +12,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = '0015_video_pct'
-down_revision = '0014_streak'
+down_revision = '0018_billing_metering_columns'
 branch_labels = None
 depends_on = None
 
