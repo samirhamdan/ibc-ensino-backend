@@ -518,7 +518,7 @@ function setupUI(){
   document.getElementById('admin-nav-section').style.display = (isAdmin()||isTutor()) ? 'block' : 'none';
   const isAdminUser = isAdmin();
   const isTutorUser = isTutor();
-  ['nav-admin-dashboard','nav-admin-categories','nav-admin-courses','nav-admin-trails','nav-admin-tutors','nav-admin-announcements','nav-admin-settings'].forEach(id=>{
+  ['nav-admin-hoje','nav-admin-dashboard','nav-admin-categories','nav-admin-courses','nav-admin-trails','nav-admin-tutors','nav-admin-announcements','nav-admin-settings'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.style.display = isAdminUser ? 'flex' : 'none';
   });
