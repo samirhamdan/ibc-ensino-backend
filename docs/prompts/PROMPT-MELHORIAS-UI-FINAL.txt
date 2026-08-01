@@ -1,0 +1,81 @@
+Aprovado o plano de refinamento do dashboard do aluno
+(docs/MELHORIAS-UI-ALUNO.md — commit este arquivo em docs/ junto
+com o trabalho). Decisões tomadas: D1 = tema CLARO oficializado
+como padrão do aluno (atualizar UX_ALUNO_SAAS.md §2 para refletir);
+D2 = OCULTAR o slot "Revisão do dia" até a feature existir;
+D3 = escopo desta rodada é P0 completo + P1 completo (P2 fica
+na fila); D4 = deploy direto após minha revisão final.
+
+Trabalhe na branch feat/GAM-05-polish-dashboard, criada a partir
+de claude/zen-hopper-SeRac atual. Execute em 3 PRs na ordem
+abaixo, cada um com testes, screenshots dos 2 tenants (ibc + demo)
+e revisão Fable 5 antes do commit final. Não faça merge em
+claude/zen-hopper-SeRac sem minha aprovação.
+
+## PR 1 — Críticos de copy e token (P0.4 + P0.5)
+
+1. Remova/oculte o slot "Revisão do dia" do dashboard (feature
+   flag desligada = slot não renderiza NADA, nem placeholder).
+2. Varredura completa: grep por "Release", "release", "sprint",
+   "Sprint", "MVP", "feature flag", "flag" em TODAS as strings
+   visíveis ao usuário final (templates, JS, mensagens de API
+   que chegam à UI). Corrija cada ocorrência com copy voltada
+   ao usuário. Reporte a lista do que encontrou.
+3. Corrija o gradiente do botão "Ver catálogo" (teal→roxo) para
+   usar --brand-gradient derivado. INVESTIGUE por que o lint de
+   hex hardcoded não pegou isso: se é gradiente em CSS que o
+   regex não cobre, corrija o lint para cobrir; se é outra
+   causa, explique. O lint corrigido deve falhar se o valor
+   antigo for reintroduzido.
+
+## PR 2 — Layout e hierarquia do herói (P0.1 + P0.2 + P0.3)
+
+1. Container: max-width ~1360px em viewports >=1440px, grid 8/4
+   preservada, gutter mínimo 24px. Aceite: em 1920px, conteúdo
+   ocupa >=70% do viewport.
+2. Card "Sua Pontuação": fundo --brand-gradient, texto
+   --brand-on-primary, sombra --shadow-elevated, pontos como o
+   maior texto da tela (48-56px), nível ("Estudioso") em chip
+   próprio. Valide contraste AA no gradiente (usar o pipeline
+   de contraste existente do theming).
+3. Streak consolidado: chama SVG (3 estados: ativa com flicker
+   sutil, em risco com pulso + tooltip, quebrada cinza estática;
+   prefers-reduced-motion = estados estáticos) DENTRO do card
+   de pontuação. Remover o badge "1 dia" da saudação; a saudação
+   passa a usar a frase de contexto dinâmica (prioridade: streak
+   em risco > revisão pendente > progresso), e "+90 pontos para
+   o próximo nível" sai da saudação (fica só em Próximas Metas).
+
+## PR 3 — Affordance e polimento (P1.1 a P1.6)
+
+1. Estados vazios com ação: conquistas ("Complete sua primeira
+   lição para ganhar a conquista Primeiro Passo" + silhueta da
+   conquista bloqueada); padronizar tom de convite em todos os
+   vazios do dashboard.
+2. Sidebar: tooltip + até 2 linhas para nomes de trilha
+   truncados; barra de progresso da trilha com 6px de altura em
+   --brand-primary; reforçar separação visual entre seções de
+   navegação e de conteúdo (ritmo 8pt).
+3. Ícones do header (relógio, olho, sino): tooltip em
+   hover/focus + aria-label descritivo em todos.
+4. Escala tipográfica explícita (14/16/20/28/40/56) documentada
+   em tokens.css como variáveis --text-*, aplicada aos títulos
+   de grupo e conteúdos; espaçamento vertical entre grupos
+   padronizado em 32px.
+5. Momento de celebração: ao concluir lição/curso/conquista,
+   animação no card correspondente (escala + partículas
+   discretas em --brand-primary, ~800ms, executa 1 única vez
+   por evento, desativada em prefers-reduced-motion). Disparo
+   apenas em evento real de conclusão, coberto por E2E.
+
+## Ao final dos 3 PRs
+
+1. Rode Lighthouse nas mesmas 2 páginas medidas antes e reporte
+   os números novos (as mudanças de CSS/JS podem ter movido o
+   score — não otimize além do que os PRs já fizeram, só meça
+   e reporte para eu decidir sobre o P2.5).
+2. Atualize docs/UX_ALUNO_SAAS.md §2 para o tema claro (D1) e
+   registre no docs/DEBITOS.md qualquer item de P2 que você
+   tenha notado como mais urgente do que parecia.
+3. Suíte completa + lint + audit + resumo final consolidado.
+   Aguarde minha revisão para o merge.

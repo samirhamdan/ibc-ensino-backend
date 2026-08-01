@@ -1,0 +1,31 @@
+Decisão tomada: mergear feat/GAM-04-dashboard-saas em
+claude/zen-hopper-SeRac agora, aceitando o gap de Lighthouse
+como débito técnico (não como bloqueador).
+
+Antes do merge, confirme:
+
+1. Registre o gap de Lighthouse em docs/DEBITOS.md com o
+   score real medido (~62-64/100 vs gate de 85), as páginas
+   testadas, e uma nota de que foi uma decisão consciente de
+   priorização — não um item esquecido. Inclua os 4 Lows do
+   Fable 5 no mesmo documento, cada um com uma linha de
+   contexto (não precisa ser extenso).
+
+2. Rode a suíte completa + lint + audit uma última vez antes
+   do merge, para garantir que nada mudou desde o último
+   relatório.
+
+3. Faça o merge de feat/GAM-04-dashboard-saas em
+   claude/zen-hopper-SeRac (fast-forward se possível).
+
+4. Push.
+
+5. Me dê a confirmação final: commit de merge, resultado da
+   suíte, e a lista consolidada do que foi entregue nesta
+   branch desde a Etapa 1 (tema, estrutura dos 5 grupos,
+   gamificação server-side, cards Netflix) — um resumo que eu
+   possa usar como registro do que está em produção-pronta
+   agora.
+
+Não faça deploy em produção ainda — isso eu decido separadamente,
+depois de revisar este resumo.

@@ -1,0 +1,116 @@
+/* ─── Navegação mobile: sidebar off-canvas + correção de overflow ──────────
+   Escopo: só ativa abaixo de 768px. Este arquivo é o último carregado no
+   <head> (depois de app.css/navigation.css/chrome-premium.css/sprint62.css),
+   então suas regras vencem a cascata sem precisar de !important em quase
+   nada — garantindo que a sidebar sempre existente (width:240px fixo,
+   navigation.css) seja corretamente sobrescrita no mobile.
+   Nada aqui roda acima de 768px — a experiência desktop não muda. ──────── */
+
+.sidebar-hamburger {
+  display: none;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+
+  /* ── Hamburguer no topbar ── */
+  .sidebar-hamburger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, .08);
+    border: 1px solid rgba(255, 255, 255, .2);
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+  }
+
+  .sidebar-hamburger:hover {
+    background: rgba(255, 255, 255, .16);
+  }
+
+  /* ── Topbar: evita que os botões/nome/relógio empurrem "Sair" para fora
+     da tela. Os itens secundários somem; avatar, sino e "Sair" continuam
+     visíveis e acessíveis. ── */
+  .topbar {
+    padding: .7rem .8rem;
+    gap: .5rem;
+  }
+
+  .topbar-user {
+    gap: .4rem;
+  }
+
+  #continueBtn,
+  #timerDisplay,
+  #studyTimerToggle,
+  #focusToggle,
+  #topbar-name,
+  #topbar-role {
+    display: none !important;
+  }
+
+  /* ── Sidebar: off-canvas (escondida por padrão, desliza da esquerda) ── */
+  .main-body {
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 60px; /* altura do topbar (navigation.css) */
+    left: 0;
+    bottom: 0;
+    height: calc(100vh - 60px);
+    width: 82vw;
+    max-width: 300px;
+    min-width: 0;
+    z-index: 300;
+    transform: translateX(-100%);
+    transition: transform .3s ease;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, .25);
+  }
+
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  /* ── Overlay escuro atrás do menu ── */
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    top: 60px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0);
+    pointer-events: none;
+    z-index: 250;
+    transition: background .3s ease;
+  }
+
+  .sidebar-backdrop.sidebar-open {
+    background: rgba(0, 0, 0, .45);
+    pointer-events: auto;
+  }
+
+  /* ── Conteúdo principal: nunca mais largo que a viewport ── */
+  .content {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+    padding: 1rem;
+  }
+
+  /* Trava o scroll do body atrás do menu aberto */
+  body.sidebar-open-lock {
+    overflow: hidden;
+  }
+}

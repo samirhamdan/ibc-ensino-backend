@@ -1,0 +1,102 @@
+/* ─── Alerts ─────────────────────────────────────────────────── */
+.alert {
+  padding: var(--space-lg);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-lg);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-medium);
+  border: 1.5px solid transparent;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  animation: slideDown .3s ease both;
+  box-shadow: var(--shadow-sm);
+}
+
+.alert-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  margin-top: .05rem;
+}
+
+.alert-body {
+  flex: 1;
+}
+
+.alert-title {
+  font-weight: var(--fw-semibold);
+  margin-bottom: var(--space-xs);
+}
+
+/* ── Semantic variants ── */
+.alert-success {
+  background: var(--success-100);
+  color: var(--success-700);
+  border-color: rgba(31, 169, 106, .25);
+}
+
+.alert-warning {
+  background: var(--warning-100);
+  color: var(--warning-700);
+  border-color: rgba(232, 161, 61, .3);
+}
+
+.alert-danger {
+  background: var(--danger-100);
+  color: var(--danger-700);
+  border-color: rgba(224, 83, 63, .25);
+}
+
+.alert-info {
+  background: var(--info-100);
+  color: var(--info-700);
+  border-color: rgba(61, 130, 196, .25);
+}
+
+/* Dismissible */
+.alert-dismissible {
+  position: relative;
+  padding-right: var(--space-2xl);
+}
+
+.alert-close {
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  background: none;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  opacity: .6;
+  transition: opacity var(--transition-fast);
+  color: inherit;
+}
+
+.alert-close:hover {
+  opacity: 1;
+}
+
+/* ── Toast (floating notification) ── */
+.toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  background: var(--dark);
+  color: var(--white);
+  padding: .75rem 1.25rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--fw-medium);
+  box-shadow: var(--shadow-xl);
+  z-index: 1100;
+  animation: toastSlideIn .3s ease both;
+  max-width: 320px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.toast-success { border-left: 3px solid var(--success); }
+.toast-warning { border-left: 3px solid var(--warning); }
+.toast-danger  { border-left: 3px solid var(--danger); }
+.toast-info    { border-left: 3px solid var(--info); }

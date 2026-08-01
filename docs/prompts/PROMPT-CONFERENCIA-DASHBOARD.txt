@@ -1,0 +1,77 @@
+Antes de qualquer merge em claude/zen-hopper-SeRac, faça uma
+auditoria completa do trabalho feito em feat/GAM-04-dashboard-saas
+(Etapas 1-4 do dashboard do aluno, docs/UX_ALUNO_SAAS.md).
+
+Não corrija nada ainda — primeiro relate o estado real. Depois
+eu decido o que corrigir antes do merge.
+
+## 1. Checklist de aceite por etapa
+
+Para cada etapa (1-4), confirme item a item se o critério de
+aceite do §6 do UX_ALUNO_SAAS.md foi realmente atingido, com
+evidência (teste específico, screenshot, ou comando que você
+rodou) — não just "sim, feito":
+
+ETAPA 1 (tema): IBC renderiza idêntico ao atual via tokens?
+Tenant demo com outra cor primária renderiza correto sem deploy?
+
+ETAPA 2 (estrutura): jornada "abrir dashboard → continuar lição"
+funcional nos 2 tenants de teste? Os 4 estados (loading/vazio/
+erro/conteúdo) existem de verdade nos 5 grupos, ou só em alguns?
+
+ETAPA 3 (gamificação): streak sobrevive a troca de dispositivo
+(teste real, não teórico)? Marcos disparam bônus corretamente?
+prefers-reduced-motion testado de verdade?
+
+ETAPA 4 (cards Netflix): Lighthouse rodado de verdade — quais
+os números exatos (não "deve estar ok")? prefers-reduced-motion
+respeitado nos cards também?
+
+## 2. Auditoria de regras transversais (§6/§7 da doc)
+
+- Rode um grep real por hex hardcoded em todo componente novo
+  das 4 etapas: `grep -rn "#[0-9a-fA-F]\{3,6\}" <diretórios
+  tocados>` excluindo tokens.css. Reporte cada ocorrência
+  encontrada, mesmo que pareça inofensiva.
+- Confirme que nenhum código novo usa localStorage/sessionStorage
+  (streaks deveriam ter migrado PARA fora, não adicionado uso novo).
+- Liste os slots da Release 1.0 (tutor, revisão espaçada real,
+  recomendações IA) e confirme que cada um está de fato atrás de
+  feature flag, desligado, sem lógica de IA implementada por engano.
+- Confirme que zero merge foi feito em claude/zen-hopper-SeRac
+  (deve continuar isolado).
+
+## 3. Estado da suíte e qualidade
+
+- Rode a suíte completa da branch agora e reporte o resultado
+  real (passed/failed/skipped), não o de memória.
+- Lint e audit de queries — rode agora, não cite resultado antigo.
+- Liste todos os commits da branch desde a Etapa 1, com uma
+  linha de resumo cada.
+
+## 4. Revisão cruzada (Fable 5)
+
+Se ainda não rodou uma revisão Fable 5 sobre as Etapas 2-4
+(só a Etapa 1 foi revisada até agora, conforme relatado), rode
+agora e reporte os achados brutos — inclusive os que você
+considerar menores ou já resolvidos.
+
+## 5. Lacunas conhecidas vs. spec
+
+Compare o que foi construído contra o UX_ALUNO_SAAS.md completo
+(não só os itens que você lembra) e liste qualquer coisa que a
+doc pede e não foi implementada, mesmo que pareça pequena
+(exemplo: badge "nova" com bounce único vs. loop, gradiente
+derivado por hash do título para cursos sem thumbnail, etc.)
+
+## 6. Screenshots
+
+Gere screenshots reais dos 2 tenants (ibc e demo) para cada um
+dos 5 grupos do dashboard, nos 4 estados quando aplicável
+(loading/vazio/erro/conteúdo). Se algum estado não puder ser
+forçado facilmente para screenshot, diga isso explicitamente
+em vez de pular.
+
+Entregue um relatório único e honesto — inclusive se a
+conclusão for "isto não está pronto para merge ainda por X, Y, Z".
+Não suavize achados negativos.

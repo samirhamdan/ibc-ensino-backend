@@ -1,0 +1,140 @@
+"""Casos de isolamento das tabelas de tenancy (Fase 2: tenants/tenant_users).
+
+Padrão do framework (doc 02 §5.4): criar dados em A e B, operar "dentro" de A
+e tentar alcançar recursos de B — por ID direto, listagem e contexto —
+exigindo 404/403 e zero linhas. Na Fase 3, cada grupo de tabelas migradas
+adiciona seus casos aqui seguindo este mesmo padrão.
+"""
+from core.tenancy import Tenant, TenantUser
+from tests.isolation.conftest import HOST_A, BASE
+
+
+# ── tenants: contexto por subdomínio ─────────────────────────────────────
+
+def test_tenant_current_nao_vaza_outro_tenant(tenant_a, tenant_b):
+    """Cada subdomínio só enxerga o próprio tenant — por construção, o
+    contexto vem do host, nunca de parâmetro manipulável pelo cliente."""
+    a = tenant_a.get('/api/tenant/current')
+    b = tenant_b.get('/api/tenant/current')
+    assert a.status_code == b.status_code == 200
+    da, db_ = a.get_json(), b.get_json()
+    assert da['slug'] == 'ibc' and db_['slug'] == 'demo'
+    assert da['id'] != db_['id']
+    # payload de A não contém NADA de B (zero linhas cruzadas)
+    assert 'demo' not in str(da)
+
+
+def test_theme_por_tenant_nao_vaza(iso_app, tenant_a, tenant_b, tenants_ab):
+    """GET /api/theme e /api/theme.json (Etapa 1, UX_ALUNO_SAAS.md §2.2)
+    derivam da cor do tenant do subdomínio — tenant B nunca vê os tokens
+    calculados a partir da cor de A, e vice-versa."""
+    from extensions import db
+    from core.tenancy import Tenant
+    from core.tenancy.cache import cache_clear
+
+    with iso_app.app_context():
+        a = Tenant.query.get(tenants_ab['a_id'])
+        b = Tenant.query.get(tenants_ab['b_id'])
+        a.tema_json = {'primary': '#008ea8'}
+        b.tema_json = {'primary': '#f0a500'}
+        db.session.commit()
+    cache_clear()
+
+    try:
+        ja = tenant_a.get('/api/theme.json').get_json()
+        jb = tenant_b.get('/api/theme.json').get_json()
+        assert ja['--brand-primary'] == '#008ea8'
+        assert jb['--brand-primary'] == '#f0a500'
+        assert ja['--brand-primary'] != jb['--brand-primary']
+
+        css_a = tenant_a.get('/api/theme').get_data(as_text=True)
+        css_b = tenant_b.get('/api/theme').get_data(as_text=True)
+        assert '#008ea8' in css_a and '#f0a500' not in css_a
+        assert '#f0a500' in css_b and '#008ea8' not in css_b
+    finally:
+        # try/finally, não sequencial: uma asserção falhando no meio não
+        # pode deixar o tenant `demo` com a cor de teste — o app/db da
+        # suíte de isolamento é compartilhado (session-scoped) entre TODOS
+        # os testes do módulo, então um estado não restaurado vaza para
+        # testes seguintes e mascara a falha real com erros confusos.
+        with iso_app.app_context():
+            a = Tenant.query.get(tenants_ab['a_id'])
+            b = Tenant.query.get(tenants_ab['b_id'])
+            a.tema_json = {'cor_primaria': '#008ea8'}
+            b.tema_json = {'cor_primaria': '#008ea8'}
+            db.session.commit()
+        cache_clear()
+
+
+def test_contexto_nao_aceita_id_de_tenant_via_request(tenant_a, tenants_ab):
+    """Tentativas de apontar para B a partir de A via query/header não têm
+    efeito: o contexto é derivado exclusivamente do subdomínio."""
+    bid = str(tenants_ab['b_id'])
+    r = tenant_a.get(f'/api/tenant/current?tenant_id={bid}')
+    assert r.get_json()['slug'] == 'ibc'
+    # header X-Tenant-Slug até existe em dev, mas o middleware o processa
+    # ANTES do host — quando presente, ele resolve, então o caso relevante
+    # de produção (override desligado) é coberto em
+    # tests/test_tenancy_middleware.py::test_header_override_ignorado_em_producao
+
+
+def test_subdominio_de_tenant_inexistente_404(iso_app):
+    from tests.isolation.conftest import TenantClient
+    c = TenantClient(iso_app.test_client(), f'invasor.{BASE}')
+    assert c.get('/api/tenant/current').status_code == 404
+    assert c.get('/api/courses').status_code == 404
+
+
+# ── tenant_users: papéis não vazam entre tenants ─────────────────────────
+
+def test_tenant_users_zero_linhas_cruzadas(iso_app, tenants_ab, seeded):
+    """Consulta escopada por tenant A retorna zero vínculos de B — o padrão
+    de repositório que TODA tabela com tenant_id seguirá."""
+    with iso_app.app_context():
+        from extensions import db
+        uid = seeded['users']['aluno']
+        a_id, b_id = tenants_ab['a_id'], tenants_ab['b_id']
+
+        TenantUser.query.filter_by(user_id=uid).delete()
+        db.session.add(TenantUser(tenant_id=a_id, user_id=uid, papel='aluno'))
+        db.session.add(TenantUser(tenant_id=b_id, user_id=uid, papel='admin_tenant'))
+        db.session.commit()
+
+        so_de_a = TenantUser.query.filter_by(tenant_id=a_id, user_id=uid).all()
+        assert len(so_de_a) == 1
+        assert all(tu.tenant_id == a_id for tu in so_de_a)
+
+        # zero linhas de B numa consulta escopada em A
+        vazadas = TenantUser.query.filter(TenantUser.tenant_id == a_id,
+                                          TenantUser.papel == 'admin_tenant').count()
+        assert vazadas == 0
+
+        # Restaura o baseline do fixture `seeded` (vínculo 'aluno' no
+        # tenant padrão) em vez de só apagar — outros testes dependem dele
+        # via usuarios_do_tenant_query/get_user_scoped_or_404.
+        TenantUser.query.filter_by(user_id=uid).delete()
+        db.session.add(TenantUser(tenant_id=a_id, user_id=uid, papel='aluno'))
+        db.session.commit()
+
+
+def test_suspensao_de_b_nao_afeta_a(iso_app, tenant_a):
+    """Suspender o tenant B não pode respingar no tenant A (TEN-04)."""
+    from core.tenancy import clear_tenant_cache
+    with iso_app.app_context():
+        from extensions import db
+        b = Tenant.query.filter_by(slug='demo').first()
+        b.status = 'suspended'
+        db.session.commit()
+    clear_tenant_cache()
+    try:
+        assert tenant_a.get('/api/tenant/current').status_code == 200
+        from tests.isolation.conftest import TenantClient
+        c = TenantClient(iso_app.test_client(), f'demo.{BASE}')
+        assert c.get('/api/tenant/current').status_code == 403
+    finally:
+        with iso_app.app_context():
+            from extensions import db
+            b = Tenant.query.filter_by(slug='demo').first()
+            b.status = 'active'
+            db.session.commit()
+        clear_tenant_cache()

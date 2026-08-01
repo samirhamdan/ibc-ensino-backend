@@ -1,0 +1,71 @@
+A Fase 6 (migração de produção) foi concluída com sucesso e está
+sendo monitorada. A Etapa 1 do dashboard (fundação de tema,
+core/theming.py + /api/theme) já está pronta e mergeada em
+claude/zen-hopper-SeRac.
+
+Agora vamos completar o dashboard do aluno inteiro antes de
+qualquer deploy — vou decidir o momento de subir depois de ver
+tudo pronto e revisado. Trabalhe na branch feat/GAM-04-dashboard-saas
+(mesma branch da Etapa 1), NÃO faça merge em claude/zen-hopper-SeRac
+até eu pedir explicitamente.
+
+Leia docs/UX_ALUNO_SAAS.md por completo antes de começar,
+especialmente §3 (estrutura dos 5 grupos), §4 (componentes) e
+§6 (plano de implementação).
+
+Execute as Etapas 2, 3 e 4 em sequência, cada uma com commit
+próprio e testes passando antes de seguir para a próxima:
+
+ETAPA 2 — Estrutura dos 5 grupos (§3, §6):
+- Grid responsivo: coluna única <768px, grid 2 colunas desktop
+  (8/4) com grupos 1-2 esquerda, 3-4 direita, grupo 5 full-width
+- Os 5 grupos: SAUDAÇÃO, CONTINUE SEUS ESTUDOS, SUA PONTUAÇÃO,
+  PRÓXIMAS METAS, RECOMENDAÇÕES
+- 4 estados obrigatórios por grupo (§4.4): loading (skeleton),
+  vazio (mensagem + ação), erro (o que houve + retry), conteúdo
+- Ligar aos dados reais existentes (progresso, matrículas,
+  cursos) — sem inventar endpoints novos além do necessário
+- Slots para features da Release 1.0 (tutor, revisão espaçada,
+  recomendações IA) ficam como estado vazio elegante, atrás de
+  feature flag por tenant (tutor_enabled, etc.) — não implementar
+  a lógica de IA agora, só o slot visual desligado
+- Aceite: jornada "abrir dashboard → continuar lição" funcional
+  em pelo menos 2 tenants de teste (ibc + demo)
+
+ETAPA 3 — Gamificação server-side (§3 Grupo 3, §4.2):
+- Migrar streaks de localStorage para API (o model já existe
+  da Fase 3 de tenancy — é só ligar a UI)
+- Componente de chama SVG com 3 estados: ativa (flicker sutil),
+  em risco hoje (pulso + tooltip), quebrada (cinza, sem animação)
+- prefers-reduced-motion respeitado em todas as animações
+- Conquistas com badge "nova" (bounce 1x na entrada, nunca loop)
+- Aceite: streak sobrevive a troca de dispositivo (testar
+  logando em duas sessões diferentes); marcos (7/30/100 dias)
+  disparam bônus corretamente
+
+ETAPA 4 — Cards Netflix + recomendações v0 (§3 Grupo 5, §4.1):
+- Carrossel horizontal, cards proporção 16:9
+- Hover desktop: scale 1.02 + shadow elevado, 180ms ease-out
+- Touch: sem hover, feedback :active (scale 0.98)
+- Gradiente derivado de --brand-gradient para cursos sem
+  thumbnail (nunca cinza genérico)
+- Ordenação por popularidade no tenant (slot pronto para
+  LRN-03 na Release 1.0, sem implementar a lógica de IA)
+- Aceite: Lighthouse >= 85 performance mobile, >= 95
+  acessibilidade; prefers-reduced-motion respeitado
+
+Regras que já seguimos na Etapa 1 e continuam valendo:
+- Zero hex hardcoded em componente novo — tudo via tokens.css
+- Nenhum uso de localStorage/sessionStorage no código novo além
+  do que já existir (streaks migram PARA fora do localStorage,
+  não criam novo uso)
+- Toda feature nova: testes unitários + E2E das jornadas afetadas
+- Screenshots dos 2 tenants de teste em cada commit relevante
+- Rota pelo padrão Sonnet-escreve/Fable-revisa antes de qualquer
+  commit ir para a branch, como fizemos até agora
+
+Ao final das 3 etapas, rode a suíte completa, lint, audit, e me
+dê um resumo do que ficou pronto — inclusive o que ficou como
+slot desligado esperando a Release 1.0 (tutor, revisão espaçada
+real, recomendações por IA). Não faça merge em
+claude/zen-hopper-SeRac ainda.

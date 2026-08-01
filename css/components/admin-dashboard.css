@@ -1,0 +1,183 @@
+/* Admin Dashboard — Tela "Hoje" (UX_ADMIN_SAAS §2) */
+
+.admin-hoje { max-width: 1360px; margin: 0 auto; padding: var(--space-lg); }
+.admin-hoje-heading {
+  font-size: var(--text-xl, 1.25rem);
+  font-weight: 600;
+  color: var(--navy, #1a2332);
+  margin-bottom: var(--space-lg);
+  display: flex; align-items: center; gap: .5rem;
+}
+
+/* ── Busca global no Hoje ── */
+.admin-hoje-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs, .5rem);
+  background: var(--bg-surface, #fff);
+  border-radius: var(--radius-button, 8px);
+  padding: 6px 12px;
+  margin-bottom: var(--space-lg);
+  box-shadow: 0 1px 3px rgb(0 0 0 / .06);
+  max-width: 480px;
+}
+.admin-hoje-search-wrap .icon { color: var(--gray, #94a3b8); flex-shrink: 0; }
+.admin-hoje-search {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: var(--text-sm, .875rem);
+  background: transparent;
+  color: var(--navy, #1a2332);
+  min-width: 0;
+}
+.admin-hoje-search::placeholder { color: var(--gray, #94a3b8); }
+
+/* ── Zona 1: Fila de Atencao ── */
+.admin-fila { margin-bottom: var(--space-xl, 2rem); }
+.admin-fila-title {
+  font-size: var(--text-base, 1rem);
+  font-weight: 600;
+  color: var(--navy, #1a2332);
+  margin-bottom: var(--space-sm);
+  display: flex; align-items: center; gap: .5rem;
+}
+.admin-fila-list { display: flex; flex-direction: column; gap: var(--space-xs, .5rem); }
+.admin-fila-item {
+  display: flex; align-items: center; gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-surface, #fff);
+  border-radius: var(--radius-card, 12px);
+  border-left: 4px solid var(--gray, #94a3b8);
+  box-shadow: 0 1px 3px rgb(0 0 0 / .06);
+}
+.admin-fila-item[data-severity="high"] { border-left-color: var(--danger, #ef4444); }
+.admin-fila-item[data-severity="warn"] { border-left-color: var(--warning, #f59e0b); }
+.admin-fila-item[data-severity="info"] { border-left-color: var(--brand-primary, #008ea8); }
+.admin-fila-icon { flex-shrink: 0; }
+.admin-fila-msg { flex: 1; font-size: var(--text-sm, .875rem); color: var(--navy, #1a2332); }
+.admin-fila-action {
+  flex-shrink: 0;
+  font-size: var(--text-xs, .75rem);
+  font-weight: 500;
+  color: var(--brand-primary, #008ea8);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.admin-fila-action:hover { text-decoration: underline; }
+.admin-fila-empty {
+  padding: var(--space-lg);
+  text-align: center;
+  color: var(--success, #10b981);
+  font-size: var(--text-sm, .875rem);
+  background: var(--bg-surface, #fff);
+  border-radius: var(--radius-card, 12px);
+}
+
+/* ── Zona 2: Pulso da Semana ── */
+.admin-pulso {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl, 2rem);
+}
+@media (max-width: 900px) { .admin-pulso { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 500px) { .admin-pulso { grid-template-columns: 1fr; } }
+
+.admin-pulso-card {
+  background: var(--bg-surface, #fff);
+  border-radius: var(--radius-card, 12px);
+  padding: var(--space-md);
+  box-shadow: 0 1px 3px rgb(0 0 0 / .06);
+  cursor: pointer;
+  transition: box-shadow .15s;
+}
+.admin-pulso-card:hover { box-shadow: 0 4px 12px rgb(0 0 0 / .1); }
+.admin-pulso-label {
+  font-size: var(--text-xs, .75rem);
+  color: var(--gray, #94a3b8);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: var(--space-xs);
+}
+.admin-pulso-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--navy, #1a2332);
+  line-height: 1;
+}
+.admin-pulso-delta {
+  font-size: var(--text-xs, .75rem);
+  margin-top: 4px;
+}
+.admin-pulso-delta.up { color: var(--success, #10b981); }
+.admin-pulso-delta.down { color: var(--danger, #ef4444); }
+.admin-pulso-delta.neutral { color: var(--gray, #94a3b8); }
+.admin-pulso-sparkline {
+  margin-top: var(--space-xs);
+  height: 24px;
+}
+.admin-pulso-sparkline svg { display: block; width: 100%; height: 24px; }
+.admin-pulso-sparkline polyline {
+  fill: none;
+  stroke: var(--brand-primary, #008ea8);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── Zona 3: Atividade Recente ── */
+.admin-atividade { margin-bottom: var(--space-xl, 2rem); }
+.admin-atividade-title {
+  font-size: var(--text-base, 1rem);
+  font-weight: 600;
+  color: var(--navy, #1a2332);
+  margin-bottom: var(--space-sm);
+  display: flex; align-items: center; gap: .5rem;
+}
+.admin-atividade-list {
+  background: var(--bg-surface, #fff);
+  border-radius: var(--radius-card, 12px);
+  box-shadow: 0 1px 3px rgb(0 0 0 / .06);
+  overflow: hidden;
+}
+.admin-atividade-item {
+  display: flex; align-items: center; gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  font-size: var(--text-sm, .875rem);
+}
+.admin-atividade-item:last-child { border-bottom: none; }
+.admin-atividade-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--brand-primary, #008ea8);
+  flex-shrink: 0;
+}
+.admin-atividade-dot[data-type="question"] { background: var(--warning, #f59e0b); }
+.admin-atividade-text { flex: 1; color: var(--navy, #1a2332); }
+.admin-atividade-text strong { font-weight: 600; }
+.admin-atividade-time { font-size: var(--text-xs, .75rem); color: var(--gray, #94a3b8); white-space: nowrap; }
+.admin-atividade-empty {
+  padding: var(--space-lg);
+  text-align: center;
+  color: var(--gray, #94a3b8);
+  font-size: var(--text-sm, .875rem);
+}
+
+/* ── Layout grid Hoje (2 colunas desktop) ── */
+.admin-hoje-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-lg);
+}
+@media (min-width: 900px) {
+  .admin-hoje-grid { grid-template-columns: 3fr 2fr; }
+}
+
+/* ── Nav admin highlight ── */
+.course-item.admin-nav-active {
+  background: var(--brand-primary-subtle, rgba(0, 142, 168, .1));
+  color: var(--brand-primary, #008ea8);
+  font-weight: 500;
+}
