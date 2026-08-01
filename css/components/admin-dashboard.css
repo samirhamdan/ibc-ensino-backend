@@ -9,6 +9,30 @@
   display: flex; align-items: center; gap: .5rem;
 }
 
+/* ── Busca global no Hoje ── */
+.admin-hoje-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs, .5rem);
+  background: var(--bg-surface, #fff);
+  border-radius: var(--radius-button, 8px);
+  padding: 6px 12px;
+  margin-bottom: var(--space-lg);
+  box-shadow: 0 1px 3px rgb(0 0 0 / .06);
+  max-width: 480px;
+}
+.admin-hoje-search-wrap .icon { color: var(--gray, #94a3b8); flex-shrink: 0; }
+.admin-hoje-search {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: var(--text-sm, .875rem);
+  background: transparent;
+  color: var(--navy, #1a2332);
+  min-width: 0;
+}
+.admin-hoje-search::placeholder { color: var(--gray, #94a3b8); }
+
 /* ── Zona 1: Fila de Atencao ── */
 .admin-fila { margin-bottom: var(--space-xl, 2rem); }
 .admin-fila-title {

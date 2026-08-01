@@ -3648,6 +3648,7 @@ async function openUserProfile(userId) {
     </div>
     <div class="profile-actions">
       <div class="profile-section-title">Ações</div>
+      <button class="btn" style="background:#eee" onclick='_sendUserMessage(${userId},${jsAttr(u.name)})'>${icon('message','14')} Mensagem</button>
       <button class="btn" style="background:#eee" onclick='openEditUserModal(${userId},${jsAttr(u.name)},${jsAttr(u.email)},${jsAttr(u.role)})'>${icon('pencil','14')} Editar</button>
       <button class="btn" style="background:#eee" onclick="openResetPasswordModal(${userId})">${icon('key','14')} Resetar Senha</button>
       <button class="btn ${u.is_active ? 'btn-danger' : ''}" onclick="toggleUserActive(${userId})">${u.is_active ? 'Desativar' : 'Reativar'}</button>
@@ -3658,6 +3659,14 @@ async function openUserProfile(userId) {
 function closeUserProfile() {
   const panel = document.getElementById('user-profile-panel');
   if (panel) panel.classList.remove('open');
+}
+
+async function _sendUserMessage(userId, userName) {
+  const msg = prompt(`Mensagem para ${userName}:`);
+  if (!msg || !msg.trim()) return;
+  const res = await api('POST', `/admin/users/${userId}/message`, {message: msg.trim()});
+  if (res.ok) showToast('Mensagem enviada.','success');
+  else showToast('Erro ao enviar mensagem.','error');
 }
 
 async function adminSetActiveTrail(userId, trailId) {
@@ -4518,6 +4527,11 @@ async function renderAdminHoje(){
   if(!el) return;
   el.innerHTML=`<div class="admin-hoje">
     <div class="admin-hoje-heading">${icon('home','20')} Hoje</div>
+    <div class="admin-hoje-search-wrap">
+      ${icon('search','16')}
+      <input type="text" class="admin-hoje-search" id="admin-global-search" placeholder="Buscar aluno por nome ou e-mail..." onkeydown="if(event.key==='Enter')_adminGlobalSearch()">
+      <button class="btn btn-primary btn-sm" onclick="_adminGlobalSearch()" style="padding:4px 12px;font-size:.82rem">Buscar</button>
+    </div>
     <div id="admin-hoje-body"><div class="alert alert-info"><span class="alert-icon">${icon('clock','16')}</span><div class="alert-body">Carregando...</div></div></div>
   </div>`;
   try {
@@ -4603,6 +4617,16 @@ function _svgSparkline(data){
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}"/></svg>`;
+}
+
+function _adminGlobalSearch(){
+  const q=(document.getElementById('admin-global-search')||{}).value||'';
+  if(!q.trim()) return;
+  showAdminPanel('users');
+  setTimeout(()=>{
+    const inp=document.getElementById('users-search');
+    if(inp){inp.value=q;adminUsersLoad();}
+  },200);
 }
 
 function _renderAtividadeRecente(activities){
