@@ -46,7 +46,7 @@ def test_migracao_0018_colunas_reversivel():
         assert 'alerta_80pct_enviado' in cols_ai_usage
         assert 'regua_pausada' in cols_subs
 
-        r = subprocess.run([sys.executable, '-m', 'alembic', 'downgrade', '-1'],
+        r = subprocess.run([sys.executable, '-m', 'alembic', 'downgrade', '0017_subscription_overdue_desde'],
                            capture_output=True, text=True, env=env, cwd=repo_root)
         assert r.returncode == 0, r.stderr
         con = sqlite3.connect(path)
