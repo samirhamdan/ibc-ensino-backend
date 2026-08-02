@@ -299,7 +299,7 @@
         <div class="sidebar-label">Administração</div>
         <div class="course-item" id="nav-admin-hoje" onclick="showAdminPanel('hoje')" style="display:none">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-home"></use></svg></span>
-          <div class="ci-text"><div class="ci-name">Hoje</div></div>
+          <div class="ci-text"><div class="ci-name">Dashboard</div></div>
         </div>
         <div class="course-item" id="nav-admin-users" onclick="showAdminPanel('users')">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-users"></use></svg></span>
@@ -4533,12 +4533,12 @@ async function _renderAdminDashboardInner(){
   console.log('[DEBUG] _renderAdminDashboardInner: concluído com sucesso');
 }
 
-// ── Admin: Tela "Hoje" (UX_ADMIN_SAAS §2) ──
+// ── Admin: Dashboard (UX_ADMIN_SAAS §2) ──
 async function renderAdminHoje(){
   const el=document.getElementById('main-content');
   if(!el) return;
   el.innerHTML=`<div class="admin-hoje">
-    <div class="admin-hoje-heading">${icon('home','20')} Hoje</div>
+    <div class="admin-hoje-heading">${icon('bar-chart','20')} Dashboard</div>
     <div class="admin-hoje-search-wrap">
       ${icon('search','16')}
       <input type="text" class="admin-hoje-search" id="admin-global-search" placeholder="Buscar aluno por nome ou e-mail..." onkeydown="if(event.key==='Enter')_adminGlobalSearch()">
@@ -4548,15 +4548,17 @@ async function renderAdminHoje(){
   try {
   const res=await api('GET','/admin/dashboard');
   if(!res.ok){
-    document.getElementById('admin-hoje-body').innerHTML=`<div class="alert alert-danger"><span class="alert-icon">${icon('x-circle','16')}</span><div class="alert-body">Nao foi possivel carregar o painel.</div></div><button class="btn btn-outline" onclick="renderAdminHoje()" style="margin-top:var(--space-sm)">Tentar de novo</button>`;
+    document.getElementById('admin-hoje-body').innerHTML=`<div class="alert alert-danger"><span class="alert-icon">${icon('x-circle','16')}</span><div class="alert-body">Não foi possível carregar o painel.</div></div><button class="btn btn-outline" onclick="renderAdminHoje()" style="margin-top:var(--space-sm)">Tentar de novo</button>`;
     return;
   }
   const d=await res.json();
   const alerts=d.alerts||[];
   const pulso=d.pulso||{};
   const recent=d.recent_activities||[];
+  const tu=d.total_users||{};
   const body=document.getElementById('admin-hoje-body');
   body.innerHTML=`
+    ${_renderKpiRow(tu, d.total_courses||0, d.completion_rate||0, d.new_users_7d||0)}
     ${_renderPulso(pulso)}
     <div class="admin-hoje-grid">
       <div>
@@ -4567,6 +4569,24 @@ async function renderAdminHoje(){
       </div>
     </div>`;
   } catch(e){ console.error('[ERRO] renderAdminHoje:', e); _renderDashboardError(e, 'painel admin'); }
+}
+
+function _renderKpiRow(users, totalCourses, completionRate, newUsers7d){
+  const kpis=[
+    {label:'Total de Alunos',value:users.alunos||0,icon:'users',color:'var(--brand-primary,#008ea8)'},
+    {label:'Cursos Publicados',value:totalCourses,icon:'books',color:'var(--success,#10b981)'},
+    {label:'Taxa de Conclusão',value:completionRate+'%',icon:'checkmark-circle',color:'var(--warning,#f59e0b)'},
+    {label:'Novos (7d)',value:newUsers7d,icon:'rocket',color:'var(--brand-primary,#008ea8)'},
+  ];
+  return `<div class="admin-kpi-row">
+    ${kpis.map(k=>`<div class="admin-kpi-card">
+      <div class="admin-kpi-icon" style="background:${k.color}15;color:${k.color}">${icon(k.icon,'22')}</div>
+      <div class="admin-kpi-body">
+        <div class="admin-kpi-value">${k.value}</div>
+        <div class="admin-kpi-label">${escapeHtml(k.label)}</div>
+      </div>
+    </div>`).join('')}
+  </div>`;
 }
 
 function _renderFilaAtencao(alerts){
@@ -4595,23 +4615,26 @@ function _renderFilaAtencao(alerts){
 
 function _renderPulso(p){
   const cards=[
-    {label:'Alunos ativos (7d)',value:p.alunos_ativos_7d||0,prev:p.alunos_ativos_prev||0,spark:p.sparklines?.active},
-    {label:'Conclusões da semana',value:p.conclusoes_semana||0,prev:p.conclusoes_prev||0,spark:p.sparklines?.completions},
-    {label:'Engajamento',value:(p.engajamento_pct||0)+'%',prev:p.engajamento_prev||0,spark:null},
-    {label:'Novos alunos',value:p.novos_semana||0,prev:p.novos_prev||0,spark:p.sparklines?.signups},
+    {label:'Alunos Ativos',sublabel:'últimos 7 dias',value:p.alunos_ativos_7d||0,prev:p.alunos_ativos_prev||0,spark:p.sparklines?.active},
+    {label:'Aulas Concluídas',sublabel:'esta semana',value:p.conclusoes_semana||0,prev:p.conclusoes_prev||0,spark:p.sparklines?.completions},
+    {label:'Engajamento',sublabel:'alunos ativos / total',value:(p.engajamento_pct||0)+'%',prev:p.engajamento_prev||0,spark:null,isPct:true},
+    {label:'Matrículas',sublabel:'esta semana',value:p.novos_semana||0,prev:p.novos_prev||0,spark:p.sparklines?.signups},
   ];
-  return `<div class="admin-fila-title" style="margin-bottom:var(--space-sm)">${icon('bar-chart','16')} Pulso da Semana</div>
+  return `<div class="admin-fila-title" style="margin-bottom:var(--space-sm)">${icon('bar-chart','16')} Tendência Semanal</div>
     <div class="admin-pulso">
       ${cards.map(c=>{
         const numVal=typeof c.value==='string'?parseInt(c.value):c.value;
         const numPrev=typeof c.prev==='string'?parseInt(c.prev):c.prev;
         const diff=numVal-numPrev;
         const cls=diff>0?'up':diff<0?'down':'neutral';
-        const diffStr=diff>0?'+'+diff:diff===0?'=':''+diff;
+        const pctChange=numPrev>0?Math.round(Math.abs(diff)/numPrev*100):diff!==0?100:0;
+        const arrow=diff>0?'↑':diff<0?'↓':'→';
+        const diffStr=diff===0?'Sem mudança':`${arrow} ${pctChange}% vs. anterior`;
         return `<div class="admin-pulso-card">
           <div class="admin-pulso-label">${escapeHtml(c.label)}</div>
+          <div class="admin-pulso-sublabel">${escapeHtml(c.sublabel||'')}</div>
           <div class="admin-pulso-value">${c.value}</div>
-          <div class="admin-pulso-delta ${cls}">${diffStr} vs. semana anterior</div>
+          <div class="admin-pulso-delta ${cls}">${diffStr}</div>
           ${c.spark?`<div class="admin-pulso-sparkline">${_svgSparkline(c.spark)}</div>`:''}
         </div>`;
       }).join('')}

@@ -1,4 +1,4 @@
-/* Admin Dashboard — Tela "Hoje" (UX_ADMIN_SAAS §2) */
+/* Admin Dashboard (UX_ADMIN_SAAS §2) */
 
 .admin-hoje { max-width: 1360px; margin: 0 auto; padding: var(--space-lg); }
 .admin-hoje-heading {
@@ -9,7 +9,7 @@
   display: flex; align-items: center; gap: .5rem;
 }
 
-/* ── Busca global no Hoje ── */
+/* ── Busca global ── */
 .admin-hoje-search-wrap {
   display: flex;
   align-items: center;
@@ -38,7 +38,45 @@
 }
 .admin-hoje-search::placeholder { color: var(--gray, #94a3b8); }
 
-/* ── Zona 1: Fila de Atencao ── */
+/* ── KPI Row (headline numbers) ── */
+.admin-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl, 2rem);
+}
+@media (max-width: 900px) { .admin-kpi-row { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 500px) { .admin-kpi-row { grid-template-columns: 1fr; } }
+
+.admin-kpi-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  background: var(--bg-surface, #fff);
+  border-radius: var(--radius-card, 12px);
+  padding: var(--space-md) var(--space-lg);
+  box-shadow: 0 1px 3px rgb(0 0 0 / .06);
+}
+.admin-kpi-icon {
+  width: 44px; height: 44px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.admin-kpi-body { min-width: 0; }
+.admin-kpi-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--navy, #1a2332);
+  line-height: 1.1;
+}
+.admin-kpi-label {
+  font-size: var(--text-xs, .75rem);
+  color: var(--gray, #94a3b8);
+  margin-top: 2px;
+}
+
+/* ── Fila de Atenção ── */
 .admin-fila { margin-bottom: var(--space-xl, 2rem); }
 .admin-fila-title {
   font-size: var(--text-base, 1rem);
@@ -80,7 +118,7 @@
   border-radius: var(--radius-card, 12px);
 }
 
-/* ── Zona 2: Pulso da Semana ── */
+/* ── Tendência Semanal (Pulso) ── */
 .admin-pulso {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -95,15 +133,19 @@
   border-radius: var(--radius-card, 12px);
   padding: var(--space-md);
   box-shadow: 0 1px 3px rgb(0 0 0 / .06);
-  cursor: pointer;
   transition: box-shadow .15s;
 }
 .admin-pulso-card:hover { box-shadow: 0 4px 12px rgb(0 0 0 / .1); }
 .admin-pulso-label {
   font-size: var(--text-xs, .75rem);
-  color: var(--gray, #94a3b8);
+  color: var(--navy, #1a2332);
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .04em;
+}
+.admin-pulso-sublabel {
+  font-size: var(--text-xs, .75rem);
+  color: var(--gray, #94a3b8);
   margin-bottom: var(--space-xs);
 }
 .admin-pulso-value {
@@ -132,7 +174,7 @@
   stroke-linejoin: round;
 }
 
-/* ── Zona 3: Atividade Recente ── */
+/* ── Atividade Recente ── */
 .admin-atividade { margin-bottom: var(--space-xl, 2rem); }
 .admin-atividade-title {
   font-size: var(--text-base, 1rem);
@@ -170,7 +212,7 @@
   font-size: var(--text-sm, .875rem);
 }
 
-/* ── Layout grid Hoje (2 colunas desktop) ── */
+/* ── Layout grid (2 colunas desktop) ── */
 .admin-hoje-grid {
   display: grid;
   grid-template-columns: 1fr;
