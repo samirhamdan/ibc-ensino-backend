@@ -2952,7 +2952,18 @@ async function openCourseEditor(courseId) {
           <span class="empty-hint">Clique em "Nova Aula" para começar.</span>
         </div>` : ''}
       </div>
+    </div>
+
+    <div class="editor-card" id="desempenhoCard">
+      <div class="editor-card-header">
+        <span class="editor-section-title">${icon('bar-chart','18')} Desempenho</span>
+      </div>
+      <div class="editor-card-body" id="desempenhoBody">
+        <p class="text-muted text-sm">Carregando dados de desempenho…</p>
+      </div>
     </div>`;
+
+  loadCourseDesempenho(courseId);
 
   if (typeof Sortable !== 'undefined') {
     _lessonSortable = new Sortable(document.getElementById('lessonAccordion'), {
@@ -2970,6 +2981,63 @@ async function openCourseEditor(courseId) {
       }
     });
   }
+}
+
+async function loadCourseDesempenho(courseId) {
+  const el = document.getElementById('desempenhoBody');
+  if (!el) return;
+  const res = await api('GET', `/courses/admin/courses/${courseId}/desempenho`);
+  if (!res.ok) { el.innerHTML = '<p class="text-muted text-sm">Sem dados de desempenho disponíveis.</p>'; return; }
+  const d = await res.json();
+  if (!d.funil || !d.funil.length) {
+    el.innerHTML = '<p class="text-muted text-sm">Nenhum módulo cadastrado neste curso.</p>';
+    return;
+  }
+  const maxAlunos = d.matriculados || 1;
+  const pctAbandono = (mod) => {
+    if (!mod.matriculados) return 0;
+    return Math.round((1 - mod.concluiram / mod.matriculados) * 100);
+  };
+  const fmtTempo = (s) => s >= 60 ? Math.round(s/60)+'min' : s+'s';
+  const piores = d.funil.filter(m => m.matriculados > 0).sort((a,b) => (a.concluiram/a.matriculados) - (b.concluiram/b.matriculados));
+  const piorModulo = piores.length ? piores[0] : null;
+
+  el.innerHTML = `
+    <div class="desemp-resumo">
+      <div class="desemp-stat"><span class="desemp-stat-value">${d.matriculados}</span><span class="desemp-stat-label">Matriculados</span></div>
+      <div class="desemp-stat"><span class="desemp-stat-value">${d.concluiram_curso}</span><span class="desemp-stat-label">Concluíram</span></div>
+      <div class="desemp-stat"><span class="desemp-stat-value">${d.taxa_conclusao}%</span><span class="desemp-stat-label">Taxa de Conclusão</span></div>
+    </div>
+    <h4 class="desemp-funil-title">Funil por Módulo</h4>
+    <div class="desemp-funil">
+      ${d.funil.map((m, i) => {
+        const pctIni = Math.round(m.iniciaram / maxAlunos * 100);
+        const pctCon = Math.round(m.concluiram / maxAlunos * 100);
+        const abandon = pctAbandono(m);
+        const isWorst = piorModulo && m.module_id === piorModulo.module_id && abandon > 30;
+        return `<div class="desemp-funil-row${isWorst?' desemp-funil-worst':''}">
+          <div class="desemp-funil-label">${i+1}. ${m.nome}</div>
+          <div class="desemp-funil-bars">
+            <div class="desemp-bar desemp-bar-ini" style="width:${Math.max(pctIni,2)}%"><span>${m.iniciaram}</span></div>
+            <div class="desemp-bar desemp-bar-con" style="width:${Math.max(pctCon,2)}%"><span>${m.concluiram}</span></div>
+          </div>
+          <div class="desemp-funil-meta">
+            ${m.nota_media !== null ? '<span>Nota: '+m.nota_media+'%</span>' : ''}
+            ${m.tempo_medio_seg ? '<span>'+fmtTempo(m.tempo_medio_seg)+'</span>' : ''}
+            ${abandon > 30 ? '<span class="desemp-abandon">'+abandon+'% abandono</span>' : ''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="desemp-legend">
+      <span class="desemp-legend-item"><span class="desemp-dot desemp-dot-ini"></span> Iniciaram</span>
+      <span class="desemp-legend-item"><span class="desemp-dot desemp-dot-con"></span> Concluíram</span>
+    </div>
+    ${piorModulo && pctAbandono(piorModulo) > 30 ? `
+    <div class="desemp-cta">
+      ${icon('lightbulb','16')} O módulo <strong>${piorModulo.nome}</strong> concentra ${pctAbandono(piorModulo)}% do abandono.
+      <a href="#" onclick="event.preventDefault();toggleLessonAccordion(${piorModulo.module_id})">Revisar conteúdo</a>
+    </div>` : ''}`;
 }
 
 function renderLessonAccordionItem(l, i) {

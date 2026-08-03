@@ -79,6 +79,7 @@ TENANT_SCOPED = {
     'courses.admin_get_lessons': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
     'courses.admin_update_lesson': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
     'courses.admin_delete_lesson': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
+    'courses.admin_course_desempenho': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
     'courses.admin_reorder_lessons': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
     'courses.admin_update_exercise': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',
     'courses.admin_add_material': 'test_content_isolation.py::test_curso_de_outro_tenant_404_por_id_direto',

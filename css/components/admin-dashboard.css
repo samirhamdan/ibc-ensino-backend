@@ -222,6 +222,68 @@
   .admin-hoje-grid { grid-template-columns: 3fr 2fr; }
 }
 
+/* ── Desempenho por curso (P1) ── */
+.desemp-resumo {
+  display: flex; gap: var(--space-lg); margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+}
+.desemp-stat { text-align: center; min-width: 100px; }
+.desemp-stat-value {
+  display: block; font-size: 1.75rem; font-weight: 700;
+  color: var(--navy, #1a2332); line-height: 1.1;
+}
+.desemp-stat-label {
+  font-size: var(--text-xs, .75rem); color: var(--gray, #94a3b8); margin-top: 2px;
+}
+.desemp-funil-title {
+  font-size: var(--text-sm, .875rem); font-weight: 600;
+  color: var(--navy, #1a2332); margin-bottom: var(--space-sm);
+}
+.desemp-funil { display: flex; flex-direction: column; gap: 6px; margin-bottom: var(--space-md); }
+.desemp-funil-row {
+  display: grid; grid-template-columns: 160px 1fr auto; gap: var(--space-sm);
+  align-items: center; padding: 4px 0;
+}
+@media (max-width: 600px) { .desemp-funil-row { grid-template-columns: 1fr; } }
+.desemp-funil-row.desemp-funil-worst {
+  background: rgba(239, 68, 68, .06); border-radius: var(--radius-button, 8px);
+  padding: 4px 8px;
+}
+.desemp-funil-label {
+  font-size: var(--text-sm, .875rem); color: var(--navy, #1a2332);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.desemp-funil-bars { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.desemp-bar {
+  height: 18px; border-radius: 4px; display: flex; align-items: center;
+  padding: 0 6px; font-size: .7rem; font-weight: 600; color: #fff;
+  min-width: 20px; transition: width .3s;
+}
+.desemp-bar span { white-space: nowrap; }
+.desemp-bar-ini { background: var(--brand-primary, #008ea8); opacity: .55; }
+.desemp-bar-con { background: var(--success, #10b981); }
+.desemp-funil-meta {
+  display: flex; gap: var(--space-xs); font-size: var(--text-xs, .75rem);
+  color: var(--gray, #94a3b8); white-space: nowrap;
+}
+.desemp-abandon { color: var(--danger, #ef4444); font-weight: 600; }
+.desemp-legend {
+  display: flex; gap: var(--space-md); font-size: var(--text-xs, .75rem);
+  color: var(--gray, #94a3b8); margin-bottom: var(--space-md);
+}
+.desemp-legend-item { display: flex; align-items: center; gap: 4px; }
+.desemp-dot { width: 10px; height: 10px; border-radius: 3px; }
+.desemp-dot-ini { background: var(--brand-primary, #008ea8); opacity: .55; }
+.desemp-dot-con { background: var(--success, #10b981); }
+.desemp-cta {
+  background: rgba(245, 158, 11, .08); border-left: 3px solid var(--warning, #f59e0b);
+  padding: var(--space-sm) var(--space-md); border-radius: var(--radius-button, 8px);
+  font-size: var(--text-sm, .875rem); color: var(--navy, #1a2332);
+}
+.desemp-cta a {
+  color: var(--brand-primary, #008ea8); font-weight: 500; margin-left: 4px;
+}
+
 /* ── Nav admin highlight ── */
 .course-item.admin-nav-active {
   background: var(--brand-primary-subtle, rgba(0, 142, 168, .1));

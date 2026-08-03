@@ -328,6 +328,66 @@ def admin_get_lessons(course_id):
         })
     return jsonify({'lessons': result})
 
+@courses_bp.route('/admin/courses/<int:course_id>/desempenho', methods=['GET'])
+def admin_course_desempenho(course_id):
+    user, err = _course_admin_required()
+    if err: return err
+    from models import LessonProgress, Progress, StudySession
+    from sqlalchemy import func
+
+    tid = current_tenant_id()
+    course = get_scoped(Course, course_id)
+    if not course:
+        return jsonify({'error': 'Curso não encontrado'}), 404
+
+    modules = Module.query.filter_by(tenant_id=tid, course_id=course_id)\
+        .order_by(Module.position).all()
+
+    enrolled = Progress.query.filter_by(tenant_id=tid, course_id=course_id).count()
+
+    funil = []
+    for m in modules:
+        lp_rows = LessonProgress.query.filter_by(
+            tenant_id=tid, course_id=course_id, module_id=m.id).all()
+        iniciaram = len(lp_rows)
+        concluiram = sum(1 for lp in lp_rows if lp.passed)
+
+        scores = [lp.score for lp in lp_rows if lp.total and lp.total > 0]
+        totals = [lp.total for lp in lp_rows if lp.total and lp.total > 0]
+        nota_media = round(sum(scores) / sum(totals) * 100) if totals else None
+
+        tempo_rows = db.session.query(func.sum(StudySession.duration_seconds))\
+            .filter(StudySession.lesson_id == m.id, StudySession.tenant_id == tid).scalar()
+        tempo_medio = round((tempo_rows or 0) / iniciaram) if iniciaram else 0
+
+        funil.append({
+            'module_id': m.id,
+            'nome': m.nome,
+            'position': m.position or 0,
+            'matriculados': enrolled,
+            'iniciaram': iniciaram,
+            'concluiram': concluiram,
+            'nota_media': nota_media,
+            'tempo_medio_seg': tempo_medio,
+        })
+
+    concluiram_curso = Progress.query.filter_by(tenant_id=tid, course_id=course_id)\
+        .filter(Progress.quiz_score > 0)\
+        .filter((Progress.quiz_score * 100 / func.nullif(Progress.quiz_total, 0)) >= 60).count() \
+        if enrolled else 0
+
+    taxa_conclusao = round(concluiram_curso / enrolled * 100) if enrolled else 0
+
+    return jsonify({
+        'course_id': course_id,
+        'course_name': course.name,
+        'matriculados': enrolled,
+        'concluiram_curso': concluiram_curso,
+        'taxa_conclusao': taxa_conclusao,
+        'funil': funil,
+    })
+
+
 @courses_bp.route('/admin/courses/<int:course_id>/lessons/reorder', methods=['PUT'])
 def admin_reorder_lessons(course_id):
     user, err = _course_admin_required()
