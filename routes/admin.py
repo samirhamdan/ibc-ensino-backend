@@ -510,6 +510,70 @@ def invite_user():
     return jsonify(resposta), 201
 
 
+@admin_bp.route('/users/import', methods=['POST'])
+def import_users():
+    admin_user, err = _admin_required()
+    if err:
+        return err
+
+    data = request.get_json(silent=True) or {}
+    rows = data.get('users', [])
+    if not rows or not isinstance(rows, list):
+        return jsonify({'error': 'Campo "users" (lista) é obrigatório'}), 400
+    if len(rows) > 500:
+        return jsonify({'error': 'Máximo 500 usuários por importação'}), 400
+
+    valid_roles = {'admin', 'tutor', 'aluno'}
+    results = []
+    created = 0
+    linked = 0
+    errors = 0
+
+    for i, row in enumerate(rows):
+        name = (row.get('name') or '').strip()
+        email = (row.get('email') or '').strip().lower()
+        role = (row.get('role') or 'aluno').strip().lower()
+        password = (row.get('password') or '').strip()
+
+        errs = []
+        if not name:
+            errs.append('Nome vazio')
+        if not email or '@' not in email:
+            errs.append('Email inválido')
+        if role not in valid_roles:
+            errs.append(f'Perfil inválido: {role}')
+        if not password or len(password) < 6:
+            errs.append('Senha deve ter ao menos 6 caracteres')
+
+        if errs:
+            errors += 1
+            results.append({'row': i, 'email': email, 'status': 'error', 'errors': errs})
+            continue
+
+        existente = User.query.filter_by(email=email).first()
+        if existente is not None:
+            if usuarios_do_tenant_query().filter(User.id == existente.id).first() is not None:
+                results.append({'row': i, 'email': email, 'status': 'skipped', 'errors': ['Já pertence a este tenant']})
+                continue
+            vincular_usuario_ao_tenant(existente, papel=role)
+            linked += 1
+            results.append({'row': i, 'email': email, 'status': 'linked'})
+            continue
+
+        u = User(name=name, email=email, role='aluno', is_active=True,
+                 onboarding_completed=True, created_at=datetime.utcnow())
+        u.set_password(password)
+        db.session.add(u)
+        db.session.flush()
+        vincular_usuario_ao_tenant(u, papel=role)
+        created += 1
+        results.append({'row': i, 'email': email, 'status': 'created'})
+
+    db.session.commit()
+    return jsonify({'created': created, 'linked': linked, 'errors': errors,
+                    'total': len(rows), 'results': results}), 200
+
+
 @admin_bp.route('/users/<int:user_id>/message', methods=['POST'])
 def send_user_message(user_id):
     admin_user, err = _admin_required()

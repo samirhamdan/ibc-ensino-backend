@@ -171,6 +171,7 @@ LEGACY_PRE_TENANCY = {
     'admin.reset_user_progress',
     'admin.toggle_user_active',
     'admin.invite_user',
+    'admin.import_users',
     'admin.bulk_action_users',
     'admin.send_user_message',
     'admin.change_user_active_trail',

@@ -3523,6 +3523,7 @@ async function renderAdminUsersV2() {
       <h1 class="course-title">${icon('users','22')} Gerenciar Usuários</h1>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="btn btn-sm btn-outline" id="densityToggle" onclick="toggleAdminDensity()">${document.body.classList.contains('density-compact')?'Confortável':'Compacto'}</button>
+        <button class="btn btn-outline" onclick="openCsvImportModal()">${icon('file','16')} Importar CSV</button>
         <button class="btn btn-primary" onclick="openInviteUserModal()">Convidar Usuário</button>
       </div>
     </div>
@@ -3824,6 +3825,122 @@ async function submitInvite(){
     const d = await res.json().catch(()=>({}));
     showToast(d.error || 'Erro ao convidar usuário.', 'error');
   }
+}
+
+let _csvImportRows = [];
+
+function openCsvImportModal(){
+  showModal('Importar Usuários via CSV', `
+    <p class="text-sm" style="color:var(--text-secondary,#64748b);margin-bottom:12px">
+      Formato esperado: <strong>nome,email,perfil,senha</strong> (1ª linha = cabeçalho, ignorada).
+      Perfis válidos: aluno, tutor, admin. Se omitido, assume "aluno".
+    </p>
+    <div id="csv-drop-zone" style="border:2px dashed var(--border,#e2e8f0);border-radius:8px;padding:32px;text-align:center;cursor:pointer;margin-bottom:12px;transition:border-color .2s">
+      <p style="margin:0;color:var(--text-secondary,#64748b)">${icon('file','24')}<br>Arraste um arquivo .csv ou clique para selecionar</p>
+      <input type="file" id="csv-file-input" accept=".csv,.txt" style="display:none">
+    </div>
+    <div id="csv-preview" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong class="text-sm" id="csv-count"></strong>
+        <button class="btn btn-sm btn-outline" onclick="openCsvImportModal()">Trocar arquivo</button>
+      </div>
+      <div style="overflow-x:auto;max-height:300px;overflow-y:auto">
+        <table class="admin-users-tbl" id="csv-preview-table"></table>
+      </div>
+    </div>
+    <div id="csv-results" style="display:none;margin-top:12px"></div>
+  `, `
+    <button class="btn" style="background:#eee" onclick="closeModal()">Cancelar</button>
+    <button class="btn btn-primary" id="csv-import-btn" style="display:none" onclick="submitCsvImport()">Importar</button>
+  `);
+  const drop = document.getElementById('csv-drop-zone');
+  const inp = document.getElementById('csv-file-input');
+  drop.onclick = () => inp.click();
+  drop.ondragover = (e) => { e.preventDefault(); drop.style.borderColor='var(--brand-primary,#008ea8)'; };
+  drop.ondragleave = () => { drop.style.borderColor='var(--border,#e2e8f0)'; };
+  drop.ondrop = (e) => { e.preventDefault(); drop.style.borderColor='var(--border,#e2e8f0)'; if(e.dataTransfer.files[0]) parseCsvFile(e.dataTransfer.files[0]); };
+  inp.onchange = () => { if(inp.files[0]) parseCsvFile(inp.files[0]); };
+}
+
+function parseCsvFile(file){
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const lines = e.target.result.split(/\r?\n/).filter(l=>l.trim());
+    if(lines.length < 2){ showToast('Arquivo vazio ou sem dados.','error'); return; }
+    const rows = [];
+    for(let i=1; i<lines.length; i++){
+      const cols = lines[i].split(/[,;\t]/).map(c=>c.trim().replace(/^"|"$/g,''));
+      if(!cols[0] && !cols[1]) continue;
+      rows.push({
+        name: cols[0]||'', email: cols[1]||'', role: (cols[2]||'aluno').toLowerCase(),
+        password: cols[3] || generateTempPassword(),
+        _errors: []
+      });
+    }
+    _csvImportRows = rows;
+    validateCsvRows();
+    renderCsvPreview();
+  };
+  reader.readAsText(file);
+}
+
+function validateCsvRows(){
+  const validRoles = new Set(['admin','tutor','aluno']);
+  _csvImportRows.forEach(r => {
+    r._errors = [];
+    if(!r.name) r._errors.push('Nome vazio');
+    if(!r.email || !r.email.includes('@')) r._errors.push('Email inválido');
+    if(!validRoles.has(r.role)) r._errors.push('Perfil inválido');
+    if(r.password.length < 6) r._errors.push('Senha curta (<6)');
+  });
+}
+
+function renderCsvPreview(){
+  const preview = document.getElementById('csv-preview');
+  const dropZone = document.getElementById('csv-drop-zone');
+  const importBtn = document.getElementById('csv-import-btn');
+  const countEl = document.getElementById('csv-count');
+  if(!preview) return;
+  dropZone.style.display = 'none';
+  preview.style.display = 'block';
+  importBtn.style.display = '';
+  const errs = _csvImportRows.filter(r=>r._errors.length).length;
+  countEl.textContent = `${_csvImportRows.length} usuário(s)` + (errs ? ` · ${errs} com erro` : '');
+  const table = document.getElementById('csv-preview-table');
+  table.innerHTML = `<thead><tr><th>#</th><th>Nome</th><th>Email</th><th>Perfil</th><th>Senha</th><th>Status</th></tr></thead>
+    <tbody>${_csvImportRows.map((r,i) => `<tr style="${r._errors.length?'background:var(--danger-100,#fbe2e1)':''}">
+      <td>${i+1}</td>
+      <td><input class="form-control form-control-sm" value="${escapeHtml(r.name)}" onchange="_csvImportRows[${i}].name=this.value;validateCsvRows();renderCsvPreview()"></td>
+      <td><input class="form-control form-control-sm" value="${escapeHtml(r.email)}" onchange="_csvImportRows[${i}].email=this.value;validateCsvRows();renderCsvPreview()"></td>
+      <td><select class="form-control form-control-sm" onchange="_csvImportRows[${i}].role=this.value;validateCsvRows();renderCsvPreview()">
+        <option value="aluno" ${r.role==='aluno'?'selected':''}>Aluno</option>
+        <option value="tutor" ${r.role==='tutor'?'selected':''}>Tutor</option>
+        <option value="admin" ${r.role==='admin'?'selected':''}>Admin</option>
+      </select></td>
+      <td><input class="form-control form-control-sm" value="${escapeHtml(r.password)}" onchange="_csvImportRows[${i}].password=this.value;validateCsvRows();renderCsvPreview()"></td>
+      <td>${r._errors.length ? '<span style="color:var(--danger,#e0533f);font-size:.75rem">'+r._errors.join(', ')+'</span>' : '<span style="color:var(--success,#1fa96a);font-size:.75rem">OK</span>'}</td>
+    </tr>`).join('')}</tbody>`;
+}
+
+async function submitCsvImport(){
+  const valid = _csvImportRows.filter(r=>!r._errors.length);
+  if(!valid.length){ showToast('Corrija os erros antes de importar.','error'); return; }
+  const btn = document.getElementById('csv-import-btn');
+  btn.disabled = true; btn.textContent = 'Importando...';
+  const res = await api('POST', '/admin/users/import', {
+    users: valid.map(r=>({name:r.name, email:r.email, role:r.role, password:r.password}))
+  });
+  btn.disabled = false; btn.textContent = 'Importar';
+  if(!res.ok){ showToast('Erro na importação.','error'); return; }
+  const d = await res.json();
+  const resultsEl = document.getElementById('csv-results');
+  resultsEl.style.display = 'block';
+  resultsEl.innerHTML = `<div style="padding:12px;background:var(--success-100,#d7f5e3);border-radius:8px;font-size:.875rem">
+    <strong>${d.created} criado(s)</strong>${d.linked?' · '+d.linked+' revinculado(s)':''}${d.errors?' · '+d.errors+' erro(s)':''}
+    ${d.results.filter(r=>r.status==='error'||r.status==='skipped').map(r=>'<br><span style="color:var(--danger)">'+escapeHtml(r.email)+': '+r.errors.join(', ')+'</span>').join('')}
+  </div>`;
+  showToast(`${d.created} usuário(s) importado(s).`,'success');
+  adminUsersLoad();
 }
 
 function openEditUserModal(userId, name, email, role){
