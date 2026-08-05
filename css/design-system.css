@@ -209,4 +209,48 @@
   --gold-light:  #33adc0;
   --success-bg:  #d4edda;
   --danger-bg:   #f8d7da;
+
+  /* ── Admin surface tokens (UX_ADMIN_SAAS §5) ── */
+  --bg-base:     #f5f7fa;
+  --bg-surface:  #ffffff;
+  --bg-hover:    #f0f2f5;
+  --text-primary:   #1a2332;
+  --text-secondary: #64748b;
+  --text-muted:     #94a3b8;
+  --border:      #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  /* ── Density (UX_ADMIN_SAAS §5) ── */
+  --table-pad-y: 8px;
+  --table-pad-x: 12px;
+  --table-font:  .85rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-base:     #0f172a;
+    --bg-surface:  #1e293b;
+    --bg-hover:    #334155;
+    --text-primary:   #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted:     #64748b;
+    --border:      #334155;
+    --border-strong: #475569;
+  }
+}
+:root[data-theme="dark"] {
+  --bg-base:     #0f172a;
+  --bg-surface:  #1e293b;
+  --bg-hover:    #334155;
+  --text-primary:   #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted:     #64748b;
+  --border:      #334155;
+  --border-strong: #475569;
+}
+
+.density-compact {
+  --table-pad-y: 4px;
+  --table-pad-x: 8px;
+  --table-font:  .78rem;
 }

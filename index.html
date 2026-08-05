@@ -2518,14 +2518,13 @@ async function addUser(){
 }
 
 async function removeUser(id){
-  if(!confirm('Remover este usuário?')) return;
-  const res=await api('DELETE',`/auth/users/${id}`);
-  if(res.ok){
-    renderAdminUsers();
-  } else {
-    const d=await res.json();
-    showToast(d.error||'Erro ao remover usuário.','error');
-  }
+  const row = document.querySelector(`[data-user-id="${id}"]`);
+  if(row) row.style.opacity = '0.4';
+  showUndoToast('Usuário removido.', async ()=>{
+    const res=await api('DELETE',`/auth/users/${id}`);
+    if(res.ok){ renderAdminUsers(); }
+    else { const d=await res.json(); showToast(d.error||'Erro ao remover usuário.','error'); if(row) row.style.opacity='1'; }
+  }, ()=>{ if(row) row.style.opacity='1'; });
 }
 
 // ── Admin: Trails (Sprint 4) ──
@@ -3378,14 +3377,15 @@ async function addCourse(){
 }
 
 async function removeCourse(id){
-  if(!confirm('Remover este curso?')) return;
-  const res=await api('DELETE',`/courses/${id}`);
-  if(res.ok){
-    if(currentCourse&&currentCourse.id===id) currentCourse=null;
-    await loadCourses();
-    renderCourseList();
-    renderAdminCourses();
-  } else { showToast('Erro ao remover curso.','error'); }
+  showUndoToast('Curso removido.', async ()=>{
+    const res=await api('DELETE',`/courses/${id}`);
+    if(res.ok){
+      if(currentCourse&&currentCourse.id===id) currentCourse=null;
+      await loadCourses();
+      renderCourseList();
+      renderAdminCourses();
+    } else { showToast('Erro ao remover curso.','error'); }
+  }, ()=>{ renderAdminCourses(); });
 }
 
 // ── Admin: Tutors (Sprint 4 Part 2) ──
@@ -3521,7 +3521,10 @@ async function renderAdminUsersV2() {
   document.getElementById('main-content').innerHTML =
     `<div class="admin-page-header">
       <h1 class="course-title">${icon('users','22')} Gerenciar Usuários</h1>
-      <button class="btn btn-primary" onclick="openInviteUserModal()">Convidar Usuário</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-sm btn-outline" id="densityToggle" onclick="toggleAdminDensity()">${document.body.classList.contains('density-compact')?'Confortável':'Compacto'}</button>
+        <button class="btn btn-primary" onclick="openInviteUserModal()">Convidar Usuário</button>
+      </div>
     </div>
     <div class="admin-section">
       <div class="admin-section-body">
@@ -5574,6 +5577,40 @@ function showToast(message, type = 'default', duration = 3000){
     setTimeout(()=>toast.remove(), 300);
   }, duration);
 }
+
+function showUndoToast(message, onConfirm, onUndo, duration = 10000){
+  const container = document.getElementById('toastContainer');
+  if(!container) return;
+  const toast = document.createElement('div');
+  toast.className = 'toast toast-undo';
+  toast.innerHTML = `<div style="flex:1"><span>${message}</span>
+    <button class="toast-undo-btn" data-undo>Desfazer</button>
+    <div class="toast-undo-timer"><div class="toast-undo-timer-bar"></div></div></div>`;
+  container.appendChild(toast);
+  let undone = false;
+  toast.querySelector('[data-undo]').onclick = () => {
+    undone = true;
+    if(onUndo) onUndo();
+    toast.classList.add('toast-out');
+    setTimeout(()=>toast.remove(), 300);
+    showToast('Ação desfeita', 'default', 2000);
+  };
+  setTimeout(()=>{
+    if(!undone && onConfirm) onConfirm();
+    if(!undone){ toast.classList.add('toast-out'); setTimeout(()=>toast.remove(), 300); }
+  }, duration);
+}
+
+function toggleAdminDensity(){
+  document.body.classList.toggle('density-compact');
+  const compact = document.body.classList.contains('density-compact');
+  localStorage.setItem('admin-density', compact ? 'compact' : 'comfortable');
+  const btn = document.getElementById('densityToggle');
+  if(btn) btn.textContent = compact ? 'Confortável' : 'Compacto';
+}
+(function(){
+  if(localStorage.getItem('admin-density')==='compact') document.body.classList.add('density-compact');
+})();
 
 // ── Trophy celebration (canvas confetti) ──
 function launchConfetti(){

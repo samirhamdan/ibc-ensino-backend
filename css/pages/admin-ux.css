@@ -308,10 +308,10 @@
 }
 .admin-bulk-bar.hidden { display: none; }
 .admin-users-table-wrap { overflow-x: auto; }
-.admin-users-tbl { width: 100%; border-collapse: collapse; font-size: .85rem; }
-.admin-users-tbl th { text-align: left; padding: 8px 12px; border-bottom: 2px solid #eee; color: var(--muted, #888); font-weight: 600; white-space: nowrap; }
-.admin-users-tbl td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
-.admin-users-tbl tr:hover td { background: #fafbfc; }
+.admin-users-tbl { width: 100%; border-collapse: collapse; font-size: var(--table-font, .85rem); }
+.admin-users-tbl th { text-align: left; padding: var(--table-pad-y, 8px) var(--table-pad-x, 12px); border-bottom: 2px solid var(--border, #eee); color: var(--text-secondary, #888); font-weight: 600; white-space: nowrap; }
+.admin-users-tbl td { padding: var(--table-pad-y, 8px) var(--table-pad-x, 12px); border-bottom: 1px solid var(--border, #f0f0f0); vertical-align: middle; }
+.admin-users-tbl tr:hover td { background: var(--bg-hover, #fafbfc); }
 .admin-users-tbl input[type="checkbox"] { accent-color: var(--primary); }
 .user-name-cell { display: flex; align-items: center; gap: 8px; }
 .user-avatar-sm {

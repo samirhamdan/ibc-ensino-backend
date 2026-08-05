@@ -29,6 +29,21 @@
 
 .toast-container .toast.toast-xp { border-left-color: #f1c40f; }
 .toast-container .toast.toast-error { border-left-color: #e74c3c; color: #c0392b; }
+.toast-container .toast.toast-undo { border-left-color: var(--warning, #f59e0b); }
+.toast-container .toast.toast-undo .toast-undo-btn {
+  background: none; border: none; color: var(--primary, #008ea8); cursor: pointer;
+  font-weight: 700; font-size: var(--text-sm, .875rem); text-decoration: underline;
+  padding: 0; margin-left: 8px; white-space: nowrap;
+}
+.toast-container .toast.toast-undo .toast-undo-timer {
+  width: 100%; height: 3px; background: var(--gray-light, #ecf0f1);
+  border-radius: 2px; margin-top: 6px; overflow: hidden;
+}
+.toast-container .toast.toast-undo .toast-undo-timer-bar {
+  height: 100%; background: var(--warning, #f59e0b);
+  animation: undoCountdown 10s linear forwards;
+}
+@keyframes undoCountdown { from { width: 100%; } to { width: 0%; } }
 .toast-container .toast.toast-out { animation: toastOut 0.3s ease forwards; }
 
 @keyframes toastIn {
