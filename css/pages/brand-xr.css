@@ -1,0 +1,101 @@
+/* Marca da plataforma XR Educação — login e barra superior.
+   As cores de conteúdo (botões, destaques) continuam vindo do tema do tenant. */
+
+/* ── Login ── */
+#screen-login { background: var(--xr-black); }
+
+#screen-login .login-gradient {
+  background:
+    radial-gradient(55% 50% at 12% 15%, rgba(18, 225, 242, .28), transparent 65%),
+    radial-gradient(50% 45% at 50% 55%, rgba(139, 92, 196, .22), transparent 65%),
+    radial-gradient(55% 50% at 90% 88%, rgba(240, 22, 138, .30), transparent 65%),
+    var(--xr-black);
+  background-size: 100% 100%;
+  animation: xrGlow 14s ease-in-out infinite alternate;
+}
+@keyframes xrGlow {
+  from { filter: hue-rotate(0deg) brightness(1); }
+  to   { filter: hue-rotate(-12deg) brightness(1.15); }
+}
+#screen-login .hero-texture-overlay { display: none; }
+
+#screen-login .login-visual-logo {
+  width: 240px;
+  filter: drop-shadow(0 0 32px rgba(139, 92, 196, .45));
+}
+#screen-login .login-visual-content .login-headline {
+  font-size: 3.4rem;
+  text-shadow: none;
+}
+.xr-gradient-text {
+  background: var(--xr-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+#screen-login .login-verse {
+  font-style: normal;
+  color: rgba(255, 255, 255, .7);
+  max-width: 26rem;
+  margin: 0 auto;
+}
+
+#screen-login .login-form-side { background: var(--xr-ink); }
+#screen-login .login-card {
+  background: var(--xr-black);
+  border: 1px solid rgba(255, 255, 255, .08);
+  box-shadow: 0 0 0 1px rgba(139, 92, 196, .15), 0 24px 64px rgba(0, 0, 0, .6);
+  color: var(--white);
+}
+#screen-login .login-card h1,
+#screen-login .login-card .login-title { color: var(--white); }
+#screen-login .login-card label { color: rgba(255, 255, 255, .75); }
+#screen-login .login-card input {
+  background: var(--xr-ink);
+  border-color: rgba(255, 255, 255, .12);
+  color: var(--white);
+}
+#screen-login .login-card input:focus {
+  border-color: var(--xr-violet);
+  box-shadow: 0 0 0 3px rgba(139, 92, 196, .25);
+}
+#screen-login .login-card .btn-primary {
+  background: var(--xr-gradient);
+  color: var(--white);
+  border: none;
+}
+#screen-login .login-card a,
+#screen-login .register-link a { color: var(--xr-cyan); }
+#screen-login .register-link,
+#screen-login .support-text { color: rgba(255, 255, 255, .6); }
+#screen-login .btn-show-password { color: rgba(255, 255, 255, .6); }
+
+@media (max-width: 768px) {
+  #screen-login .login-visual-content .login-headline { font-size: 2.2rem; }
+  #screen-login .login-visual-logo { width: 160px; }
+}
+
+/* ── Barra superior ── */
+.topbar {
+  background: var(--xr-black);
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+}
+.topbar::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 2px;
+  background: var(--xr-gradient);
+  opacity: .8;
+}
+.topbar-logo-box {
+  background: transparent;
+  padding: 0;
+}
+.topbar-logo-box img { height: 30px; }
+
+/* Cor de texto legada (teal da IBC) → grafite neutro da XR */
+:root {
+  --navy: #1b1830;
+  --navy-light: var(--brand-primary);
+}

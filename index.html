@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="IBC Ensino — Plataforma de estudos bíblicos da Igreja Batista Central">
-<meta property="og:title" content="IBC Ensino">
-<meta property="og:description" content="Sua jornada de crescimento espiritual">
+<meta name="description" content="XR Educação — plataforma de ensino online">
+<meta property="og:title" content="XR Educação">
+<meta property="og:description" content="Aprendizagem que transforma">
 <meta property="og:type" content="website">
-<meta name="theme-color" content="#008ea8">
-<title>IBC Ensino — Plataforma EAD</title>
-<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<meta name="theme-color" content="#07070d">
+<title>XR Educação</title>
+<link rel="icon" type="image/png" href="images/xr-favicon.png">
 
 <!-- Google Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -54,6 +54,7 @@
 <link rel="stylesheet" href="css/pages/meu-perfil.css">
 <link rel="stylesheet" href="css/pages/sprint62.css">
 <link rel="stylesheet" href="css/pages/mobile-nav.css">
+<link rel="stylesheet" href="css/pages/brand-xr.css">
 
 <!-- Tema do tenant (UX_ALUNO_SAAS.md §2.2): XHR SÍNCRONO de propósito —
      precisa terminar e o <style id="tenant-theme"> ser inserido no DOM
@@ -106,17 +107,16 @@
     <div class="login-gradient"></div>
     <div class="hero-texture-overlay"></div>
     <div class="login-visual-content">
-      <img class="login-visual-logo" src="images/logo-ibc-white.png" alt="Escola da IBC">
-      <h1 class="login-headline">Sua jornada<br>de fé<br>começa aqui.</h1>
-      <p class="login-verse login-verse-text">"Lâmpada para os meus pés é a tua palavra e luz para o meu caminho."</p>
-      <p class="login-verse-ref">Salmos 119:105</p>
+      <img class="login-visual-logo" src="images/xr-logo.png" alt="XR Educação">
+      <h1 class="login-headline">Aprendizagem<br>que <span class="xr-gradient-text">transforma.</span></h1>
+      <p class="login-verse login-verse-text">Cursos, trilhas e acompanhamento em uma só plataforma.</p>
     </div>
   </div>
   <div class="login-form-side">
   <div class="login-card" id="login-card">
     <div class="login-logo">
-      <h1 class="login-title" style="font-family:var(--font-display);font-size:1.4rem;color:var(--primary);margin:0">IBC Ensino</h1>
-      <p style="font-size:.75rem;color:#888;letter-spacing:.05em;text-transform:uppercase;margin-top:.2rem">Plataforma de Estudos</p>
+      <h1 class="login-title" style="font-family:var(--font-display);font-size:1.4rem;margin:0">Entrar</h1>
+      <p style="font-size:.75rem;color:#888;letter-spacing:.05em;text-transform:uppercase;margin-top:.2rem">XR Educação</p>
     </div>
     <div class="field">
       <label>E-mail</label>
@@ -140,7 +140,7 @@
   <div id="register-card" class="login-card" style="display:none">
     <div class="login-logo">
       <h1 style="font-family:var(--font-display);font-size:1.4rem;color:var(--primary);margin:0">Criar Conta</h1>
-      <p style="font-size:.75rem;color:#888;letter-spacing:.05em;text-transform:uppercase;margin-top:.2rem">Junte-se à comunidade IBC Ensino</p>
+      <p style="font-size:.75rem;color:#888;letter-spacing:.05em;text-transform:uppercase;margin-top:.2rem">Comece a aprender hoje</p>
     </div>
     <div class="field">
       <label>Nome completo</label>
@@ -170,10 +170,10 @@
       <p class="register-link">Já tem conta? <a href="#" onclick="showLoginCard();return false;">Fazer login</a></p>
     </div>
   </div>
-  <div class="login-footer">
+  <div class="login-footer" id="login-support" hidden>
     <p class="support-text">
       Dúvidas? Entre em contato:<br>
-      <a href="https://wa.me/5567999999999" target="_blank" rel="noopener" class="whatsapp-link login-whatsapp"><svg class="icon icon-sm" viewBox="0 0 24 24"><use href="#icon-chat"></use></svg> <span>WhatsApp: (67) 99999-9999</span></a>
+      <a href="#" target="_blank" rel="noopener" class="whatsapp-link login-whatsapp"><svg class="icon icon-sm" viewBox="0 0 24 24"><use href="#icon-chat"></use></svg> <span></span></a>
     </p>
   </div>
   </div>
@@ -226,7 +226,7 @@
       <button class="sidebar-hamburger" id="sidebarHamburger" onclick="toggleSidebar()" aria-label="Abrir menu" title="Menu" data-tooltip="Menu">
         <svg class="icon" width="22" height="22" viewBox="0 0 24 24"><use href="#icon-menu"></use></svg>
       </button>
-      <div class="topbar-logo-box"><img src="images/logo-ibc.png" alt="Escola da IBC"></div>
+      <div class="topbar-logo-box"><img src="images/xr-mark.png" alt="XR Educação"></div>
       <div style="border-left:1px solid rgba(255,255,255,.25);padding-left:.7rem">
         <div class="topbar-subtitle">Plataforma EAD</div>
       </div>
@@ -431,9 +431,11 @@ async function loadLoginConfig(){
     const res = await fetch('/api/config/public', {credentials:'same-origin'});
     if(!res.ok) return;
     const cfg = await res.json();
-    document.querySelectorAll('.login-verse-text').forEach(el => el.textContent = `"${cfg.verse_text}"`);
-    document.querySelectorAll('.login-verse-ref').forEach(el => el.textContent = cfg.verse_reference);
-    document.querySelectorAll('.login-title').forEach(el => el.textContent = cfg.platform_name);
+    if (cfg.verse_text) {
+      document.querySelectorAll('.login-verse-text').forEach(el => el.textContent = `"${cfg.verse_text}"`);
+    }
+    const support = document.getElementById('login-support');
+    if (support) support.hidden = !cfg.whatsapp;
     document.querySelectorAll('.login-whatsapp').forEach(el => {
       const digits = (cfg.whatsapp || '').replace(/\D/g, '');
       el.href = `https://wa.me/55${digits}`;
@@ -1105,7 +1107,7 @@ async function renderCourseResume(){
       <h1 class="course-hero-title">${escapeHtml(c.name)}</h1>
       ${c.resumo?`<p class="course-hero-desc">${escapeHtml(c.resumo)}</p>`:''}
       <div class="course-hero-meta">
-        <span>${icon('user-check','14')} ${c.tutor_id&&currentCourse.tutor_name?escapeHtml(currentCourse.tutor_name):'Professor IBC'}</span>
+        <span>${icon('user-check','14')} ${c.tutor_id&&currentCourse.tutor_name?escapeHtml(currentCourse.tutor_name):'Professor'}</span>
         ${c.duracao?`<span>${icon('clock','14')} ${c.duracao}</span>`:''}
         <span>${icon('play-circle','14')} ${total} aula(s)</span>
         <span>${icon('target','14')} Nota mínima: 60%</span>
@@ -3786,7 +3788,7 @@ function closeModal(){
 // ── Gestão Avançada de Usuários ──
 function generateTempPassword(){
   const digits = Math.floor(1000 + Math.random()*9000);
-  return 'IBC'+digits+'!';
+  return 'XR'+digits+'!';
 }
 
 function openInviteUserModal(){
@@ -5817,7 +5819,7 @@ function renderHero(userData, stats){
   const roleCtx = {
     admin: 'Gerencie a plataforma e acompanhe o crescimento da comunidade.',
     tutor: 'Veja as dúvidas pendentes e acompanhe seus alunos.',
-    aluno: 'Continue sua jornada de fé e desbloqueie novas conquistas.',
+    aluno: 'Continue sua jornada e desbloqueie novas conquistas.',
   };
   const s = stats || {};
   const level = s.level || 1;
@@ -6135,7 +6137,7 @@ function downloadCertificate(certCode){
 
 function shareWhatsApp(cert){
   const text = encodeURIComponent(
-    `🎓 Acabei de conquistar o certificado "${escapeHtml(cert.title)}" no IBC Ensino!\n` +
+    `🎓 Acabei de conquistar o certificado "${escapeHtml(cert.title)}" na XR Educação!\n` +
     `Verifique: ${window.location.origin}/#verificar/${cert.cert_code}`
   );
   window.open(`https://wa.me/?text=${text}`, '_blank');
@@ -6693,11 +6695,11 @@ function removeTourTooltip(){
     </div>
     <!-- Step 1: Welcome -->
     <div class="onboarding-step-content active">
-      <div class="onboarding-title">Bem-vindo ao IBC Ensino! 🎉</div>
+      <div class="onboarding-title">Bem-vindo à XR Educação!</div>
       <div class="onboarding-subtitle">Vamos personalizar sua experiência de aprendizado em 3 passos rápidos.</div>
       <div style="font-size:4rem;text-align:center;margin:var(--space-xl) 0">📖</div>
       <p style="color:var(--gray-dark);font-size:var(--text-sm);text-align:center;line-height:1.6">
-        A plataforma IBC Ensino usa <strong>Trilhas de Aprendizado</strong> — percursos guiados de cursos organizados por objetivo. Você vai escolher a sua!
+        A plataforma usa <strong>Trilhas de Aprendizado</strong> — percursos guiados de cursos organizados por objetivo. Você vai escolher a sua!
       </p>
       <div class="onboarding-actions" style="margin-top:var(--space-xl)">
         <button class="btn btn-primary" onclick="onboardingNext()">Começar →</button>

@@ -20,13 +20,13 @@ def seed_config():
     if PlatformConfig.query.first():
         return
     db.session.add(PlatformConfig(
-        platform_name='IBC Ensino',
-        platform_short='IBC',
-        whatsapp='(67) 99999-9999',
-        support_email='contato@ibccg.org.br',
+        platform_name='XR Educação',
+        platform_short='XR',
+        whatsapp='',
+        support_email='',
         support_hours='Seg-Sex, 8h-17h',
-        verse_text='Lâmpada para os meus pés é a tua palavra e luz para o meu caminho.',
-        verse_reference='Salmos 119:105',
+        verse_text='',
+        verse_reference='',
         points_read_material=10,
         points_complete_video=10,
         points_correct_exercise=20,

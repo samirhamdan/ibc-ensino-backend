@@ -42,7 +42,7 @@ def seed_admin():
     # Sem vínculo no tenant padrão o login recusa ("sem acesso a este tenant").
     tid = default_tenant_id()
     if not TenantUser.query.filter_by(tenant_id=tid, user_id=admin.id).first():
-        db.session.add(TenantUser(tenant_id=tid, user_id=admin.id, papel='admin_tenant'))
+        db.session.add(TenantUser(tenant_id=tid, user_id=admin.id, papel='admin'))
         print(f"Admin '{admin_email}' vinculado ao tenant padrão.")
     db.session.commit()
 

@@ -210,6 +210,14 @@
   --success-bg:  #d4edda;
   --danger-bg:   #f8d7da;
 
+  /* ── Marca da plataforma XR Educação (fixa, não muda por tenant) ── */
+  --xr-black:    #07070d;
+  --xr-ink:      #11111c;
+  --xr-cyan:     #12e1f2;
+  --xr-violet:   #8b5cc4;
+  --xr-magenta:  #f0168a;
+  --xr-gradient: linear-gradient(120deg, var(--xr-cyan) 0%, var(--xr-violet) 50%, var(--xr-magenta) 100%);
+
   /* ── Admin surface tokens (UX_ADMIN_SAAS §5) ── */
   --bg-base:     #f5f7fa;
   --bg-surface:  #ffffff;
