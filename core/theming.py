@@ -149,6 +149,10 @@ def construir_tokens(tema_json, nome_tenant):
         '_meta': {
             'nome_exibido': tema_json.get('nome_exibido') or nome_tenant,
             'logo': tema_json.get('logo') or '',
+            'favicon': tema_json.get('favicon') or '',
+            'login_titulo': tema_json.get('login_titulo') or '',
+            'login_subtitulo': tema_json.get('login_subtitulo') or '',
+            'cor_original': bruta,
             'cor_ajustada_por_contraste': ajustada,
         },
     }

@@ -60,3 +60,14 @@ def get_theme_json():
     """Mesmos tokens em JSON — usado pelo painel admin (preview ao vivo,
     incluindo o aviso de cor ajustada por contraste) e por testes."""
     return jsonify(_tokens_do_tenant_atual()), 200
+
+
+@theme_bp.route('/branding/<path:nome>', methods=['GET'])
+def serve_branding(nome):
+    """Logos/favicons enviados pelos tenants — públicos (aparecem no login)."""
+    import os
+    from flask import current_app, send_from_directory
+    pasta = os.path.join(current_app.config['UPLOAD_FOLDER'], 'branding')
+    resp = send_from_directory(pasta, os.path.basename(nome), max_age=86400)
+    resp.headers['X-Content-Type-Options'] = 'nosniff'
+    return resp

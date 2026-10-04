@@ -29,6 +29,15 @@ TENANT_SCOPED = {
     'tenant_current': 'test_tenant_isolation.py::test_tenant_current_nao_vaza_outro_tenant',
     'theme.get_theme': 'test_tenant_isolation.py::test_theme_por_tenant_nao_vaza',
     'theme.get_theme_json': 'test_tenant_isolation.py::test_theme_por_tenant_nao_vaza',
+    'admin.list_levels': 'test_config_isolation.py::test_config_e_niveis_por_tenant',
+    'admin.replace_levels': 'test_config_isolation.py::test_config_e_niveis_por_tenant',
+    'admin.get_admin_config': 'test_config_isolation.py::test_config_e_niveis_por_tenant',
+    'admin.update_admin_config': 'test_config_isolation.py::test_config_e_niveis_por_tenant',
+    'notifications.get_public_config': 'test_config_isolation.py::test_config_e_niveis_por_tenant',
+    'notifications.get_gamification_config': 'test_config_isolation.py::test_config_e_niveis_por_tenant',
+    'admin.get_branding': 'test_config_isolation.py::test_marca_por_tenant',
+    'admin.update_branding': 'test_config_isolation.py::test_marca_por_tenant',
+    'admin.upload_branding_image': 'test_config_isolation.py::test_marca_por_tenant',
     # grupo 1 — gamificação (Fase 3)
     'gamification.user_stats': 'test_gamification_isolation.py::test_pontos_independentes_por_tenant',
     'gamification.list_badges': 'test_gamification_isolation.py::test_badges_desbloqueados_nao_vazam',
@@ -143,6 +152,7 @@ PUBLIC_INFRA = {
     'serve_css',
     'serve_icon_sprite',
     'serve_images',
+    'theme.serve_branding',  # logo/favicon do tenant: públicos (aparecem no login)
     'serve_upload',        # dado de curso, mas o controle é por material (Fase 3)
 }
 
@@ -176,14 +186,6 @@ LEGACY_PRE_TENANCY = {
     'admin.send_user_message',
     'admin.change_user_active_trail',
     'admin.list_tutors',
-    # PlatformConfig e Level são config GLOBAL legada (docs/DEBITOS.md #1) —
-    # decisão pendente de consolidação dos sistemas de nível
-    'admin.list_levels',
-    'admin.replace_levels',
-    'admin.get_admin_config',
-    'admin.update_admin_config',
-    'notifications.get_public_config',
-    'notifications.get_gamification_config',
     # flag global User.onboarding_completed (docs/DEBITOS.md #14)
     'onboarding.onboarding_status',
     # upload bruto de arquivo (sem linha de domínio; o REGISTRO do material é

@@ -446,6 +446,40 @@ async function loadLoginConfig(){
 }
 document.addEventListener('DOMContentLoaded', loadLoginConfig);
 
+// Marca do tenant (TEN-03): sem personalização, fica a marca XR do HTML.
+const _MARCA_PADRAO = {logo: 'images/xr-logo.png', simbolo: 'images/xr-mark.png', favicon: 'images/xr-favicon.png', nome: 'XR Educação'};
+let _headlinePadrao = null;
+
+function aplicarMarca(meta){
+  meta = meta || {};
+  const nome = meta.nome_exibido || _MARCA_PADRAO.nome;
+  document.title = nome;
+  document.body.classList.toggle('marca-propria', !!meta.logo);
+  const fav = document.querySelector('link[rel="icon"]');
+  if(fav) fav.href = meta.favicon || meta.logo || _MARCA_PADRAO.favicon;
+  document.querySelectorAll('.login-visual-logo').forEach(el => { el.src = meta.logo || _MARCA_PADRAO.logo; el.alt = nome; });
+  document.querySelectorAll('.topbar-logo-box img').forEach(el => { el.src = meta.logo || _MARCA_PADRAO.simbolo; el.alt = nome; });
+  document.querySelectorAll('.login-card .login-logo p').forEach(el => { el.textContent = nome; });
+  const h = document.querySelector('.login-headline');
+  if(h){
+    if(_headlinePadrao === null) _headlinePadrao = h.innerHTML;
+    if(meta.login_titulo) h.textContent = meta.login_titulo; else h.innerHTML = _headlinePadrao;
+  }
+  if(meta.login_subtitulo) document.querySelectorAll('.login-verse-text').forEach(el => { el.textContent = meta.login_subtitulo; });
+}
+
+async function recarregarMarca(){
+  try{
+    const [cssRes, jsonRes] = await Promise.all([fetch('/api/theme', {credentials:'same-origin'}), fetch('/api/theme.json', {credentials:'same-origin'})]);
+    if(cssRes.ok){
+      const tag = document.getElementById('tenant-theme');
+      if(tag) tag.textContent = await cssRes.text();
+    }
+    if(jsonRes.ok) aplicarMarca((await jsonRes.json())._meta);
+  }catch(e){}
+}
+document.addEventListener('DOMContentLoaded', recarregarMarca);
+
 // ── App init ──
 let resetToken = null;
 
@@ -4244,13 +4278,17 @@ async function archiveAnnouncement(id){
 async function renderAdminSettings(){
   const main = document.getElementById('main-content');
   main.innerHTML = '<p>Carregando...</p>';
-  const [cfgRes, lvlRes] = await Promise.all([
+  const [cfgRes, lvlRes, brandRes] = await Promise.all([
     api('GET','/admin/config'),
     api('GET','/admin/levels'),
+    api('GET','/admin/branding'),
   ]);
-  if(!cfgRes.ok || !lvlRes.ok){ showToast('Erro ao carregar configurações.', 'error'); return; }
+  if(!cfgRes.ok || !lvlRes.ok || !brandRes.ok){ showToast('Erro ao carregar configurações.', 'error'); return; }
   const cfg = await cfgRes.json();
   const levels = await lvlRes.json();
+  const brand = await brandRes.json();
+  const tema = brand.tema || {};
+  const esc = v => escapeHtml(v || '');
 
   main.innerHTML = `
     <div class="admin-page-header">
@@ -4258,11 +4296,44 @@ async function renderAdminSettings(){
     </div>
 
     <div class="settings-section">
-      <div class="settings-section-header">${icon('church','18')} Identidade</div>
-      <div class="settings-section-body">
-        <div class="form-row">
-          <div class="form-group"><label>Nome da plataforma</label><input type="text" id="cfg-name" class="form-control" value="${(cfg.platform_name||'').replace(/"/g,'&quot;')}"></div>
-          <div class="form-group"><label>Sigla</label><input type="text" id="cfg-short" class="form-control" value="${(cfg.platform_short||'').replace(/"/g,'&quot;')}"></div>
+      <div class="settings-section-header">${icon('edit','18')} Marca</div>
+      <div class="settings-section-body brand-editor">
+        <div class="brand-editor-form">
+          <div class="form-row">
+            <div class="form-group"><label>Nome exibido</label><input type="text" id="brand-nome" class="form-control" maxlength="80" value="${esc(tema.nome_exibido || cfg.platform_name)}" oninput="_brandPreview()"></div>
+            <div class="form-group"><label>Sigla</label><input type="text" id="cfg-short" class="form-control" maxlength="20" value="${esc(cfg.platform_short)}"></div>
+          </div>
+          <div class="form-group">
+            <label>Cor principal</label>
+            <div class="brand-color-row">
+              <input type="color" id="brand-cor" value="${esc(tema.primary || tema.cor_primaria || '#8b5cc4')}" oninput="document.getElementById('brand-cor-hex').value=this.value;_brandPreview()">
+              <input type="text" id="brand-cor-hex" class="form-control" maxlength="7" value="${esc(tema.primary || tema.cor_primaria || '#8b5cc4')}" oninput="if(/^#[0-9a-fA-F]{6}$/.test(this.value)){document.getElementById('brand-cor').value=this.value;_brandPreview()}">
+            </div>
+            <span class="form-hint" id="brand-cor-aviso">${brand.tokens._meta.cor_ajustada_por_contraste ? 'A cor foi ajustada automaticamente para garantir leitura acessível.' : 'Usada em botões, links e destaques.'}</span>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Logo <span class="form-hint">(PNG, JPG ou WEBP até 1 MB; fundo transparente fica melhor)</span></label>
+              <input type="file" id="brand-logo-file" accept="image/png,image/jpeg,image/webp" class="form-control" onchange="_brandUpload('logo', this)">
+              ${tema.logo ? `<button type="button" class="btn-link" onclick="_brandRemover('logo')">Remover logo</button>` : ''}
+            </div>
+            <div class="form-group">
+              <label>Ícone da aba (favicon)</label>
+              <input type="file" id="brand-favicon-file" accept="image/png,image/jpeg,image/webp" class="form-control" onchange="_brandUpload('favicon', this)">
+              ${tema.favicon ? `<button type="button" class="btn-link" onclick="_brandRemover('favicon')">Remover ícone</button>` : ''}
+            </div>
+          </div>
+          <div class="form-group"><label>Título da tela de login</label><input type="text" id="brand-login-titulo" class="form-control" maxlength="80" placeholder="Aprendizagem que transforma." value="${esc(tema.login_titulo)}" oninput="_brandPreview()"></div>
+          <div class="form-group"><label>Subtítulo da tela de login</label><textarea id="brand-login-sub" class="form-control" rows="2" maxlength="200" placeholder="Cursos, trilhas e acompanhamento em uma só plataforma." oninput="_brandPreview()">${esc(tema.login_subtitulo)}</textarea></div>
+        </div>
+        <div class="brand-preview" id="brand-preview">
+          <div class="preview-label">Pré-visualização do login</div>
+          <div class="brand-preview-card">
+            <img id="brand-preview-logo" src="${esc(tema.logo) || 'images/xr-logo.png'}" alt="">
+            <div class="brand-preview-titulo" id="brand-preview-titulo"></div>
+            <div class="brand-preview-sub" id="brand-preview-sub"></div>
+            <div class="brand-preview-btn" id="brand-preview-btn">Entrar</div>
+          </div>
         </div>
       </div>
     </div>
@@ -4274,18 +4345,6 @@ async function renderAdminSettings(){
           <div class="form-group"><label>WhatsApp</label><input type="text" id="cfg-whatsapp" class="form-control" value="${(cfg.whatsapp||'').replace(/"/g,'&quot;')}"></div>
           <div class="form-group"><label>E-mail de suporte</label><input type="email" id="cfg-email" class="form-control" value="${(cfg.support_email||'').replace(/"/g,'&quot;')}"></div>
           <div class="form-group"><label>Horário de atendimento</label><input type="text" id="cfg-hours" class="form-control" value="${(cfg.support_hours||'').replace(/"/g,'&quot;')}"></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="settings-section">
-      <div class="settings-section-header">${icon('cross-light','18')} Versículo da Tela de Login</div>
-      <div class="settings-section-body">
-        <div class="form-group"><label>Texto do versículo</label><textarea id="cfg-verse-text" class="form-control" rows="2" oninput="_updateVersePreview()">${(cfg.verse_text||'').replace(/</g,'&lt;')}</textarea></div>
-        <div class="form-group"><label>Referência</label><input type="text" id="cfg-verse-ref" class="form-control" value="${(cfg.verse_reference||'').replace(/"/g,'&quot;')}" oninput="_updateVersePreview()"></div>
-        <div class="settings-preview">
-          <div class="preview-label">Pré-visualização</div>
-          <div class="verse-preview" id="verse-preview-block">"${(cfg.verse_text||'')}" <cite id="verse-preview-ref">${(cfg.verse_reference||'')}</cite></div>
         </div>
       </div>
     </div>
@@ -4328,12 +4387,7 @@ async function renderAdminSettings(){
       <button class="btn btn-primary" id="saveAllSettingsBtn" onclick="saveAllSettings()">${icon('checkmark','16')} Salvar Todas as Configurações</button>
     </div>
   `;
-}
-
-function _updateVersePreview(){
-  const text = document.getElementById('cfg-verse-text').value;
-  const ref = document.getElementById('cfg-verse-ref').value;
-  document.getElementById('verse-preview-block').innerHTML = `"${text}" <cite id="verse-preview-ref">${ref}</cite>`;
+  _brandPreview();
 }
 
 function addLevelRow(){
@@ -4358,19 +4412,44 @@ function removeLevelRow(btn){
   btn.closest('tr').remove();
 }
 
+function _brandPreview(){
+  const cor = document.getElementById('brand-cor-hex').value;
+  const t = document.getElementById('brand-login-titulo').value || 'Aprendizagem que transforma.';
+  const sub = document.getElementById('brand-login-sub').value || 'Cursos, trilhas e acompanhamento em uma só plataforma.';
+  document.getElementById('brand-preview-titulo').textContent = t;
+  document.getElementById('brand-preview-sub').textContent = sub;
+  if(/^#[0-9a-fA-F]{6}$/.test(cor)) document.getElementById('brand-preview-btn').style.background = cor;
+}
+
+async function _brandUpload(tipo, input){
+  const file = input.files[0];
+  if(!file) return;
+  if(file.size > 1024*1024){ showToast('Imagem maior que 1 MB.', 'error'); input.value=''; return; }
+  const fd = new FormData(); fd.append('file', file);
+  const res = await fetch(`/api/admin/branding/${tipo}`, {method:'POST', body:fd, credentials:'same-origin'});
+  const d = await res.json().catch(()=>({}));
+  if(!res.ok){ showToast(d.error || 'Erro ao enviar imagem.', 'error'); input.value=''; return; }
+  showToast(tipo === 'logo' ? 'Logo atualizada.' : 'Ícone atualizado.', 'success');
+  await recarregarMarca();
+  renderAdminSettings();
+}
+
+async function _brandRemover(tipo){
+  const res = await api('PUT', '/admin/branding', {[`remover_${tipo}`]: true});
+  if(res.ok){ await recarregarMarca(); renderAdminSettings(); }
+}
+
 async function saveAllSettings(){
   const btn = document.getElementById('saveAllSettingsBtn');
   const savedMsg = document.getElementById('settingsSavedMsg');
   btn.disabled = true;
   try{
     const configBody = {
-      platform_name: document.getElementById('cfg-name').value,
+      platform_name: document.getElementById('brand-nome').value,
       platform_short: document.getElementById('cfg-short').value,
       whatsapp: document.getElementById('cfg-whatsapp').value,
       support_email: document.getElementById('cfg-email').value,
       support_hours: document.getElementById('cfg-hours').value,
-      verse_text: document.getElementById('cfg-verse-text').value,
-      verse_reference: document.getElementById('cfg-verse-ref').value,
       points_read_material: parseInt(document.getElementById('cfg-pts-read').value) || 0,
       points_complete_video: parseInt(document.getElementById('cfg-pts-video').value) || 0,
       points_correct_exercise: parseInt(document.getElementById('cfg-pts-exercise').value) || 0,
@@ -4378,6 +4457,12 @@ async function saveAllSettings(){
       points_complete_trail: parseInt(document.getElementById('cfg-pts-trail').value) || 0,
     };
     const cfgRes = await api('PUT', '/admin/config', configBody);
+    const brandRes = await api('PUT', '/admin/branding', {
+      nome_exibido: document.getElementById('brand-nome').value,
+      primary: document.getElementById('brand-cor-hex').value,
+      login_titulo: document.getElementById('brand-login-titulo').value,
+      login_subtitulo: document.getElementById('brand-login-sub').value,
+    });
 
     const rows = Array.from(document.querySelectorAll('#levelsTableBody tr'));
     const levelsBody = {
@@ -4390,11 +4475,12 @@ async function saveAllSettings(){
     };
     const lvlRes = await api('PUT', '/admin/levels', levelsBody);
 
-    if(cfgRes.ok && lvlRes.ok){
+    if(cfgRes.ok && lvlRes.ok && brandRes.ok){
       showToast('Configurações salvas com sucesso!', 'success');
+      await recarregarMarca();
       if(savedMsg){ savedMsg.style.display = 'inline'; setTimeout(()=>{ savedMsg.style.display = 'none'; }, 3000); }
     } else {
-      const err = !cfgRes.ok ? await cfgRes.json() : await lvlRes.json();
+      const err = !cfgRes.ok ? await cfgRes.json() : !brandRes.ok ? await brandRes.json() : await lvlRes.json();
       showToast(err.error || 'Erro ao salvar configurações.', 'error');
     }
   } finally {

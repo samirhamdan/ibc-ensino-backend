@@ -673,12 +673,16 @@ def delete_announcement(announcement_id):
 # ── Platform Configuration ────────────────────────────────────────────────────
 
 def _get_or_create_config():
-    config = PlatformConfig.query.first()
+    config = PlatformConfig.query.filter_by(tenant_id=current_tenant_id()).first()
     if not config:
         config = PlatformConfig()
         db.session.add(config)
         db.session.commit()
     return config
+
+
+def _levels_do_tenant():
+    return Level.query.filter_by(tenant_id=current_tenant_id()).order_by(Level.number).all()
 
 
 @admin_bp.route('/config', methods=['GET'])
@@ -689,7 +693,7 @@ def get_admin_config():
 
     config = _get_or_create_config()
     data = config.to_dict()
-    data['levels'] = [lv.to_dict() for lv in Level.query.order_by(Level.number).all()]
+    data['levels'] = [lv.to_dict() for lv in _levels_do_tenant()]
     return jsonify(data), 200
 
 
@@ -720,8 +724,7 @@ def list_levels():
     if err:
         return err
 
-    levels = Level.query.order_by(Level.number).all()
-    return jsonify([lv.to_dict() for lv in levels]), 200
+    return jsonify([lv.to_dict() for lv in _levels_do_tenant()]), 200
 
 
 @admin_bp.route('/levels', methods=['PUT'])
@@ -747,7 +750,7 @@ def replace_levels():
             return jsonify({'error': 'Pontos mínimos devem aumentar a cada nível'}), 400
         prev_points = points
 
-    Level.query.delete()
+    Level.query.filter_by(tenant_id=current_tenant_id()).delete()
     for lv in levels_data:
         db.session.add(Level(
             number=lv.get('number'),
@@ -756,7 +759,7 @@ def replace_levels():
             color=lv.get('color', '#008ea8'),
         ))
     db.session.commit()
-    return jsonify({'success': True, 'levels': [lv.to_dict() for lv in Level.query.order_by(Level.number).all()]}), 200
+    return jsonify({'success': True, 'levels': [lv.to_dict() for lv in _levels_do_tenant()]}), 200
 
 
 # ── Course status management ──────────────────────────────────────────────────
@@ -823,3 +826,110 @@ def duplicate_course(course_id):
 
     db.session.commit()
     return jsonify({'success': True, 'course_id': new_course.id, 'name': new_course.name}), 200
+
+
+# ── Marca do tenant (TEN-03) ──────────────────────────────────────────────────
+
+_MARCA_TEXTOS = {'nome_exibido': 80, 'login_titulo': 80, 'login_subtitulo': 200}
+_IMAGENS_ACEITAS = {
+    b'\x89PNG\r\n\x1a\n': 'png',
+    b'\xff\xd8\xff': 'jpg',
+    b'RIFF': 'webp',
+}
+_MAX_IMAGEM_BYTES = 1024 * 1024
+
+
+def _tenant_atual():
+    from core.tenancy.models import Tenant
+    return Tenant.query.get(current_tenant_id())
+
+
+def _salvar_tema(tenant, tema):
+    from core.tenancy.middleware import clear_tenant_cache
+    tenant.tema_json = tema   # dict novo: força o UPDATE da coluna JSON
+    db.session.commit()
+    clear_tenant_cache()
+
+
+@admin_bp.route('/branding', methods=['GET'])
+def get_branding():
+    _, err = _admin_required()
+    if err:
+        return err
+    from core.theming import construir_tokens
+    tenant = _tenant_atual()
+    return jsonify({'tema': tenant.tema_json or {},
+                    'tokens': construir_tokens(tenant.tema_json, tenant.nome)}), 200
+
+
+@admin_bp.route('/branding', methods=['PUT'])
+def update_branding():
+    _, err = _admin_required()
+    if err:
+        return err
+    import re
+    data = request.get_json(silent=True) or {}
+    tenant = _tenant_atual()
+    tema = dict(tenant.tema_json or {})
+
+    for campo, limite in _MARCA_TEXTOS.items():
+        if campo in data:
+            valor = (data[campo] or '').strip()
+            if len(valor) > limite:
+                return jsonify({'error': f'{campo}: máximo de {limite} caracteres'}), 400
+            if valor:
+                tema[campo] = valor
+            else:
+                tema.pop(campo, None)
+
+    if 'primary' in data:
+        cor = (data['primary'] or '').strip()
+        if cor and not re.fullmatch(r'#[0-9a-fA-F]{6}', cor):
+            return jsonify({'error': 'Cor inválida (use o formato #RRGGBB)'}), 400
+        tema.pop('cor_primaria', None)
+        if cor:
+            tema['primary'] = cor.lower()
+        else:
+            tema.pop('primary', None)
+
+    for campo in ('logo', 'favicon'):
+        if data.get(f'remover_{campo}'):
+            tema.pop(campo, None)
+
+    _salvar_tema(tenant, tema)
+    return jsonify({'success': True, 'tema': tema}), 200
+
+
+@admin_bp.route('/branding/<tipo>', methods=['POST'])
+def upload_branding_image(tipo):
+    _, err = _admin_required()
+    if err:
+        return err
+    if tipo not in ('logo', 'favicon'):
+        return jsonify({'error': 'Tipo inválido'}), 404
+    arquivo = request.files.get('file')
+    if not arquivo:
+        return jsonify({'error': 'Envie um arquivo no campo "file"'}), 400
+    conteudo = arquivo.read(_MAX_IMAGEM_BYTES + 1)
+    if len(conteudo) > _MAX_IMAGEM_BYTES:
+        return jsonify({'error': 'Imagem maior que 1 MB'}), 400
+    ext = next((e for magica, e in _IMAGENS_ACEITAS.items() if conteudo.startswith(magica)), None)
+    if ext == 'webp' and conteudo[8:12] != b'WEBP':
+        ext = None
+    if not ext:
+        return jsonify({'error': 'Formato não suportado (use PNG, JPG ou WEBP)'}), 400
+
+    import os
+    import secrets as _secrets
+    from flask import current_app
+    pasta = os.path.join(current_app.config['UPLOAD_FOLDER'], 'branding')
+    os.makedirs(pasta, exist_ok=True)
+    nome = f'{current_tenant_id()}-{tipo}-{_secrets.token_hex(4)}.{ext}'
+    with open(os.path.join(pasta, nome), 'wb') as f:
+        f.write(conteudo)
+
+    tenant = _tenant_atual()
+    tema = dict(tenant.tema_json or {})
+    tema[tipo] = f'/api/branding/{nome}'
+    _salvar_tema(tenant, tema)
+    return jsonify({'success': True, 'url': tema[tipo]}), 200

@@ -630,8 +630,11 @@ class AnnouncementDismissal(TenantScopedModel, db.Model):
     dismissed_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
-class PlatformConfig(db.Model):
+class PlatformConfig(TenantScopedModel, db.Model):
+    """Configuração de cada tenant (nome, contatos, pontuação). Uma linha por tenant."""
     __tablename__ = 'platform_config'
+    __table_args__ = (db.UniqueConstraint('tenant_id', name='uq_platform_config_tenant'),
+                      db.Index('ix_platform_config_tenant_id_id', 'tenant_id', 'id'))
 
     id = db.Column(db.Integer, primary_key=True)
     platform_name = db.Column(db.String(100), default='XR Educação')
@@ -669,11 +672,13 @@ class PlatformConfig(db.Model):
         }
 
 
-class Level(db.Model):
+class Level(TenantScopedModel, db.Model):
     __tablename__ = 'levels'
+    __table_args__ = (db.UniqueConstraint('tenant_id', 'number', name='uq_levels_tenant_number'),
+                      db.Index('ix_levels_tenant_id_id', 'tenant_id', 'id'))
 
     id = db.Column(db.Integer, primary_key=True)
-    number = db.Column(db.Integer, unique=True, nullable=False)
+    number = db.Column(db.Integer, nullable=False)
     name = db.Column(db.String(50), nullable=False)
     min_points = db.Column(db.Integer, nullable=False)
     color = db.Column(db.String(7), default='#008ea8')

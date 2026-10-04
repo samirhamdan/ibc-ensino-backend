@@ -773,3 +773,22 @@
   .lesson-actions-bar .btn { width: 100%; justify-content: center; }
   .material-input-row { flex-direction: column; }
 }
+
+/* ── Editor de marca (TEN-03) ── */
+.brand-editor { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--space-lg); align-items: start; }
+@media (max-width: 900px) { .brand-editor { grid-template-columns: 1fr; } }
+.brand-color-row { display: flex; gap: var(--space-sm); align-items: center; }
+.brand-color-row input[type="color"] { width: 48px; height: 38px; padding: 2px; border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; }
+.brand-color-row input[type="text"] { max-width: 120px; font-family: monospace; }
+.brand-preview { position: sticky; top: var(--space-lg); }
+.brand-preview-card {
+  background: var(--xr-black); border-radius: var(--radius-lg); padding: var(--space-xl) var(--space-lg);
+  text-align: center; color: var(--white); display: flex; flex-direction: column; align-items: center; gap: var(--space-sm);
+}
+.brand-preview-card img { max-width: 140px; max-height: 80px; object-fit: contain; margin-bottom: var(--space-sm); }
+.brand-preview-titulo { font-size: 1.15rem; font-weight: 700; line-height: 1.25; }
+.brand-preview-sub { font-size: .8rem; color: rgba(255, 255, 255, .7); }
+.brand-preview-btn {
+  margin-top: var(--space-sm); width: 100%; padding: 8px; border-radius: var(--radius-md);
+  background: var(--brand-primary); color: var(--white); font-weight: 600; font-size: .85rem;
+}

@@ -17,7 +17,8 @@ LEVELS = [
 
 
 def seed_config():
-    if PlatformConfig.query.first():
+    from core.tenancy import current_tenant_id
+    if PlatformConfig.query.filter_by(tenant_id=current_tenant_id()).first():
         return
     db.session.add(PlatformConfig(
         platform_name='XR Educação',
@@ -38,8 +39,9 @@ def seed_config():
 
 
 def seed_levels():
+    from core.tenancy import current_tenant_id
     for number, name, min_points, color in LEVELS:
-        if Level.query.filter_by(number=number).first():
+        if Level.query.filter_by(number=number, tenant_id=current_tenant_id()).first():
             continue
         db.session.add(Level(number=number, name=name, min_points=min_points, color=color))
     db.session.commit()

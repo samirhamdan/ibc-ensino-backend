@@ -100,7 +100,7 @@ def dismiss_announcement(announcement_id):
 
 
 def _get_or_create_config():
-    config = PlatformConfig.query.first()
+    config = PlatformConfig.query.filter_by(tenant_id=current_tenant_id()).first()
     if not config:
         config = PlatformConfig()
         db.session.add(config)
@@ -128,7 +128,7 @@ def get_gamification_config():
         return jsonify({'error': 'Não autenticado'}), 401
 
     config = _get_or_create_config()
-    levels = Level.query.order_by(Level.number).all()
+    levels = Level.query.filter_by(tenant_id=current_tenant_id()).order_by(Level.number).all()
     return jsonify({
         'points_read_material': config.points_read_material,
         'points_complete_video': config.points_complete_video,

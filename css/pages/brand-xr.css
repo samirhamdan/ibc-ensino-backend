@@ -99,3 +99,17 @@
   --navy: #1b1830;
   --navy-light: var(--brand-primary);
 }
+
+/* Tenant com logo própria: o login usa a cor dele, não o gradiente da XR */
+body.marca-propria #screen-login .login-gradient {
+  background:
+    radial-gradient(60% 55% at 20% 20%, var(--brand-primary-subtle), transparent 70%),
+    radial-gradient(55% 50% at 85% 85%, var(--brand-primary-subtle), transparent 70%),
+    var(--xr-black);
+  animation: none;
+}
+body.marca-propria #screen-login .login-card .btn-primary { background: var(--brand-primary); }
+body.marca-propria #screen-login .login-card a,
+body.marca-propria #screen-login .register-link a { color: var(--brand-primary); }
+body.marca-propria #screen-login .login-visual-logo { filter: none; }
+body.marca-propria .topbar::after { background: var(--brand-primary); }
