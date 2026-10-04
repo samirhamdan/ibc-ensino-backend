@@ -13,4 +13,4 @@ COPY . .
 RUN mkdir -p /data/uploads
 
 EXPOSE 8000
-CMD ["sh", "-c", "alembic upgrade head && python seed_production.py && exec gunicorn --bind 0.0.0.0:8000 --workers 2 --threads 4 --worker-class gthread --timeout 60 \"app:create_app('production')\""]
+CMD ["sh", "-c", "alembic upgrade head && python seed_production.py && exec gunicorn --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-2} --threads 4 --worker-class gthread --timeout 60 \"app:create_app('production')\""]
