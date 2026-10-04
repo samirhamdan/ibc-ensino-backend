@@ -55,6 +55,7 @@
 <link rel="stylesheet" href="css/pages/sprint62.css">
 <link rel="stylesheet" href="css/pages/mobile-nav.css">
 <link rel="stylesheet" href="css/pages/brand-xr.css">
+<link rel="stylesheet" href="css/pages/ops.css">
 
 <!-- Tema do tenant (UX_ALUNO_SAAS.md §2.2): XHR SÍNCRONO de propósito —
      precisa terminar e o <style id="tenant-theme"> ser inserido no DOM
@@ -92,6 +93,7 @@
 </script>
 
 <!-- Scripts -->
+<script src="js/ops.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -324,6 +326,10 @@
         <div class="course-item" id="nav-admin-settings" onclick="showAdminPanel('settings')" style="display:none">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-settings"></use></svg></span>
           <div class="ci-text"><div class="ci-name">Configurações</div></div>
+        </div>
+ <div class="course-item" id="nav-ops" onclick="abrirPainelOperador()" style="display:none">
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-key"></use></svg></span>
+          <div class="ci-text"><div class="ci-name">Operador da plataforma</div></div>
         </div>
         <div class="course-item" id="nav-tutor-dash" onclick="detectarPerfilEAtualizarDashboard()" style="display:none">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-bar-chart"></use></svg></span>
@@ -558,6 +564,7 @@ function setupUI(){
     const el=document.getElementById(id);
     if(el) el.style.display = isAdminUser ? 'flex' : 'none';
   });
+  if(typeof detectarOperador === 'function') detectarOperador();
   const usersNav=document.getElementById('nav-admin-users');
   if(usersNav) usersNav.style.display = (isAdminUser||isTutorUser) ? 'flex' : 'none';
   const tutorDashNav=document.getElementById('nav-tutor-dash');
@@ -2441,6 +2448,7 @@ async function responderPergunta(qid){
 
 // ── Admin panel ──
 function showAdminPanel(panel){
+  if(typeof sairModoOperador === 'function') sairModoOperador();
   document.querySelectorAll('.course-item[id^=nav-admin]').forEach(x=>x.classList.remove('active'));
   const navEl=document.getElementById('nav-admin-'+panel);
   if(navEl) navEl.classList.add('active');

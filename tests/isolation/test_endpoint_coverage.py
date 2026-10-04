@@ -3,7 +3,7 @@ isolamento DERRUBA o pipeline. É este teste que transforma a regra do
 CLAUDE.md ("nenhum endpoint novo sem caso de isolamento") em verificação
 executável."""
 from tests.isolation.registry import (TENANT_SCOPED, LEGACY_PRE_TENANCY, PUBLIC_INFRA,
-                                       EXTERNAL_WEBHOOK)
+                                       EXTERNAL_WEBHOOK, OPERADOR_PLATAFORMA)
 
 
 def _endpoints(app):
@@ -12,7 +12,7 @@ def _endpoints(app):
 
 def test_todo_endpoint_esta_classificado(iso_app):
     atuais = _endpoints(iso_app)
-    classificados = set(TENANT_SCOPED) | LEGACY_PRE_TENANCY | PUBLIC_INFRA | set(EXTERNAL_WEBHOOK)
+    classificados = set(TENANT_SCOPED) | LEGACY_PRE_TENANCY | PUBLIC_INFRA | set(EXTERNAL_WEBHOOK) | OPERADOR_PLATAFORMA
 
     sem_classificacao = atuais - classificados
     assert not sem_classificacao, (
@@ -29,7 +29,7 @@ def test_todo_endpoint_esta_classificado(iso_app):
 def test_registro_sem_entradas_orfas(iso_app):
     """Entrada no registro apontando p/ endpoint inexistente = lixo acumulado."""
     atuais = _endpoints(iso_app)
-    classificados = set(TENANT_SCOPED) | LEGACY_PRE_TENANCY | PUBLIC_INFRA | set(EXTERNAL_WEBHOOK)
+    classificados = set(TENANT_SCOPED) | LEGACY_PRE_TENANCY | PUBLIC_INFRA | set(EXTERNAL_WEBHOOK) | OPERADOR_PLATAFORMA
     orfaos = classificados - atuais
     assert not orfaos, f'Entradas órfãs no registry (endpoint não existe): {sorted(orfaos)}'
 

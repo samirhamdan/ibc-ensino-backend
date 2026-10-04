@@ -150,6 +150,7 @@ PUBLIC_INFRA = {
     'frontend',
     'favicon',
     'serve_css',
+    'serve_js',
     'serve_icon_sprite',
     'serve_images',
     'theme.serve_branding',  # logo/favicon do tenant: públicos (aparecem no login)
@@ -191,4 +192,16 @@ LEGACY_PRE_TENANCY = {
     # upload bruto de arquivo (sem linha de domínio; o REGISTRO do material é
     # tenant-scoped e o serve verifica acesso via material)
     'upload_file',
+}
+
+
+# ── Painel do operador da plataforma (/api/ops) ──────────────────────────
+# Cross-tenant por definição. Isolamento aqui = NENHUM usuário de tenant
+# (nem admin) acessa: test_operador_isolation.py percorre TODAS as rotas
+# deste blueprint e exige 403.
+OPERADOR_PLATAFORMA = {
+    'ops.me', 'ops.configurar_2fa', 'ops.verificar_2fa', 'ops.sair',
+    'ops.get_pulso', 'ops.get_planos', 'ops.get_tenants', 'ops.get_disponibilidade',
+    'ops.post_tenant', 'ops.get_tenant', 'ops.patch_tenant', 'ops.post_status',
+    'ops.get_auditoria',
 }

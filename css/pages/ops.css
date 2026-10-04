@@ -1,0 +1,81 @@
+/* Painel do operador da plataforma (UX_OPERADOR_SAAS §5): denso, claro,
+   barra superior grafite para nunca confundir com o painel de um tenant. */
+body.modo-operador .topbar { background: var(--gray-dark); }
+body.modo-operador .topbar::after { background: var(--warning); opacity: 1; }
+
+.ops-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--gray-dark); color: var(--white);
+  font-size: .7rem; font-weight: 700; letter-spacing: .08em;
+  padding: 4px 10px; border-radius: var(--radius-full);
+}
+.ops-header { display: flex; flex-direction: column; gap: var(--space-md); margin-bottom: var(--space-lg); }
+.ops-abas { display: flex; gap: var(--space-xs); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.ops-aba {
+  display: inline-flex; align-items: center; gap: 6px; background: none; border: none;
+  padding: 10px 14px; font: inherit; font-size: var(--text-sm); color: var(--text-secondary);
+  border-bottom: 2px solid transparent; cursor: pointer; margin-bottom: -1px;
+}
+.ops-aba.active { color: var(--navy); border-bottom-color: var(--brand-primary); font-weight: 600; }
+
+.ops-card { background: var(--bg-surface); border-radius: var(--radius-lg); padding: var(--space-lg); box-shadow: var(--shadow-sm); margin-bottom: var(--space-lg); }
+.ops-card-titulo { font-size: var(--text-base); font-weight: 600; color: var(--navy); margin: 0 0 var(--space-md); }
+.ops-mt { margin-top: var(--space-xl); }
+.ops-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg); }
+@media (max-width: 900px) { .ops-grid-2 { grid-template-columns: 1fr; } }
+
+.ops-semaforo { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: var(--space-md); }
+.ops-semaforo span { width: 12px; height: 12px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 4px var(--success-100); }
+.ops-semaforo-amarelo span { background: var(--warning); box-shadow: 0 0 0 4px var(--warning-100); }
+.ops-dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; font-size: var(--text-sm); }
+.ops-dl dt { color: var(--text-secondary); }
+.ops-dl dd { margin: 0; }
+
+.ops-kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-md); }
+.ops-kpis-linha { grid-template-columns: repeat(6, 1fr); background: var(--bg-surface); border-radius: var(--radius-lg); padding: var(--space-md) var(--space-lg); box-shadow: var(--shadow-sm); margin-bottom: var(--space-lg); }
+@media (max-width: 900px) { .ops-kpis-linha { grid-template-columns: repeat(3, 1fr); } }
+.ops-kpi-valor { font-size: 1.35rem; font-weight: 700; color: var(--navy); line-height: 1.2; }
+.ops-kpi-label { font-size: var(--text-xs); color: var(--text-secondary); }
+.ops-kpi-sub { font-size: var(--text-xs); color: var(--text-muted); }
+
+.ops-fila { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ops-fila-item { display: flex; justify-content: space-between; align-items: center; gap: var(--space-md); padding: 8px 12px; border-left: 4px solid var(--brand-primary); background: var(--bg-base); border-radius: var(--radius-md); font-size: var(--text-sm); }
+.ops-fila-item[data-nivel="high"] { border-left-color: var(--danger); }
+.ops-fila-item[data-nivel="warn"] { border-left-color: var(--warning); }
+.ops-vazio { color: var(--text-secondary); font-size: var(--text-sm); text-align: center; padding: var(--space-md); }
+
+.ops-toolbar { display: flex; gap: var(--space-sm); margin-bottom: var(--space-md); flex-wrap: wrap; }
+.ops-toolbar input { flex: 1; min-width: 200px; }
+.ops-toolbar select { max-width: 200px; }
+.ops-tabela-wrap { overflow-x: auto; background: var(--bg-surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+.ops-tabela .ops-linha { cursor: pointer; }
+.ops-slug { font-size: var(--text-xs); }
+.ops-detalhes { font-size: var(--text-xs); color: var(--text-secondary); max-width: 360px; }
+.ops-paginacao { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-sm); margin-top: var(--space-md); font-size: var(--text-sm); color: var(--text-secondary); }
+
+.ops-selo { display: inline-block; font-size: var(--text-xs); font-weight: 600; padding: 2px 8px; border-radius: var(--radius-full); white-space: nowrap; }
+.ops-selo-ok { background: var(--success-100); color: var(--success-700); }
+.ops-selo-warn { background: var(--warning-100); color: var(--warning-700); }
+.ops-selo-bad { background: var(--danger-100); color: var(--danger-700); }
+
+.ops-perfil-topo { display: flex; align-items: center; gap: var(--space-md); margin: var(--space-md) 0 var(--space-lg); flex-wrap: wrap; }
+.ops-perfil-logo { height: 48px; max-width: 140px; object-fit: contain; background: var(--xr-black); border-radius: var(--radius-md); padding: 6px; }
+.ops-perfil-inicial { width: 48px; height: 48px; border-radius: var(--radius-md); background: var(--brand-primary); color: var(--white); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; font-weight: 700; }
+.ops-perfil-selos { margin-left: auto; display: flex; gap: 6px; }
+.ops-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: var(--text-sm); }
+.ops-eventos { max-height: 280px; overflow-y: auto; }
+
+.ops-subdominio { display: flex; align-items: center; gap: 6px; }
+.ops-subdominio span { color: var(--text-secondary); font-size: var(--text-sm); }
+.ops-ok { color: var(--success-700); }
+.ops-erro { color: var(--danger-700); }
+.ops-senha { font-size: 1.05rem; user-select: all; }
+
+.ops-2fa { max-width: 440px; margin: var(--space-2xl) auto; text-align: center; display: flex; flex-direction: column; gap: var(--space-md); align-items: center; }
+.ops-2fa-passos { text-align: left; font-size: var(--text-sm); color: var(--text-secondary); padding-left: 1.2rem; margin: 0; }
+.ops-2fa-qr { background: var(--white); padding: 12px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); }
+.ops-2fa-chave { font-size: var(--text-xs); word-break: break-all; }
+.ops-2fa-form { display: flex; gap: var(--space-sm); width: 100%; }
+.ops-2fa-form input { text-align: center; letter-spacing: .3em; font-size: 1.2rem; }
+.ops-header .ops-badge { align-self: flex-start; }
+.ops-toolbar .btn, .ops-card .btn, .ops-2fa-form .btn { width: auto; }

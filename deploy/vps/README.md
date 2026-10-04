@@ -59,6 +59,18 @@ docker exec alessio_caddy caddy reload --config /etc/caddy/Caddyfile
 (crontab -l; echo "0 3 * * * /opt/xr-educacao/deploy/vps/backup.sh") | crontab -
 ```
 
+## Operador da plataforma
+Para conceder acesso ao painel do operador (gestão de todos os clientes) a um usuário que já existe:
+```sh
+docker exec xr_educacao_app python make_operator.py seu@email.com
+```
+No primeiro acesso a "Operador da plataforma", configure o app autenticador lendo o QR code.
+
+Se perder o celular:
+```sh
+docker exec xr_educacao_app python make_operator.py seu@email.com --reset-2fa
+```
+
 ## Atualizar
 ```sh
 cd /opt/xr-educacao && git pull && cd deploy/vps && docker compose up -d --build

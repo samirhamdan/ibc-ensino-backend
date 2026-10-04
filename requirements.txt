@@ -11,3 +11,4 @@ Flask-Limiter==4.1.1
 alembic==1.18.5
 requests==2.34.2
 redis==5.0.8
+segno==1.6.6

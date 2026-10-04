@@ -24,6 +24,23 @@ Regra: o tenant sobrescreve a plataforma. Campo vazio no tenant significa que va
 - **Contato no login** (WhatsApp) só aparece se o tenant configurar.
 - APIs: `GET/PUT /api/admin/branding`, `POST /api/admin/branding/<logo|favicon>`, `GET /api/branding/<arquivo>`.
 
+### Pronto (Fase 2 — painel do operador P0, out/2026)
+- Papel global `operadores_plataforma` (migração `0022`). Concedido só por CLI (`make_operator.py`), nunca pelo painel de um tenant.
+- **2FA TOTP obrigatório**, com QR code gerado no servidor. A sessão do painel expira após 30 min de inatividade.
+- Suspender e reativar exigem um código novo do autenticador e um motivo.
+- **Pulso**: saúde técnica (banco e migração), MRR estimado pela tabela de planos, clientes ativos e pagantes, usuários ativos em 7 dias e fila de ação (inadimplência, cliente sem usuários, cliente sem acesso há 21 dias).
+- **Clientes**: lista com busca, filtro e paginação; perfil com métricas, administradores e histórico; criação de cliente (subdomínio validado, plano, admin com senha temporária, catálogo padrão de níveis, conquistas e categorias); edição de nome e plano; suspensão e reativação.
+- **Auditoria**: toda ação do operador gera uma linha na mesma transação da mudança.
+- Testes: `tests/test_operador.py` e `tests/isolation/test_operador_isolation.py`. Este último percorre todas as rotas `/api/ops` e exige 403 para admin de tenant e para anônimo.
+
+**Pendente do operador**:
+- Marca padrão da plataforma editável.
+- Impersonação auditada.
+- Tela de Receita (Asaas).
+- Custos de IA.
+- Plataforma (flags, jobs, erros).
+- Exportação e exclusão LGPD.
+
 ### Lacunas encontradas
 1. **Marca da plataforma fixa no código**: o logo, as cores e os textos da XR estão em `index.html` e `css/pages/brand-xr.css`. Falta um operador para editá-los sem deploy.
 2. **Sem painel do operador**: criar tenant, definir subdomínio e plano e suspender exige acesso ao banco.
@@ -39,7 +56,7 @@ Regra: o tenant sobrescreve a plataforma. Campo vazio no tenant significa que va
 
 | Fase | Entrega | Lacunas |
 |---|---|---|
-| **2. Painel do operador** | Papel `operador_plataforma`. CRUD de tenants (nome, subdomínio, plano, status), marca padrão da plataforma editável, visão de cobrança | 1, 2 |
+| **2. Painel do operador** | ~~Papel de operador, CRUD de tenants, auditoria~~ (pronto). Falta: marca padrão da plataforma editável, visão de cobrança, impersonação | 1, 2 |
 | **3. Experiência do tenant** | Módulos liga/desliga, cadastro aberto ou só por convite, terminologia, tema padrão claro/escuro, imagem de fundo do login | 5, 6, 8 |
 | **4. Documentos e comunicação** | Certificado por tenant (logo, assinatura, texto, prefixo do código), e-mails com remetente e marca do tenant | 3, 4 |
 | **5. Domínio próprio** | Domínio customizado por tenant com HTTPS automático | 7 |

@@ -43,7 +43,7 @@ from flask import request, jsonify, Response
 from core.tenancy.context import current_tenant, default_tenant_id
 from core.tenancy.models import Tenant
 
-_ROTAS_SEMPRE_LIVRES_PREFIXOS = ('/billing/', '/api/theme', '/api/auth/', '/api/config/')
+_ROTAS_SEMPRE_LIVRES_PREFIXOS = ('/billing/', '/api/theme', '/api/auth/', '/api/config/', '/api/ops/')
 _ROTAS_SEMPRE_LIVRES_EXATAS = {'/health', '/', '/index.html', '/favicon.svg'}
 
 _METODOS_MUTANTES = {'POST', 'PUT', 'DELETE', 'PATCH'}

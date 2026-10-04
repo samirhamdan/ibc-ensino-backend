@@ -59,6 +59,9 @@ class TenantClient:
     def delete(self, path, **kw):
         return self._client.delete(path, **self._com_host(kw))
 
+    def patch(self, path, **kw):
+        return self._client.patch(path, **self._com_host(kw))
+
 
 @pytest.fixture()
 def tenant_a(iso_app):

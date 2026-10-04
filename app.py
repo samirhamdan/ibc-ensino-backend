@@ -125,6 +125,7 @@ def create_app(config_name='development'):
         from shared.events import DomainEvent
         from shared.audit import AuditLog
         from core.billing.models import Subscription, AiUsage
+        from core.plataforma.models import OperadorPlataforma  # noqa: F401
 
         # Fase 6 do playbook: registrado ANTES de tudo — em manutenção,
         # nenhuma rota (nem a resolução de tenant) deve rodar contra um
@@ -165,6 +166,7 @@ def create_app(config_name='development'):
         from routes.aluno import aluno_bp
         from routes.theme import theme_bp
         from core.billing.routes import billing_bp
+        from core.plataforma.routes import ops_bp
 
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
         app.register_blueprint(courses_bp, url_prefix='/api/courses')
@@ -182,6 +184,7 @@ def create_app(config_name='development'):
         app.register_blueprint(aluno_bp, url_prefix='/api/aluno')
         app.register_blueprint(theme_bp, url_prefix='/api')
         app.register_blueprint(billing_bp, url_prefix='/billing')
+        app.register_blueprint(ops_bp, url_prefix='/api/ops')
 
         # Convenience alias so GET /api/user works alongside /api/auth/user
         @app.route('/api/user', methods=['GET'])
@@ -266,6 +269,10 @@ def create_app(config_name='development'):
         def serve_css(filename):
             css_dir = os.path.join(basedir, 'css')
             return send_from_directory(css_dir, filename)
+
+        @app.route('/js/<path:filename>', methods=['GET'])
+        def serve_js(filename):
+            return send_from_directory(os.path.join(basedir, 'js'), filename)
 
         # Health check
         @app.route('/health', methods=['GET'])
