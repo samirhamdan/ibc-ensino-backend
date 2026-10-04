@@ -58,6 +58,7 @@
 <link rel="stylesheet" href="css/pages/ops.css">
 <link rel="stylesheet" href="css/pages/aluno-v2.css">
 <link rel="stylesheet" href="css/pages/tutor-v2.css">
+<link rel="stylesheet" href="css/pages/sidebar-v2.css">
 
 <!-- Tema do tenant (UX_ALUNO_SAAS.md §2.2): XHR SÍNCRONO de propósito —
      precisa terminar e o <style id="tenant-theme"> ser inserido no DOM
@@ -268,7 +269,12 @@
         <div class="sidebar-label">Menu</div>
         <div class="course-item" id="nav-student-dash" onclick="detectarPerfilEAtualizarDashboard()" style="display:none">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-home"></use></svg></span>
-          <div class="ci-text"><div class="ci-name">Meu Painel</div></div>
+          <div class="ci-text"><div class="ci-name">Início</div></div>
+        </div>
+        <div class="course-item" id="nav-minhas-perguntas" onclick="navigateToMinhasPerguntas()" style="display:none">
+          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-message"></use></svg></span>
+          <div class="ci-text"><div class="ci-name">Perguntas</div></div>
+          <span class="nav-badge" id="nav-perguntas-badge" hidden></span>
         </div>
         <div class="course-item" id="nav-trilhas" onclick="navigateToTrilhas()" style="display:none">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-trails"></use></svg></span>
@@ -276,28 +282,24 @@
         </div>
         <div class="course-item" id="nav-certificados" onclick="navigateToCertificados()" style="display:none">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-certificates"></use></svg></span>
-          <div class="ci-text"><div class="ci-name">Meus Certificados</div></div>
+          <div class="ci-text"><div class="ci-name">Certificados</div></div>
         </div>
         <div class="course-item" id="nav-meu-perfil" onclick="navigateToMeuPerfil()" style="display:none">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-user"></use></svg></span>
-          <div class="ci-text"><div class="ci-name">Meu Perfil</div></div>
-        </div>
-        <div class="course-item" id="nav-minhas-perguntas" onclick="navigateToMinhasPerguntas()" style="display:none">
-          <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-message"></use></svg></span>
-          <div class="ci-text"><div class="ci-name">Minhas Perguntas</div></div>
+          <div class="ci-text"><div class="ci-name">Meu perfil</div></div>
         </div>
         <div class="course-item" id="nav-catalog" onclick="showCatalog()">
           <span class="ci-icon"><svg class="icon" viewBox="0 0 24 24"><use href="#icon-catalog"></use></svg></span>
-          <div class="ci-text"><div class="ci-name">Catálogo de Cursos</div></div>
+          <div class="ci-text"><div class="ci-name">Catálogo de cursos</div></div>
         </div>
       </div>
-      <div class="sidebar-section" id="my-trails-section" style="display:none">
-        <div class="sidebar-label">Minhas Trilhas</div>
-        <div id="sidebar-trail-list"></div>
-      </div>
       <div class="sidebar-section" id="my-courses-section">
-        <div class="sidebar-label">Meus Cursos</div>
+        <div class="sidebar-label">Meus cursos</div>
         <div id="course-list"></div>
+      </div>
+      <div class="sidebar-section" id="my-trails-section" style="display:none">
+        <div class="sidebar-label">Minhas trilhas</div>
+        <div id="sidebar-trail-list"></div>
       </div>
       <div class="sidebar-section" id="admin-nav-section" style="display:none">
         <div class="sidebar-label">Administração</div>
@@ -821,6 +823,10 @@ function detectarPerfilEAtualizarDashboard(){
   const mc = document.getElementById('main-content');
   if(mc){ mc.style.display = 'block'; mc.style.visibility = 'visible'; mc.style.opacity = '1'; }
   document.querySelectorAll('.course-item').forEach(x=>x.classList.remove('active'));
+  if(currentUser){
+    const navInicio = document.getElementById(isAdmin() ? 'nav-admin-hoje' : isTutor() ? 'nav-tutor-dash' : 'nav-student-dash');
+    if(navInicio) navInicio.classList.add('active');
+  }
   if(!currentUser){ console.log('[DEBUG] sem currentUser → renderAlunoDashboard'); renderAlunoDashboard(); return; }
   console.log('[DEBUG] role:', currentUser.role, 'isAdmin:', isAdmin(), 'isTutor:', isTutor(), 'isAluno:', isAluno());
   try {
@@ -940,23 +946,45 @@ function renderCourseList(){
       el.appendChild(div);
     });
   };
-  // Alunos: only courses with started progress; admin/tutor: all
-  if(currentUser && isAluno()){
-    Promise.all(courses.map(c=>
-      api('GET',`/progress/${c.id}`).then(r=>r.ok?r.json():null).catch(()=>null)
-    )).then(progs=>{
-      const started=courses.filter((c,i)=>{
-        const p=progs[i];
-        return p && (p.id || p.material_done || p.quiz_total>0);
-      });
-      renderItems(started);
-    });
-  } else {
-    renderItems(courses);
+  if(currentUser && isAluno()){ renderMeusCursosAluno(); return; }
+  renderItems(courses);
+}
+
+// Menu do aluno: progresso real das aulas (LessonProgress), em uma requisição.
+async function renderMeusCursosAluno(){
+  const el = document.getElementById('course-list'); if(!el) return;
+  let d;
+  try { const r = await api('GET', '/aluno/meus-cursos'); if(!r.ok) return; d = await r.json(); } catch(e){ return; }
+  const badge = document.getElementById('nav-perguntas-badge');
+  if(badge){
+    badge.hidden = !d.respostas_novas;
+    badge.textContent = d.respostas_novas > 9 ? '9+' : String(d.respostas_novas || '');
+    badge.title = d.respostas_novas === 1 ? '1 resposta nova' : `${d.respostas_novas} respostas novas`;
   }
+  if(!d.cursos.length){
+    el.innerHTML = `<div class="sidebar-empty">Você ainda não começou nenhum curso.<br><a onclick="showCatalog()">Escolher um curso →</a></div>`;
+    return;
+  }
+  el.innerHTML = d.cursos.map(c => {
+    const ativo = currentCourse && currentCourse.id === c.id;
+    const feito = c.status === 'concluido';
+    const legenda = feito ? 'Concluído' : `Aula ${c.aula_atual} de ${c.total_aulas} · ${c.percentage}%`;
+    return `<div class="course-item curso-aluno${ativo ? ' active' : ''}${feito ? ' concluido' : ''}" id="course-nav-${c.id}"
+        role="button" tabindex="0" title="${_dashSaasEscAttr(c.name)}"
+        onclick="selectCourse(${c.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectCourse(${c.id})}">
+      <span class="ci-inicial" aria-hidden="true">${feito ? icon('checkmark','14') : escapeHtml((c.name || '?').trim().charAt(0).toUpperCase())}</span>
+      <div class="ci-text">
+        <div class="ci-name">${escapeHtml(c.name)}</div>
+        <div class="ci-progress">${legenda}</div>
+        ${feito ? '' : `<div class="mini-bar" role="progressbar" aria-valuenow="${c.percentage}" aria-valuemin="0" aria-valuemax="100"><div class="mini-bar-fill" style="width:${c.percentage}%"></div></div>`}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function updateCourseNavProgress(cid, prog){
+  // Aluno: o menu usa o progresso real das aulas (renderMeusCursosAluno), não o modelo legado.
+  if(currentUser && isAluno()) return;
   const nav = document.getElementById('course-nav-'+cid);
   if(!nav) return;
   const pct = getCourseProgressPct(prog);
@@ -1242,6 +1270,7 @@ async function loadAula(courseId, aulaNum){
     return;
   }
   currentAula = await res.json();
+  if(currentUser && isAluno()) renderMeusCursosAluno();
   if(currentAula.progress){
     aulaQuizSubmitted = true;
     aulaQuizFeedback = {score:currentAula.progress.score, total:currentAula.progress.total,
@@ -1701,6 +1730,7 @@ async function submitAulaQuiz(){
     if(currentAula.progress){ currentAula.progress.passed = currentAula.progress.passed || aulaQuizFeedback.passed; }
     else currentAula.progress = {passed: aulaQuizFeedback.passed, score: aulaQuizFeedback.score, total: aulaQuizFeedback.total};
     if(aulaQuizFeedback.passed) resetAttempts(moduleId);
+    if(aulaQuizFeedback.passed && isAluno()) renderMeusCursosAluno();
     gamiShowResult(aulaQuizFeedback.points);
     if(aulaQuizFeedback.new_achievements && aulaQuizFeedback.new_achievements.length){
       setTimeout(()=>showAchievementPopups(aulaQuizFeedback.new_achievements), 900);

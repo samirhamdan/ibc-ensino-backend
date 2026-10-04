@@ -73,6 +73,7 @@ TENANT_SCOPED = {
     'trails.focus_trail': 'test_progress_isolation.py::test_matricula_em_trilha_nao_vaza',
     'onboarding.submit_onboarding': 'test_progress_isolation.py::test_onboarding_answer_por_tenant',
     'aluno.save_study_time': 'test_progress_isolation.py::test_progresso_de_aula_nao_desbloqueia_em_outro_tenant',
+    'aluno.meus_cursos': 'test_progress_isolation.py::test_meus_cursos_nao_mostra_progresso_de_outro_tenant',
     'aluno.stats': 'test_progress_isolation.py::test_progresso_de_aula_nao_desbloqueia_em_outro_tenant',
     'aluno.continue_learning': 'test_progress_isolation.py::test_progresso_de_aula_nao_desbloqueia_em_outro_tenant',
     # grupo 3 — conteúdo (Fase 3, fecha TEN-01)

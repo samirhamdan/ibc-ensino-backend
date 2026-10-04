@@ -109,3 +109,25 @@ def test_progresso_legado_zero_linhas_cruzadas(iso_app, tenants_ab, seeded):
 
         Progress.query.filter_by(user_id=uid).delete()
         db.session.commit()
+
+
+def test_meus_cursos_nao_mostra_progresso_de_outro_tenant(iso_app, seeded, vinculo_b):
+    """O mesmo aluno em B não vê no menu o curso que estudou em A."""
+    from extensions import db
+    from models import LessonProgress
+    from tests.isolation.conftest import TenantClient, HOST_A, HOST_B
+    with iso_app.app_context():
+        db.session.add(LessonProgress(user_id=seeded['users']['aluno'], course_id=seeded['course_id'],
+                                      module_id=seeded['module1_id'], passed=True, score=2, total=2))
+        db.session.commit()
+    try:
+        a = TenantClient(iso_app.test_client(), HOST_A)
+        a.post('/api/auth/login', json={'email': 'aluno@test.com', 'password': 'senha123'})
+        assert len(a.get('/api/aluno/meus-cursos').get_json()['cursos']) == 1
+        b = TenantClient(iso_app.test_client(), HOST_B)
+        b.post('/api/auth/login', json={'email': 'aluno@test.com', 'password': 'senha123'})
+        assert b.get('/api/aluno/meus-cursos').get_json()['cursos'] == []
+    finally:
+        with iso_app.app_context():
+            LessonProgress.query.filter_by(user_id=seeded['users']['aluno'], course_id=seeded['course_id']).delete()
+            db.session.commit()

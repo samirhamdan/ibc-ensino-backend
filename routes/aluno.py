@@ -136,6 +136,40 @@ def continue_learning():
 
 # ── Minhas Perguntas (Sprint 6.2) ────────────────────────────────────────────
 
+@aluno_bp.route('/meus-cursos', methods=['GET'])
+def meus_cursos():
+    """Menu lateral do aluno: cursos com progresso real (LessonProgress) em uma
+    consulta, + quantas perguntas têm resposta nova (respondidas e não resolvidas)."""
+    user, err = _require_aluno()
+    if err:
+        return err
+    from routes.dashboards import _batch_completion
+    tid = current_tenant_id()
+    cursos_ids = [cid for (cid,) in db.session.query(db.func.distinct(LessonProgress.course_id))
+                  .filter(LessonProgress.tenant_id == tid, LessonProgress.user_id == user.id)]
+    cursos = Course.query.filter(Course.tenant_id == tid, Course.id.in_(cursos_ids)).all() if cursos_ids else []
+    completion, modulos = _batch_completion(tid, course_ids=[c.id for c in cursos], user_ids=[user.id])
+    ultima = dict(db.session.query(LessonProgress.course_id, db.func.max(LessonProgress.completed_at))
+                  .filter(LessonProgress.tenant_id == tid, LessonProgress.user_id == user.id)
+                  .group_by(LessonProgress.course_id).all())
+    resultado = []
+    for c in cursos:
+        total = modulos.get(c.id, 0)
+        pct = completion.get((c.id, user.id), 0)
+        concluidas = round(pct * total / 100) if total else 0
+        resultado.append({
+            'id': c.id, 'name': c.name,
+            'percentage': pct, 'total_aulas': total,
+            'aula_atual': min(concluidas + 1, total) if total else 0,
+            'status': 'concluido' if total and pct == 100 else 'em_andamento',
+            'ultima_atividade': ultima[c.id].isoformat() if ultima.get(c.id) else None,
+        })
+    # em andamento primeiro (mais recente no topo), concluídos no fim
+    resultado.sort(key=lambda x: (x['status'] == 'concluido', -(datetime.fromisoformat(x['ultima_atividade']).timestamp() if x['ultima_atividade'] else 0)))
+    respostas_novas = Question.query.filter_by(tenant_id=tid, user_id=user.id, status='answered').count()
+    return jsonify({'cursos': resultado, 'respostas_novas': respostas_novas}), 200
+
+
 @aluno_bp.route('/questions', methods=['GET'])
 def my_questions_with_status():
     """All of the current student's questions, with status/course info for the
