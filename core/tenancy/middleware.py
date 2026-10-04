@@ -13,6 +13,7 @@ Cache em memória com TTL de 60s (dict — Redis entra na Fase 4). O TTL de 60s
 também satisfaz o aceite de TEN-04: suspensão passa a valer em <60s sem
 invalidação explícita.
 """
+from markupsafe import escape
 import os
 import time
 import uuid as uuid_mod
@@ -114,7 +115,7 @@ def _resposta_403_suspenso(ctx):
     return (f'<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">'
             f'<title>Conta suspensa</title></head><body '
             f'style="font-family:sans-serif;text-align:center;padding:4rem">'
-            f'<h1>{ctx.nome}</h1>'
+            f'<h1>{escape(ctx.nome)}</h1>'
             f'<p>Esta conta está temporariamente suspensa.</p>'
             f'<p>Entre em contato com o administrador da plataforma.</p>'
             '</body></html>'), 403

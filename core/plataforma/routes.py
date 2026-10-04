@@ -9,7 +9,7 @@ import time
 
 from flask import Blueprint, jsonify, request, session
 
-from extensions import db, limiter
+from extensions import db, limiter, chave_por_usuario
 from core.plataforma import servico, totp
 from core.plataforma.models import OperadorPlataforma
 from core.tenancy.models import Tenant
@@ -98,6 +98,7 @@ def configurar_2fa():
 
 @ops_bp.route('/2fa/verificar', methods=['POST'])
 @limiter.limit('10 per minute')
+@limiter.limit('5 per minute;20 per hour', key_func=chave_por_usuario)
 def verificar_2fa():
     user, op, err = _exigir_operador(exigir_2fa=False)
     if err:

@@ -87,6 +87,14 @@ def create_app(config_name='development'):
     # Database
     db.init_app(app)
 
+    # Atrás de proxy reverso (Caddy na VPS, Railway): sem isto todo request
+    # chega com o IP do proxy e o rate limit vira um limite GLOBAL — qualquer
+    # um bloqueia o login de todos. TRUST_PROXY_HOPS = nº de proxies na frente.
+    hops = int(os.getenv('TRUST_PROXY_HOPS', '1' if is_production else '0'))
+    if hops > 0:
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops, x_host=hops)
+
     # Rate limiting (login/forgot-password — ver decorators em routes/auth.py)
     limiter.init_app(app)
 
@@ -277,7 +285,14 @@ def create_app(config_name='development'):
         # Health check
         @app.route('/health', methods=['GET'])
         def health():
-            return jsonify({'status': 'ok', 'db': 'connected'}), 200
+            # Consulta o banco de verdade — antes respondia "connected" fixo
+            # e o monitoramento não via uma queda do Postgres.
+            try:
+                db.session.execute(db.text('SELECT 1'))
+                return jsonify({'status': 'ok', 'db': 'connected'}), 200
+            except Exception:
+                db.session.rollback()
+                return jsonify({'status': 'erro', 'db': 'indisponivel'}), 503
         
         # Serve frontend
         @app.route('/index.html', methods=['GET'])
@@ -290,6 +305,38 @@ def create_app(config_name='development'):
         def home():
             return send_from_directory(basedir, 'index.html')
     
+    # Cabeçalhos de segurança. O SPA usa scripts e onclick inline, então a CSP
+    # ainda precisa de 'unsafe-inline' em script-src; mesmo assim ela restringe
+    # de onde scripts/frames/conexões podem vir, bloqueia <object>/<base> e
+    # impede que o site seja embutido em outro (clickjacking).
+    csp = '; '.join([
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net "
+        "https://www.youtube.com https://s.ytimg.com https://player.vimeo.com",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' data: https://fonts.gstatic.com",
+        "img-src 'self' data: blob: https:",
+        "media-src 'self' blob: https:",
+        "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com",
+        "worker-src 'self' blob: https://cdnjs.cloudflare.com",
+        "connect-src 'self' https://cdnjs.cloudflare.com",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "frame-ancestors 'self'",
+    ])
+
+    @app.after_request
+    def _cabecalhos_de_seguranca(resp):
+        resp.headers.setdefault('Content-Security-Policy', csp)
+        resp.headers.setdefault('X-Content-Type-Options', 'nosniff')
+        resp.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+        resp.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+        resp.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+        if is_production:
+            resp.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+        return resp
+
     return app
 
 # ──────────────────────────────────────────────────────

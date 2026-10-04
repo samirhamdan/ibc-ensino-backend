@@ -7,6 +7,7 @@ de auditoria na MESMA transação da mudança (UX_OPERADOR_SAAS §4.6).
 Hoje a app conecta com role BYPASSRLS (docs/RUNBOOK-RLS.md); quando o RLS for
 ativado, estas consultas precisam de uma conexão de operador (DEBITOS #26).
 """
+import os
 import re
 import secrets
 from contextlib import contextmanager
@@ -137,6 +138,7 @@ def pulso():
         'tecnico': {
             'db_ok': True,
             'db_latencia_ms': latencia_db,
+            'email_ok': bool(os.getenv('SMTP_USER') and os.getenv('SMTP_PASS')),
             'migracao': migracao,
             'semaforo': 'verde' if latencia_db < 200 else 'amarelo',
         },

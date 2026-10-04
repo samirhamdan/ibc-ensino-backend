@@ -6,8 +6,8 @@ import smtplib
 from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from flask import Blueprint, request, jsonify, session
-from extensions import db, limiter
+from flask import Blueprint, request, jsonify, session, current_app
+from extensions import db, limiter, chave_por_email
 from core.tenancy import (current_tenant_id, role_no_tenant, vincular_usuario_ao_tenant,
                           usuarios_do_tenant_query, get_user_scoped_or_404,
                           tenant_user_ou_none)
@@ -70,6 +70,7 @@ def signup():
 
 @auth_bp.route('/login', methods=['POST'])
 @limiter.limit('10 per minute')
+@limiter.limit('5 per minute;20 per hour', key_func=chave_por_email)
 def login():
     data = request.get_json(silent=True) or {}
     email = (data.get('email') or '').strip().lower()
@@ -302,41 +303,50 @@ def register():
     return jsonify({'success': True, 'message': 'Conta criada com sucesso! Faça login para continuar.'}), 201
 
 
+SMTP_TIMEOUT_S = 10
+
+
+def smtp_configurado():
+    return bool(os.getenv('SMTP_USER') and os.getenv('SMTP_PASS'))
+
+
 def _send_reset_email(to_email, to_name, reset_url):
-    """Send password reset email via SMTP (Gmail)."""
+    """Envia o e-mail de redefinição via SMTP (com timeout: um servidor de
+    e-mail travado não pode prender uma thread do gunicorn)."""
+    from html import escape
     smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
     smtp_port = int(os.getenv('SMTP_PORT', 587))
     smtp_user = os.getenv('SMTP_USER', '')
     smtp_pass = os.getenv('SMTP_PASS', '')
-    from_name = os.getenv('EMAIL_FROM_NAME', 'IBC Ensino')
+    from_name = os.getenv('EMAIL_FROM_NAME', 'XR Educação')
 
     if not smtp_user or not smtp_pass:
         return False, 'Email não configurado no servidor'
 
     html = f"""
     <div style="font-family:sans-serif;max-width:500px;margin:auto;padding:2rem">
-      <h2 style="color:#1a2e52">🔑 Redefinição de Senha</h2>
-      <p>Olá, <strong>{to_name}</strong>!</p>
-      <p>Recebemos uma solicitação para redefinir sua senha na plataforma <strong>IBC Ensino</strong>.</p>
+      <h2 style="color:#1b1830">Redefinição de senha</h2>
+      <p>Olá, <strong>{escape(to_name or '')}</strong>!</p>
+      <p>Recebemos uma solicitação para redefinir sua senha na plataforma <strong>{escape(from_name)}</strong>.</p>
       <div style="text-align:center;margin:2rem 0">
-        <a href="{reset_url}" style="background:#c9a84c;color:#fff;padding:.9rem 2rem;border-radius:8px;text-decoration:none;font-weight:bold;font-size:1rem">
+        <a href="{escape(reset_url)}" style="background:#7a4fc2;color:#fff;padding:.9rem 2rem;border-radius:8px;text-decoration:none;font-weight:bold;font-size:1rem">
           Redefinir minha senha
         </a>
       </div>
       <p style="color:#666;font-size:.85rem">Este link expira em <strong>1 hora</strong>. Se você não solicitou, ignore este email.</p>
       <hr style="border:none;border-top:1px solid #eee;margin:1.5rem 0">
-      <p style="color:#999;font-size:.75rem;text-align:center">IBC Ensino — Igreja Batista Central</p>
+      <p style="color:#999;font-size:.75rem;text-align:center">{escape(from_name)}</p>
     </div>
     """
 
     msg = MIMEMultipart('alternative')
-    msg['Subject'] = 'Redefinição de senha — IBC Ensino'
+    msg['Subject'] = f'Redefinição de senha — {from_name}'
     msg['From'] = f'{from_name} <{smtp_user}>'
     msg['To'] = to_email
     msg.attach(MIMEText(html, 'html'))
 
     try:
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=SMTP_TIMEOUT_S) as server:
             server.starttls()
             server.login(smtp_user, smtp_pass)
             server.sendmail(smtp_user, to_email, msg.as_string())
@@ -347,6 +357,7 @@ def _send_reset_email(to_email, to_name, reset_url):
 
 @auth_bp.route('/forgot-password', methods=['POST'])
 @limiter.limit('5 per hour')
+@limiter.limit('3 per hour', key_func=chave_por_email)
 def forgot_password():
     data = request.get_json(silent=True) or {}
     email = (data.get('email') or '').strip().lower()
@@ -359,6 +370,13 @@ def forgot_password():
     # diferença de status (e de tempo, por causa do envio síncrono) permitia
     # inferir quais e-mails têm conta. Falha de envio agora só é logada.
     resposta_padrao = jsonify({'message': 'Se o email existir, você receberá as instruções.'})
+
+    # Sem SMTP no servidor nenhum e-mail sai — dizer "você receberá" seria
+    # mentir. A resposta é a mesma para qualquer e-mail (não revela contas).
+    if not smtp_configurado():
+        current_app.logger.error('forgot-password: SMTP não configurado (SMTP_USER/SMTP_PASS)')
+        return jsonify({'error': 'A recuperação de senha por e-mail está indisponível no momento. '
+                                 'Fale com o administrador da sua escola para redefinir sua senha.'}), 503
 
     user = User.query.filter_by(email=email).first()
     if not user:

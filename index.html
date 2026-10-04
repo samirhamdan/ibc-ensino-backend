@@ -866,7 +866,7 @@ async function doForgotPassword(){
   if(res.ok){
     document.getElementById('forgot-email-field').style.display='none';
     document.getElementById('forgot-btn').style.display='none';
-    document.getElementById('forgot-sub').textContent='✅ Instruções enviadas! Verifique seu email (incluindo spam).';
+    document.getElementById('forgot-sub').textContent='Se este e-mail estiver cadastrado, você vai receber um link para criar uma nova senha. Confira também a caixa de spam.';
     document.getElementById('forgot-error').textContent='';
   } else {
     const d=await res.json();
@@ -1334,7 +1334,7 @@ function renderAulaPage(){
         </div>
       </div>
       <div class="material-item-actions">
-        ${m.tipo==='pdf'?`<button class="btn btn-outline" onclick="openPdfViewer(${m.id},'${m.name.replace(/'/g,"\\'")}')">${icon('book','14')} Abrir Viewer</button>`:''}
+        ${m.tipo==='pdf'?`<button class="btn btn-outline" onclick="openPdfViewer(${m.id},${jsAttr(m.name)})">${icon('book','14')} Abrir Viewer</button>`:''}
         <a class="btn btn-outline" href="${safeUrl(m.url)}" target="_blank" rel="noopener">${m.tipo==='pdf'?icon('download','14')+' Baixar':icon('share','14')+' Abrir'}</a>
       </div>
     </div>`).join('');
@@ -1510,7 +1510,7 @@ function renderAulaPage(){
     <nav class="breadcrumb">
       <a onclick="detectarPerfilEAtualizarDashboard()">${icon('home','14')} Meu Painel</a>
       <span>›</span>
-      <a onclick="selectCourse(${a.course.id})">${a.course.icon} ${a.course.name}</a>
+      <a onclick="selectCourse(${a.course.id})">${escapeHtml(a.course.icon)} ${escapeHtml(a.course.name)}</a>
       <span>›</span>
       <span class="breadcrumb-current">Aula ${num} de ${total}</span>
     </nav>
@@ -1636,7 +1636,8 @@ async function openPdfViewer(materialId, materialName){
   },1000);
 
   try{
-    const loadingTask = pdfjsLib.getDocument(meta.file_url);
+    // isEvalSupported:false — mitigação oficial do CVE-2024-4367 (PDF malicioso executando JS) no pdf.js 3.x
+    const loadingTask = pdfjsLib.getDocument({ url: meta.file_url, isEvalSupported: false });
     pdfViewerState.pdf = await loadingTask.promise;
     pdfViewerState.totalPages = pdfViewerState.pdf.numPages;
     document.getElementById('pdf-goto-input').max = pdfViewerState.totalPages;
@@ -1884,7 +1885,7 @@ async function renderConclusion(){
       ${certCode?`<div style="margin:.8rem 0;font-size:.85rem;color:var(--muted)">Código: <strong>${certCode}</strong></div>`:''}
       <div style="margin-top:1.5rem;display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap">
         ${certCode?`<button class="btn btn-primary" onclick="downloadCertificate('${certCode}')">${icon('download','18')} Baixar Certificado</button>`:''}
-        ${certCode?`<button class="btn btn-success" onclick="shareWhatsApp({cert_code:'${certCode}',title:'${c.name.replace(/'/g,"\\'")}' })">${icon('share','16','icon--success')} Compartilhar</button>`:''}
+        ${certCode?`<button class="btn btn-success" onclick="shareWhatsApp({cert_code:${jsAttr(certCode)},title:${jsAttr(c.name)}})">${icon('share','16','icon--success')} Compartilhar</button>`:''}
         <button class="btn btn-secondary" onclick="selectCourse(${c.id})">Voltar ao curso</button>
         <button class="btn btn-secondary" onclick="showCatalog()">Ver outros cursos</button>
       </div>
@@ -2216,7 +2217,7 @@ function renderMaterial(){
       <div class="pdf-toolbar">
         <div class="pdf-toolbar-left">
           <span class="pdf-badge">PDF</span>
-          <span class="pdf-filename">${mats[viewingPDF].name}</span>
+          <span class="pdf-filename">${escapeHtml(mats[viewingPDF].name)}</span>
         </div>
         <button class="btn-sm" style="border-color:#dde;background:#f5f5f5;color:var(--text)" onclick="viewingPDF=null;renderTabContent()">✕ Fechar</button>
       </div>
@@ -2719,7 +2720,7 @@ async function openTrailEditor(trailId) {
         <div class="add-course-row">
           <select id="addCourseSelect" class="form-control">
             <option value="">Selecionar curso para adicionar...</option>
-            ${available.map(c => '<option value="'+c.id+'">'+c.name+'</option>').join('')}
+            ${available.map(c => '<option value="'+c.id+'">'+escapeHtml(c.name)+'</option>').join('')}
           </select>
           <button class="btn btn-outline" onclick="addCourseToTrail()">${icon('plus','16')} Adicionar</button>
         </div>
@@ -3118,7 +3119,7 @@ async function loadCourseDesempenho(courseId) {
         const abandon = pctAbandono(m);
         const isWorst = piorModulo && m.module_id === piorModulo.module_id && abandon > 30;
         return `<div class="desemp-funil-row${isWorst?' desemp-funil-worst':''}">
-          <div class="desemp-funil-label">${i+1}. ${m.nome}</div>
+          <div class="desemp-funil-label">${i+1}. ${escapeHtml(m.nome)}</div>
           <div class="desemp-funil-bars">
             <div class="desemp-bar desemp-bar-ini" style="width:${Math.max(pctIni,2)}%"><span>${m.iniciaram}</span></div>
             <div class="desemp-bar desemp-bar-con" style="width:${Math.max(pctCon,2)}%"><span>${m.concluiram}</span></div>
@@ -3137,7 +3138,7 @@ async function loadCourseDesempenho(courseId) {
     </div>
     ${piorModulo && pctAbandono(piorModulo) > 30 ? `
     <div class="desemp-cta">
-      ${icon('lightbulb','16')} O módulo <strong>${piorModulo.nome}</strong> concentra ${pctAbandono(piorModulo)}% do abandono.
+      ${icon('lightbulb','16')} O módulo <strong>${escapeHtml(piorModulo.nome)}</strong> concentra ${pctAbandono(piorModulo)}% do abandono.
       <a href="#" onclick="event.preventDefault();toggleLessonAccordion(${piorModulo.module_id})">Revisar conteúdo</a>
     </div>` : ''}`;
 }
@@ -3360,7 +3361,7 @@ async function adminAddMaterial(lessonId) {
       const div = document.createElement('div');
       div.className = 'material-edit-item';
       div.id = 'matItem_' + mat.id;
-      div.innerHTML = '<span class="material-info">'+icon('document-text','14')+' '+mat.name+'</span><button class="btn-icon-only" onclick="adminRemoveMaterial('+mat.id+','+lessonId+')">'+icon('x-circle','16')+'</button>';
+      div.innerHTML = '<span class="material-info">'+icon('document-text','14')+' '+escapeHtml(mat.name)+'</span><button class="btn-icon-only" onclick="adminRemoveMaterial('+mat.id+','+lessonId+')">'+icon('x-circle','16')+'</button>';
       list.appendChild(div);
     }
     if (nameEl) nameEl.value = '';
@@ -3385,7 +3386,7 @@ async function adminAddMaterial(lessonId) {
       const div = document.createElement('div');
       div.className = 'material-edit-item';
       div.id = 'matItem_' + mat.id;
-      div.innerHTML = '<span class="material-info">'+icon('file','14')+' '+mat.name+'</span><button class="btn-icon-only" onclick="adminRemoveMaterial('+mat.id+','+lessonId+')">'+icon('x-circle','16')+'</button>';
+      div.innerHTML = '<span class="material-info">'+icon('file','14')+' '+escapeHtml(mat.name)+'</span><button class="btn-icon-only" onclick="adminRemoveMaterial('+mat.id+','+lessonId+')">'+icon('x-circle','16')+'</button>';
       list.appendChild(div);
     }
     showToast('PDF adicionado!', 'success');
@@ -4566,7 +4567,7 @@ function renderDashboard(){
     +'<div class="admin-section"><div class="admin-section-header">'+icon('books','16','icon--books')+' Cursos disponíveis</div>'
     +'<div class="admin-section-body" style="padding:0">'
     +'<table class="table-users"><thead><tr><th>Curso</th><th>Categoria</th><th>Acesso</th></tr></thead>'
-    +'<tbody>'+courses.map(c=>'<tr><td>'+(c.icon||'📚')+' '+c.name+'</td><td><span class="badge-cat">'+(c.tag||'—')+'</span></td><td>'+(c.acesso==='publico'?'🌐 Público':'✝️ Interno')+'</td></tr>').join('')+'</tbody></table>'
+    +'<tbody>'+courses.map(c=>'<tr><td>'+escapeHtml(c.icon||'📚')+' '+escapeHtml(c.name)+'</td><td><span class="badge-cat">'+escapeHtml(c.tag||'—')+'</span></td><td>'+(c.acesso==='publico'?'🌐 Público':'✝️ Interno')+'</td></tr>').join('')+'</tbody></table>'
     +'</div></div>';
 }
 
@@ -4758,7 +4759,7 @@ async function showBadgesPage(){
   const locked = badges.filter(b=>!b.unlocked);
   const card=(b)=>`
     <div style="background:white;border:1px solid #e8e0d4;border-radius:8px;padding:.8rem 1rem;display:flex;gap:.8rem;align-items:flex-start;margin-bottom:.6rem;${b.unlocked?'':'opacity:.6'}">
-      <div style="font-size:1.8rem">${b.unlocked?'✅':'❌'} ${b.icon}</div>
+      <div style="font-size:1.8rem">${b.unlocked?'✅':'❌'} ${escapeHtml(b.icon)}</div>
       <div>
         <div style="font-weight:700;color:var(--navy);font-family:var(--font-display)">${escapeHtml(b.name)}</div>
         <div style="font-size:.78rem;color:var(--muted)">${escapeHtml(b.description||'')}</div>
@@ -4857,7 +4858,7 @@ async function _renderAdminDashboardInner(){
       <div class="card-header"><h3 class="card-title">${icon('clock','16')} Atividades Recentes</h3></div>
       <div class="card-body">
         <div class="activity-list">
-          ${recentActivities.length?recentActivities.map(a=>`<div class="activity-item"><div class="activity-dot"></div><div class="activity-text"><strong>${a.user}</strong> ${a.action}</div><div class="activity-time">${a.timestamp?new Date(a.timestamp).toLocaleString('pt-BR'):''}</div></div>`).join(''):'<p style="color:var(--gray);font-size:var(--text-sm)">Nenhuma atividade recente.</p>'}
+          ${recentActivities.length?recentActivities.map(a=>`<div class="activity-item"><div class="activity-dot"></div><div class="activity-text"><strong>${escapeHtml(a.user)}</strong> ${escapeHtml(a.action)}</div><div class="activity-time">${a.timestamp?new Date(a.timestamp).toLocaleString('pt-BR'):''}</div></div>`).join(''):'<p style="color:var(--gray);font-size:var(--text-sm)">Nenhuma atividade recente.</p>'}
         </div>
       </div>
     </div>
@@ -5423,8 +5424,8 @@ async function _renderDiscoverDashboard(){
   const body=document.getElementById('externo-dash-body');
   const stars=(n)=>'⭐'.repeat(Math.round(n))+'☆'.repeat(5-Math.round(n));
   body.innerHTML=`
-    ${d.user_stats?`<div class="card" style="border-left:4px solid var(--primary);margin-bottom:var(--space-xl)"><div class="card-body" style="display:flex;align-items:center;gap:var(--space-lg);flex-wrap:wrap"><span class="level-badge">⭐ Nível ${d.user_stats.level}: ${d.user_stats.level_name}</span><span style="font-size:var(--text-sm);color:var(--gray-dark)">${d.user_stats.points_in_level} pontos</span><span style="font-size:var(--text-sm);color:var(--gray-dark)">🏆 ${d.trofeus_count} conquista(s)</span></div></div>`:''}
-    ${d.in_progress?`<div class="card" style="border-left:4px solid var(--primary);margin-bottom:var(--space-xl)"><div class="card-body"><h3 class="card-title">🚀 Continue Estudando</h3><div style="margin:var(--space-md) 0;font-size:var(--text-sm);font-weight:var(--fw-semibold);color:var(--dark)">${d.in_progress.icon} ${d.in_progress.name} — Aula ${d.in_progress.aula}/${d.in_progress.total}</div><div class="progress progress-sm" style="margin-bottom:var(--space-md)"><div class="progress-bar" style="width:${d.in_progress.percentage}%"></div></div><button class="btn btn-primary" onclick="selectCourse(${d.in_progress.id})">🚀 Continuar Aula</button></div></div>`:''}
+    ${d.user_stats?`<div class="card" style="border-left:4px solid var(--primary);margin-bottom:var(--space-xl)"><div class="card-body" style="display:flex;align-items:center;gap:var(--space-lg);flex-wrap:wrap"><span class="level-badge">⭐ Nível ${d.user_stats.level}: ${escapeHtml(d.user_stats.level_name)}</span><span style="font-size:var(--text-sm);color:var(--gray-dark)">${d.user_stats.points_in_level} pontos</span><span style="font-size:var(--text-sm);color:var(--gray-dark)">🏆 ${d.trofeus_count} conquista(s)</span></div></div>`:''}
+    ${d.in_progress?`<div class="card" style="border-left:4px solid var(--primary);margin-bottom:var(--space-xl)"><div class="card-body"><h3 class="card-title">🚀 Continue Estudando</h3><div style="margin:var(--space-md) 0;font-size:var(--text-sm);font-weight:var(--fw-semibold);color:var(--dark)">${escapeHtml(d.in_progress.icon)} ${escapeHtml(d.in_progress.name)} — Aula ${d.in_progress.aula}/${d.in_progress.total}</div><div class="progress progress-sm" style="margin-bottom:var(--space-md)"><div class="progress-bar" style="width:${d.in_progress.percentage}%"></div></div><button class="btn btn-primary" onclick="selectCourse(${d.in_progress.id})">🚀 Continuar Aula</button></div></div>`:''}
     <div class="dash-section">
       <div class="dash-section-title">🌟 Descubra Cursos</div>
       <div class="course-card-grid">${d.featured_courses.map(c=>`<div class="course-card-new stagger-item" onclick="selectCourse(${c.id})"><div class="course-image">${c.icon||'📚'}</div><div class="course-body"><div class="course-category">${escapeHtml(c.category)}</div><div class="course-name">${escapeHtml(c.name)}</div><div style="font-size:var(--text-xs);margin:var(--space-xs) 0">${stars(c.rating)} <span style="color:var(--gray)">(${c.review_count})</span></div><div class="course-meta-row"><span>📋 ${c.lessons} aula(s)</span><span style="color:var(--success)">Gratuito ✅</span></div></div><div class="course-footer"><button class="btn btn-primary btn-sm btn-full" onclick="event.stopPropagation();selectCourse(${c.id})">Começar Agora</button></div></div>`).join('')}</div>
@@ -6010,7 +6011,7 @@ async function renderTrailSelection(container){
         <div class="trail-grid" id="trailGrid">
           ${trails.map(t=>`
             <div class="trail-card stagger-item" onclick="enrollTrail(${t.id})">
-              <span class="trail-card-icon">${t.icon}</span>
+              <span class="trail-card-icon">${escapeHtml(t.icon)}</span>
               <div class="trail-card-name">${escapeHtml(t.name)}</div>
               <div class="trail-card-description">${escapeHtml(t.description)}</div>
               <div class="trail-card-meta">
@@ -6060,7 +6061,7 @@ function renderTrailProgress(container, trail, extraTrailsCount){
   container.innerHTML = `
     <div class="trail-progress-card" style="margin-bottom:var(--space-xl)">
       <div class="trail-progress-header">
-        <span class="trail-progress-icon">${trail.icon}</span>
+        <span class="trail-progress-icon">${escapeHtml(trail.icon)}</span>
         <div>
           <div class="trail-progress-name">${escapeHtml(trail.name)}</div>
           <div class="trail-progress-sub">${done}/${total} cursos · ${pct}% concluído</div>
@@ -6160,7 +6161,7 @@ async function renderTrilhasPage(){
 
   const inProgressHtml = my.in_progress.length ? my.in_progress.map(t=>`
     <div class="trail-row-card">
-      <span class="trail-row-icon">${t.icon}</span>
+      <span class="trail-row-icon">${escapeHtml(t.icon)}</span>
       <div class="trail-row-info">
         <div class="trail-row-name">${escapeHtml(t.name)}</div>
         <div class="trail-row-sub">Passo ${Math.min(t.done_count+1, t.total_courses)} de ${t.total_courses} · ${t.percentage}%</div>
@@ -6173,7 +6174,7 @@ async function renderTrilhasPage(){
   const availableHtml = available.length ? `<div class="trail-grid">
     ${available.map(t=>`
       <div class="trail-card stagger-item">
-        <span class="trail-card-icon">${t.icon}</span>
+        <span class="trail-card-icon">${escapeHtml(t.icon)}</span>
         <div class="trail-card-name">${escapeHtml(t.name)}</div>
         <div class="trail-card-description">${escapeHtml(t.description)}</div>
         <div class="trail-card-meta">
@@ -6319,7 +6320,7 @@ async function renderMeuPerfil(){
 
       <div class="profile-stats-grid">
         <div class="profile-stat-card"><div class="psc-value">${stats.total_points}</div><div class="psc-label">${icon('points','14','icon--gold')} Pontos</div></div>
-        <div class="profile-stat-card"><div class="psc-value">${stats.current_level}</div><div class="psc-label">Nível — ${stats.level_name}</div></div>
+        <div class="profile-stat-card"><div class="psc-value">${stats.current_level}</div><div class="psc-label">Nível — ${escapeHtml(stats.level_name)}</div></div>
         <div class="profile-stat-card"><div class="psc-value">${stats.lessons_completed}</div><div class="psc-label">Aulas Concluídas</div></div>
         <div class="profile-stat-card"><div class="psc-value">${stats.courses_completed}</div><div class="psc-label">Cursos Concluídos</div></div>
         <div class="profile-stat-card"><div class="psc-value">${stats.trails_completed}</div><div class="psc-label">Trilhas Concluídas</div></div>
@@ -6665,7 +6666,7 @@ async function onboardingNext(){
         if(recDiv && _recommendedTrail){
           recDiv.innerHTML = `
             <div class="onboarding-recommendation">
-              <span class="onboarding-rec-icon">${_recommendedTrail.icon}</span>
+              <span class="onboarding-rec-icon">${escapeHtml(_recommendedTrail.icon)}</span>
               <div class="onboarding-rec-name">${escapeHtml(_recommendedTrail.name)}</div>
               <div class="onboarding-rec-desc">${escapeHtml(_recommendedTrail.description)}</div>
             </div>`;

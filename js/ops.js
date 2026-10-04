@@ -113,6 +113,7 @@
           <dl class="ops-dl">
             <dt>Banco de dados</dt><dd>${t.db_ok ? 'Conectado' : 'Fora do ar'} · ${t.db_latencia_ms} ms</dd>
             <dt>Migração do banco</dt><dd><code>${esc(t.migracao || '—')}</code></dd>
+            <dt>E-mail (SMTP)</dt><dd>${t.email_ok ? 'Configurado' : '<span class="ops-selo ops-selo-bad">Não configurado — recuperação de senha indisponível</span>'}</dd>
           </dl>
         </section>
         <section class="ops-card">
