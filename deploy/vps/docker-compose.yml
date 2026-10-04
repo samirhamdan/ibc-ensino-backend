@@ -1,0 +1,43 @@
+name: xr-educacao
+
+services:
+  app:
+    build: ../..
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://xr:${POSTGRES_PASSWORD}@db:5432/xr
+      REDIS_URL: redis://redis:6379/0
+      UPLOAD_FOLDER: /data/uploads
+    volumes:
+      - uploads:/data/uploads
+    # Caddy (container do sdr-agent) alcança o host pelo gateway 172.18.0.1,
+    # mesmo padrão do bloco morumbifestas (porta 5001). Não expõe na internet.
+    ports:
+      - "172.18.0.1:5003:8000"
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: xr
+      POSTGRES_DB: xr
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xr -d xr"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  uploads:

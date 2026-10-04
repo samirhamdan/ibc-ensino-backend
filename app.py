@@ -40,7 +40,10 @@ def create_app(config_name='development'):
     # Config
     basedir = os.path.abspath(os.path.dirname(__file__))
     instance_dir = os.path.join(basedir, 'instance')
-    if is_production:
+    if os.getenv('UPLOAD_FOLDER'):
+        # VPS: volume persistente montado no container
+        uploads_dir = os.getenv('UPLOAD_FOLDER')
+    elif is_production:
         # Vercel só permite escrita em /tmp (efêmero entre invocações)
         uploads_dir = '/tmp/uploads'
     else:

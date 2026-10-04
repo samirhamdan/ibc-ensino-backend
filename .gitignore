@@ -19,3 +19,5 @@ rehearsal-*.log
 rehearsal-backup-*.dump
 rehearsal-backup-*.sql
 .venv/
+deploy/vps/.env
+deploy/vps/backups/
