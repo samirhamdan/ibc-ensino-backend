@@ -4821,108 +4821,95 @@ async function _renderAdminDashboardInner(){
 async function renderAdminHoje(){
   const el=document.getElementById('main-content');
   if(!el) return;
-  el.innerHTML=`<div class="admin-hoje">
-    <div class="admin-hoje-heading">${icon('bar-chart','20')} Dashboard</div>
-    <div class="admin-hoje-search-wrap">
-      ${icon('search','16')}
-      <input type="text" class="admin-hoje-search" id="admin-global-search" placeholder="Buscar aluno por nome ou e-mail..." onkeydown="if(event.key==='Enter')_adminGlobalSearch()">
-    </div>
-    <div id="admin-hoje-body"><div class="alert alert-info"><span class="alert-icon">${icon('clock','16')}</span><div class="alert-body">Carregando...</div></div></div>
-  </div>`;
+  el.innerHTML=`<div class="admin-hoje" id="admin-hoje-body"><div class="alert alert-info"><span class="alert-icon">${icon('clock','16')}</span><div class="alert-body">Carregando...</div></div></div>`;
   try {
-  const res=await api('GET','/admin/dashboard');
-  if(!res.ok){
-    document.getElementById('admin-hoje-body').innerHTML=`<div class="alert alert-danger"><span class="alert-icon">${icon('x-circle','16')}</span><div class="alert-body">Não foi possível carregar o painel.</div></div><button class="btn btn-outline" onclick="renderAdminHoje()" style="margin-top:var(--space-sm)">Tentar de novo</button>`;
-    return;
-  }
-  const d=await res.json();
-  const alerts=d.alerts||[];
-  const pulso=d.pulso||{};
-  const recent=d.recent_activities||[];
-  const tu=d.total_users||{};
-  const body=document.getElementById('admin-hoje-body');
-  body.innerHTML=`
-    ${_renderKpiRow(tu, d.total_courses||0, d.completion_rate||0, d.new_users_7d||0)}
-    ${_renderPulso(pulso)}
-    <div class="admin-hoje-grid">
-      <div>
-        ${_renderFilaAtencao(alerts)}
+    const res=await api('GET','/admin/dashboard');
+    const body=document.getElementById('admin-hoje-body');
+    if(!res.ok){
+      body.innerHTML=`<div class="alert alert-danger"><span class="alert-icon">${icon('x-circle','16')}</span><div class="alert-body">Não foi possível carregar o painel.</div></div><button class="btn btn-outline" onclick="renderAdminHoje()" style="margin-top:var(--space-sm)">Tentar de novo</button>`;
+      return;
+    }
+    const d=await res.json();
+    const ord={high:0,warn:1,info:2};
+    const fila=(d.alerts||[]).filter(a=>a.titulo).sort((a,b)=>(ord[a.severity]??2)-(ord[b.severity]??2));
+    _adminFila=fila;
+    const feitos=_adminFeitosHoje();
+    const pendentes=fila.filter(a=>!feitos.includes(a.type)).length;
+    const h=new Date().getHours();
+    const saud=h<12?'Bom dia':h<18?'Boa tarde':'Boa noite';
+    const nome=(currentUser&&currentUser.name||'').split(' ')[0];
+    body.innerHTML=`
+      <div class="admin-hoje-head">
+        <div>
+          <h1 class="admin-hoje-titulo">${saud}${nome?', '+escapeHtml(nome):''}</h1>
+          <p class="admin-hoje-sub">${pendentes?`${pendentes} ${pendentes===1?'coisa precisa':'coisas precisam'} de você hoje.`:'Tudo em dia por hoje.'}</p>
+        </div>
+        <button class="btn btn-outline" onclick="showAdminPanel('dashboard')">Ver relatórios</button>
       </div>
-      <div>
-        ${_renderAtividadeRecente(recent)}
-      </div>
-    </div>`;
+      ${_renderEngajamento(d.pulso||{}, (d.total_users||{}).alunos||0)}
+      ${_renderFilaAtencao(fila, feitos)}
+      <p class="admin-hoje-rodape"><a onclick="showAdminPanel('dashboard')">Matrículas, tendências e desempenho detalhado estão em Relatórios →</a></p>`;
   } catch(e){ console.error('[ERRO] renderAdminHoje:', e); _renderDashboardError(e, 'painel admin'); }
 }
 
-function _renderKpiRow(users, totalCourses, completionRate, newUsers7d){
-  const kpis=[
-    {label:'Total de Alunos',value:users.alunos||0,icon:'users',color:'var(--brand-primary,#008ea8)'},
-    {label:'Cursos Publicados',value:totalCourses,icon:'books',color:'var(--success,#10b981)'},
-    {label:'Taxa de Conclusão',value:completionRate+'%',icon:'checkmark-circle',color:'var(--warning,#f59e0b)'},
-    {label:'Novos (7d)',value:newUsers7d,icon:'rocket',color:'var(--brand-primary,#008ea8)'},
-  ];
-  return `<div class="admin-kpi-row">
-    ${kpis.map(k=>`<div class="admin-kpi-card">
-      <div class="admin-kpi-icon" style="background:${k.color}15;color:${k.color}">${icon(k.icon,'22')}</div>
-      <div class="admin-kpi-body">
-        <div class="admin-kpi-value">${k.value}</div>
-        <div class="admin-kpi-label">${escapeHtml(k.label)}</div>
-      </div>
-    </div>`).join('')}
-  </div>`;
+let _adminFila=[];
+function _adminChaveHoje(){ return 'admin-feitos-'+new Date().toISOString().slice(0,10); }
+function _adminFeitosHoje(){ try{ return JSON.parse(localStorage.getItem(_adminChaveHoje())||'[]'); }catch(e){ return []; } }
+function _adminMarcarFeito(tipo){
+  try{ const f=_adminFeitosHoje(); if(!f.includes(tipo)){ f.push(tipo); localStorage.setItem(_adminChaveHoje(), JSON.stringify(f)); } }catch(e){}
 }
 
-function _renderFilaAtencao(alerts){
-  const severityIcon={high:'x-circle',warn:'lightbulb',info:'checkmark-circle'};
-  if(!alerts.length){
-    return `<div class="admin-fila">
-      <div class="admin-fila-title">${icon('target','16')} Fila de Atenção</div>
-      <div class="admin-fila-empty">${icon('checkmark-circle','16')} Tudo em dia. Nenhuma ação pendente.</div>
-    </div>`;
-  }
-  const highFirst=[...alerts].sort((a,b)=>{
-    const ord={high:0,warn:1,info:2};
-    return (ord[a.severity]||2)-(ord[b.severity]||2);
-  });
-  return `<div class="admin-fila">
-    <div class="admin-fila-title">${icon('target','16')} Fila de Atenção</div>
-    <div class="admin-fila-list">
-      ${highFirst.map(a=>`<div class="admin-fila-item" data-severity="${a.severity||'info'}">
-        <span class="admin-fila-icon">${icon(severityIcon[a.severity]||'checkmark-circle','16')}</span>
-        <span class="admin-fila-msg">${escapeHtml(a.message)}</span>
-        ${a.action_label?`<a class="admin-fila-action" onclick="showAdminPanel('${(a.action_target||'').split(':')[0]||'users'}')">${escapeHtml(a.action_label)}</a>`:''}
-      </div>`).join('')}
+function _renderEngajamento(p, totalAlunos){
+  const pct=p.engajamento_pct||0, prev=p.engajamento_prev||0, diff=pct-prev;
+  const ativos=p.alunos_ativos_7d||0;
+  const delta=diff>0?`<span class="badge-tom badge-ok">↑ ${diff} p.p.</span>`:diff<0?`<span class="badge-tom badge-bad">↓ ${Math.abs(diff)} p.p.</span>`:'';
+  return `<section class="admin-eng">
+    <div class="admin-eng-valor">
+      <span class="admin-eng-rotulo">Engajamento da semana</span>
+      <div class="admin-eng-numero"><strong>${pct}%</strong>${delta}</div>
     </div>
-  </div>`;
+    <div class="admin-eng-texto">
+      <p class="admin-eng-l1">${ativos} de ${totalAlunos} alunos estudaram nos últimos 7 dias.</p>
+      <p class="admin-eng-l2">É o número que mais prevê conclusão e renovação. Meta sugerida: acima de 70%.</p>
+    </div>
+    <div class="admin-eng-spark">${_svgSparkline((p.sparklines||{}).active)}</div>
+  </section>`;
 }
 
-function _renderPulso(p){
-  const cards=[
-    {label:'Alunos Ativos',sublabel:'últimos 7 dias',value:p.alunos_ativos_7d||0,prev:p.alunos_ativos_prev||0,spark:p.sparklines?.active},
-    {label:'Aulas Concluídas',sublabel:'esta semana',value:p.conclusoes_semana||0,prev:p.conclusoes_prev||0,spark:p.sparklines?.completions},
-    {label:'Engajamento',sublabel:'alunos ativos / total',value:(p.engajamento_pct||0)+'%',prev:p.engajamento_prev||0,spark:null,isPct:true},
-    {label:'Matrículas',sublabel:'esta semana',value:p.novos_semana||0,prev:p.novos_prev||0,spark:p.sparklines?.signups},
-  ];
-  return `<div class="admin-fila-title" style="margin-bottom:var(--space-sm)">${icon('bar-chart','16')} Tendência Semanal</div>
-    <div class="admin-pulso">
-      ${cards.map(c=>{
-        const numVal=typeof c.value==='string'?parseInt(c.value):c.value;
-        const numPrev=typeof c.prev==='string'?parseInt(c.prev):c.prev;
-        const diff=numVal-numPrev;
-        const cls=diff>0?'up':diff<0?'down':'neutral';
-        const pctChange=numPrev>0?Math.round(Math.abs(diff)/numPrev*100):diff!==0?100:0;
-        const arrow=diff>0?'↑':diff<0?'↓':'→';
-        const diffStr=diff===0?'Sem mudança':`${arrow} ${pctChange}% vs. anterior`;
-        return `<div class="admin-pulso-card">
-          <div class="admin-pulso-label">${escapeHtml(c.label)}</div>
-          <div class="admin-pulso-sublabel">${escapeHtml(c.sublabel||'')}</div>
-          <div class="admin-pulso-value">${c.value}</div>
-          <div class="admin-pulso-delta ${cls}">${diffStr}</div>
-          ${c.spark?`<div class="admin-pulso-sparkline">${_svgSparkline(c.spark)}</div>`:''}
-        </div>`;
-      }).join('')}
-    </div>`;
+function _renderFilaAtencao(fila, feitos){
+  const rot={high:['Urgente','badge-bad'],warn:['Atenção','badge-warn'],info:['Hoje','badge-info']};
+  const total=fila.length, ok=fila.filter(a=>feitos.includes(a.type)).length;
+  if(!total){
+    return `<section class="admin-fila-card"><div class="admin-fila-vazia">${icon('checkmark-circle','28')}<strong>Tudo em dia.</strong><span>Nenhuma ação pendente — volte amanhã.</span></div></section>`;
+  }
+  return `<section class="admin-fila-card">
+    <div class="admin-fila-head"><h2>Precisa de você hoje</h2><span>Concluídos hoje: ${ok} de ${total}</span></div>
+    ${fila.map((a,i)=>{
+      const feito=feitos.includes(a.type);
+      const [r,cls]=rot[a.severity]||rot.info;
+      return `<div class="admin-fila-row${feito?' feito':''}">
+        <span class="badge-tom ${feito?'badge-ok':cls}">${feito?'Feito':r}</span>
+        <div class="admin-fila-txt"><strong>${escapeHtml(a.titulo)}</strong><span>${escapeHtml(a.descricao||'')}</span></div>
+        <div class="admin-fila-acoes">${(a.acoes||[]).map((ac,k)=>`<button class="btn btn-sm ${ac.estilo==='primary'?'btn-primary':ac.estilo==='ghost'?'btn-ghost':'btn-outline'}" onclick="_adminExecutar(${i},${k},this)">${escapeHtml(ac.label)}</button>`).join('')}</div>
+      </div>`;
+    }).join('')}
+  </section>`;
+}
+
+async function _adminExecutar(i, k, btn){
+  const alerta=_adminFila[i]; if(!alerta) return;
+  const acao=(alerta.acoes||[])[k]; if(!acao) return;
+  if(acao.acao==='lembrete_inativos'){
+    btn.disabled=true; btn.textContent='Enviando…';
+    const r=await api('POST','/admin/lembrete-inativos');
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){ btn.disabled=false; btn.textContent=acao.label; showToast(d.error||'Não foi possível enviar.','error'); return; }
+    showToast(d.enviados?`Lembrete enviado para ${d.enviados} aluno(s).`:'Esses alunos já foram lembrados nas últimas 24h.','success');
+    _adminMarcarFeito(alerta.type); renderAdminHoje(); return;
+  }
+  _adminMarcarFeito(alerta.type);
+  if(acao.acao.startsWith('curso:')) return openCourseEditor(parseInt(acao.acao.split(':')[1]));
+  if(acao.acao.startsWith('painel:')) return showAdminPanel(acao.acao.split(':')[1]);
 }
 
 function _svgSparkline(data){
@@ -4937,34 +4924,7 @@ function _svgSparkline(data){
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}"/></svg>`;
 }
 
-function _adminGlobalSearch(){
-  const q=(document.getElementById('admin-global-search')||{}).value||'';
-  if(!q.trim()) return;
-  showAdminPanel('users');
-  setTimeout(()=>{
-    const inp=document.getElementById('users-search');
-    if(inp){inp.value=q;adminUsersLoad();}
-  },200);
-}
 
-function _renderAtividadeRecente(activities){
-  if(!activities.length){
-    return `<div class="admin-atividade">
-      <div class="admin-atividade-title">${icon('clock','16')} Atividade Recente</div>
-      <div class="admin-atividade-list"><div class="admin-atividade-empty">Nenhuma atividade nas últimas 24 horas.</div></div>
-    </div>`;
-  }
-  return `<div class="admin-atividade">
-    <div class="admin-atividade-title">${icon('clock','16')} Atividade Recente</div>
-    <div class="admin-atividade-list">
-      ${activities.map(a=>`<div class="admin-atividade-item">
-        <span class="admin-atividade-dot" data-type="${a.type||''}"></span>
-        <span class="admin-atividade-text"><strong>${escapeHtml(a.user||'')}</strong> ${escapeHtml(a.action||'')}</span>
-        <span class="admin-atividade-time">${a.timestamp?new Date(a.timestamp).toLocaleString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''}</span>
-      </div>`).join('')}
-    </div>
-  </div>`;
-}
 
 async function renderTutorPanelDashboard(){
   try { return await _renderTutorPanelDashboardInner(); }

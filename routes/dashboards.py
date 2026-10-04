@@ -90,6 +90,45 @@ def _batch_completion(tenant_id, course_ids=None, user_ids=None):
 
 # ── Admin ────────────────────────────────────────────────────────────────
 
+LEMBRETE_TITULO = 'Sentimos sua falta!'
+LEMBRETE_TEXTO = 'Faz alguns dias que você não estuda. Que tal continuar de onde parou? Uma aula hoje já faz diferença.'
+
+
+def _alunos_inativos(tid, agora, dias=7):
+    """Alunos do tenant sem aula registrada nos últimos `dias` dias: [(user_id, nome)]."""
+    ativos = db.session.query(db.func.distinct(LessonProgress.user_id)).filter(
+        LessonProgress.tenant_id == tid,
+        LessonProgress.completed_at >= agora - timedelta(days=dias))
+    return (db.session.query(User.id, User.name)
+            .join(TenantUser, TenantUser.user_id == User.id)
+            .filter(TenantUser.tenant_id == tid, TenantUser.papel == 'aluno',
+                    ~User.id.in_(ativos))
+            .order_by(User.name).all())
+
+
+@dashboards_bp.route('/admin/lembrete-inativos', methods=['POST'])
+def enviar_lembrete_inativos():
+    """Notifica alunos inativos. Quem já recebeu lembrete nas últimas 24h é pulado."""
+    user = _current_user()
+    if not user or role_no_tenant(user) != 'admin':
+        return jsonify({'error': 'Acesso negado'}), 403
+    from models import Notification
+    tid = current_tenant_id()
+    agora = datetime.utcnow()
+    inativos = _alunos_inativos(tid, agora)
+    recentes = {uid for (uid,) in db.session.query(Notification.user_id).filter(
+        Notification.tenant_id == tid, Notification.type == 'lembrete',
+        Notification.created_at >= agora - timedelta(hours=24))}
+    enviados = 0
+    for uid, _ in inativos:
+        if uid in recentes:
+            continue
+        db.session.add(Notification(user_id=uid, title=LEMBRETE_TITULO, message=LEMBRETE_TEXTO,
+                                    type='lembrete', created_by=user.id))
+        enviados += 1
+    db.session.commit()
+    return jsonify({'enviados': enviados, 'ja_lembrados': len(inativos) - enviados}), 200
+
 @dashboards_bp.route('/admin/dashboard', methods=['GET'])
 def admin_dashboard():
     user = _current_user()
@@ -202,53 +241,52 @@ def admin_dashboard():
         dropout = round((students - completed) / students * 100)
         if dropout >= 35:
             c = course_map.get(cid)
+            nome = c.name if c else str(cid)
             alerts.append({
                 'type': 'dropout',
-                'message': f'Curso "{c.name if c else cid}" com {dropout}% de abandono',
-                'severity': 'high',
+                'message': f'Curso "{nome}" com {dropout}% de abandono',
+                'titulo': f'{nome}: {dropout}% dos alunos não concluíram',
+                'descricao': f'{students - completed} de {students} alunos pararam no meio. O funil mostra em qual aula.',
+                'severity': 'warn',
                 'action_label': 'Ver ponto de abandono',
                 'action_target': f'courses:{cid}',
+                'acoes': [{'label': 'Ver funil', 'estilo': 'secondary', 'acao': f'curso:{cid}'}],
             })
 
-    inactive_7d = db.session.query(db.func.count(db.func.distinct(TenantUser.user_id))).filter(
-        TenantUser.tenant_id == tid,
-        TenantUser.papel == 'aluno',
-        ~TenantUser.user_id.in_(
-            db.session.query(db.func.distinct(LessonProgress.user_id)).filter(
-                LessonProgress.tenant_id == tid,
-                LessonProgress.completed_at >= now - timedelta(days=7))
-        )
-    ).scalar() or 0
-    if inactive_7d > 0:
+    inativos = _alunos_inativos(tid, now)
+    if inativos:
+        nomes = [n.split(' ')[0] for _, n in inativos[:3]]
+        resto = len(inativos) - len(nomes)
+        lista = ', '.join(nomes) + (f' e mais {resto}' if resto > 0 else '')
         alerts.append({
             'type': 'inactivity',
-            'message': f'{inactive_7d} alunos sem atividade nos ultimos 7 dias',
-            'severity': 'warn',
+            'message': f'{len(inativos)} alunos sem atividade nos últimos 7 dias',
+            'titulo': f'{len(inativos)} aluno{"s" if len(inativos) != 1 else ""} em risco de evasão',
+            'descricao': f'{lista} — sem estudar há 7+ dias. Um lembrete agora costuma trazer de volta.',
+            'severity': 'high',
             'action_label': 'Ver alunos',
             'action_target': 'users',
+            'acoes': [
+                {'label': 'Enviar lembrete', 'estilo': 'primary', 'acao': 'lembrete_inativos'},
+                {'label': 'Ver alunos', 'estilo': 'ghost', 'acao': 'painel:users'},
+            ],
         })
 
     pending_questions = Question.query.filter(
         Question.tenant_id == tid,
         Question.resposta == '',
-        Question.created_at <= now - timedelta(days=5)
+        Question.created_at <= now - timedelta(days=2)
     ).count()
     if pending_questions > 0:
         alerts.append({
             'type': 'pending_questions',
-            'message': f'{pending_questions} perguntas aguardando resposta ha mais de 5 dias',
+            'message': f'{pending_questions} perguntas aguardando resposta há mais de 48h',
+            'titulo': f'{pending_questions} dúvida{"s" if pending_questions != 1 else ""} sem resposta há mais de 48h',
+            'descricao': 'Dúvida sem resposta é um dos maiores motivos de abandono. Atribua um tutor ou responda.',
             'severity': 'warn',
-            'action_label': 'Responder agora',
-            'action_target': 'users',
-        })
-
-    if new_users_7d:
-        alerts.append({
-            'type': 'signup',
-            'message': f'{new_users_7d} novos alunos inscritos nos ultimos 7 dias',
-            'severity': 'info',
-            'action_label': 'Ver alunos',
-            'action_target': 'users',
+            'action_label': 'Ver tutores',
+            'action_target': 'tutors',
+            'acoes': [{'label': 'Atribuir tutor', 'estilo': 'secondary', 'acao': 'painel:tutors'}],
         })
 
     # ── Atividade recente (24h, max 8) ──
