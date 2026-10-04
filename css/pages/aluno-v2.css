@@ -1,0 +1,61 @@
+/* Dashboard do aluno v2 (revisão Pareto): uma prioridade — continuar de onde parou. */
+.aluno-v2 { max-width: 1120px; margin: 0 auto; padding: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-lg); }
+.aluno-v2 .dash-saas-grupo { background: none; box-shadow: none; padding: 0; border: 0; }
+
+.aluno-v2-head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-md); flex-wrap: wrap; }
+.aluno-v2-titulo { font-size: var(--text-28); font-weight: 700; color: var(--text-primary); margin: 0; line-height: 1.2; }
+.aluno-v2-sub { margin: 4px 0 0; color: var(--text-secondary); }
+
+.aluno-v2-meta { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-radius: var(--radius-lg); background: var(--warning-100); color: var(--warning-700); }
+.aluno-v2-meta div { display: flex; flex-direction: column; }
+.aluno-v2-meta strong { font-size: var(--text-sm); }
+.aluno-v2-meta span { font-size: var(--text-xs); }
+.aluno-v2-meta--ok { background: var(--success-100); color: var(--success-700); }
+.aluno-v2-meta--quebrada { background: var(--bg-hover); color: var(--text-secondary); }
+
+/* Card gigante: continuar */
+.aluno-v2-hero {
+  display: grid; grid-template-columns: minmax(220px, 340px) 1fr; gap: var(--space-xl); align-items: center;
+  background: var(--bg-surface); border-radius: var(--radius-lg); padding: var(--space-lg); box-shadow: var(--shadow-sm);
+}
+.aluno-v2-hero--vazio { display: block; }
+@media (max-width: 860px) { .aluno-v2-hero { grid-template-columns: 1fr; gap: var(--space-md); } }
+.aluno-v2-thumb {
+  aspect-ratio: 16 / 9; width: 100%; max-width: 100%; border: 0; cursor: pointer; border-radius: var(--radius-lg);
+  background: var(--brand-gradient); display: flex; align-items: flex-end; padding: var(--space-md);
+}
+.aluno-v2-play {
+  display: inline-flex; align-items: center; gap: 6px; background: var(--bg-surface); color: var(--text-primary);
+  border-radius: var(--radius-full); padding: 6px 14px; font-size: var(--text-xs); font-weight: 600;
+}
+.aluno-v2-play .icon { color: var(--brand-primary); }
+.aluno-v2-info { display: flex; flex-direction: column; gap: var(--space-sm); min-width: 0; }
+.aluno-v2-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--brand-primary); }
+.aluno-v2-aula { font-size: clamp(1.6rem, 2.6vw, 2.5rem); font-weight: 800; line-height: 1.1; color: var(--text-primary); margin: 0; overflow-wrap: anywhere; }
+.aluno-v2-prog { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: var(--text-xs); color: var(--text-secondary); }
+.aluno-v2-barra { display: block; flex: 1; min-width: 160px; max-width: 320px; height: 10px; border-radius: var(--radius-full); background: var(--bg-hover); overflow: hidden; }
+.aluno-v2-barra > * { display: block; height: 100%; border-radius: inherit; background: var(--brand-primary); }
+.aluno-v2-acoes { display: flex; gap: var(--space-sm); flex-wrap: wrap; align-items: center; margin-top: var(--space-xs); }
+.aluno-v2-acoes .btn { width: auto; }
+.aluno-v2-cta { font-size: var(--text-base); padding: 14px 28px; }
+
+/* Resumo pessoal em uma linha */
+.aluno-v2-resumo {
+  display: flex; align-items: center; gap: var(--space-md); flex-wrap: wrap;
+  background: var(--bg-surface); border-radius: var(--radius-lg); padding: var(--space-md) var(--space-lg); box-shadow: var(--shadow-sm);
+}
+.aluno-v2-resumo strong { color: var(--text-primary); }
+.aluno-v2-recorde { font-size: var(--text-xs); color: var(--text-secondary); }
+.aluno-v2-link { margin-left: auto; color: var(--brand-primary); font-size: var(--text-sm); font-weight: 600; cursor: pointer; }
+
+/* Também em andamento */
+.aluno-v2-andamento { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-lg); }
+.aluno-v2-curso {
+  display: flex; flex-direction: column; gap: 10px; text-align: left; cursor: pointer; border: 0; font: inherit;
+  background: var(--bg-surface); border-radius: var(--radius-lg); padding: var(--space-md) var(--space-lg); box-shadow: var(--shadow-sm);
+}
+.aluno-v2-curso:hover { box-shadow: var(--shadow-md); }
+.aluno-v2-curso .aluno-v2-barra { max-width: none; height: 8px; }
+.aluno-v2-curso-topo, .aluno-v2-curso-rodape { display: flex; justify-content: space-between; gap: 8px; font-size: var(--text-xs); color: var(--text-secondary); }
+.aluno-v2-curso-topo strong { font-size: var(--text-sm); }
+.aluno-v2-curso-rodape .aluno-v2-link { margin: 0; font-size: var(--text-xs); }

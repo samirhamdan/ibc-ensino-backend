@@ -16,8 +16,7 @@
   window.detectarOperador = async function () {
     const nav = document.getElementById('nav-ops');
     if (!nav) return;
-    const res = await fetch('/api/ops/me', { credentials: 'same-origin' });
-    const ok = res.ok;
+    const ok = typeof currentUser !== 'undefined' && !!(currentUser && currentUser.operador);
     nav.style.display = ok ? 'flex' : 'none';
     if (ok) document.getElementById('admin-nav-section').style.display = 'block';
   };

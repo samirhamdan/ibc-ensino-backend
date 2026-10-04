@@ -433,6 +433,14 @@ def aluno_dashboard():
         })
 
     in_progress_course = next((c for c in enrolled_courses if c['status'] == 'em_andamento'), None)
+    if in_progress_course:
+        modulos = (Module.query.filter_by(tenant_id=tid, course_id=in_progress_course['id'])
+                   .order_by(Module.position, Module.id).all())
+        idx = min(in_progress_course['aula_atual'], len(modulos)) - 1
+        if modulos and idx >= 0:
+            in_progress_course['proxima_aula'] = {'id': modulos[idx].id, 'nome': modulos[idx].nome,
+                                                  'duracao': modulos[idx].dur or ''}
+        in_progress_course['aulas_restantes'] = max(0, in_progress_course['total_aulas'] - in_progress_course['aula_atual'] + 1)
     other_courses = [c for c in enrolled_courses if c is not in_progress_course]
     # status='published': mesmo filtro que list_courses() já aplica pra
     # quem não é admin/tutor — sem isto, um curso em rascunho aparecia no
@@ -466,6 +474,13 @@ def aluno_dashboard():
     pending_q = Question.query.filter_by(tenant_id=current_tenant_id(), user_id=user.id, resposta='').count()
     if pending_q:
         next_metas.append({'description': f'Você tem {pending_q} pergunta(s) aguardando resposta', 'type': 'duvida'})
+
+    inicio_do_dia = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    user_stats['estudou_hoje'] = db.session.query(LessonProgress.id).filter(
+        LessonProgress.tenant_id == tid, LessonProgress.user_id == user.id,
+        LessonProgress.completed_at >= inicio_do_dia).first() is not None
+    semana = datetime.utcnow() - timedelta(days=7)
+    user_stats['conquistas_novas'] = sum(1 for ub in user_badges if ub.unlocked_at and ub.unlocked_at >= semana)
 
     return jsonify({
         'user_stats': user_stats,

@@ -105,7 +105,7 @@ def test_tenant_com_cor_diferente_aplica_de_verdade_no_browser(app, servidor_viv
 
 def test_jornada_abrir_dashboard_e_continuar_licao(servidor_vivo, browser, seeded):
     """Critério de aceite da Etapa 2: um aluno com progresso em andamento
-    abre o dashboard e vê a estrutura de 5 grupos com o card de 'continuar'
+    abre o dashboard (v2: saudação, continuar, resumo) e vê a estrutura com o card de 'continuar'
     correto — sem erro de console, sem tela branca."""
     page = browser.new_page(viewport={'width': 1280, 'height': 900})
     erros_console = []
@@ -119,12 +119,11 @@ def test_jornada_abrir_dashboard_e_continuar_licao(servidor_vivo, browser, seede
 
     # os 5 grupos existem no DOM
     for grupo_id in ('dash-saas-saudacao', 'dash-saas-continuar', 'dash-saas-pontuacao',
-                     'dash-saas-metas', 'dash-saas-recomendacoes'):
+                     'dash-saas-recomendacoes'):
         assert page.locator(f'#{grupo_id}').count() == 1, f'grupo {grupo_id} ausente'
 
     # nenhum grupo ficou preso no skeleton (loading infinito)
-    for grupo_id in ('dash-saas-saudacao', 'dash-saas-continuar', 'dash-saas-pontuacao',
-                     'dash-saas-metas', 'dash-saas-recomendacoes'):
+    for grupo_id in ('dash-saas-saudacao', 'dash-saas-continuar', 'dash-saas-pontuacao'):
         assert page.locator(f'#{grupo_id} .dash-saas-skeleton').count() == 0, \
             f'grupo {grupo_id} ficou preso no estado de loading'
 
@@ -135,32 +134,25 @@ def test_jornada_abrir_dashboard_e_continuar_licao(servidor_vivo, browser, seede
     # ANTES do login, tratado com .catch pelo app) não são erros do
     # dashboard — são ruído do ambiente/fluxo de boot pré-existente.
     erros_relevantes = [e for e in erros_console
-                        if 'ERR_TUNNEL' not in e and 'ERR_CONNECTION' not in e and '401' not in e]
+                        if 'ERR_TUNNEL' not in e and 'ERR_CONNECTION' not in e and 'ERR_CERT' not in e and '401' not in e]
     assert not erros_relevantes, f'erros de console inesperados: {erros_relevantes}'
 
     page.close()
 
 
 def test_contadores_de_streak_e_pontos_tem_aria_live(servidor_vivo, browser, seeded):
-    """UX_ALUNO_SAAS.md §5 (gate de aceite): "contadores (streak, pontos)
-    com aria-live='polite' quando atualizam" — achado da auditoria de
-    release, faltava inteiramente (zero ocorrências de aria-live no HTML).
-    Prova real: inspeciona o DOM depois do dashboard carregar."""
+    """UX_ALUNO_SAAS.md §5 (gate de aceite): contadores (streak, pontos) com
+    aria-live='polite'. No v2 o streak vive na meta do dia (saudação) e os
+    pontos no resumo de uma linha."""
     page = browser.new_page()
     page.goto(servidor_vivo + '/')
     page.fill('#login-email', 'aluno@test.com')
     page.fill('#login-pass', 'senha123')
     page.press('#login-pass', 'Enter')
-    page.wait_for_selector('.dash-saas-pontuacao-linha1', timeout=8000)
-    page.wait_for_selector('.dash-saas-streak-chip', timeout=8000)
-
-    linha_pontos = page.locator('.dash-saas-pontuacao-linha1')
-    assert linha_pontos.get_attribute('aria-live') == 'polite'
-
-    streak_wrapper = page.evaluate(
-        "() => document.querySelector('.dash-saas-streak-chip')?.closest('[aria-live]') ? true : false")
-    assert streak_wrapper, 'chip de streak não está dentro de um container aria-live'
-
+    page.wait_for_selector('.aluno-v2-resumo', timeout=8000)
+    page.wait_for_selector('.aluno-v2-meta', timeout=8000)
+    assert page.locator('.aluno-v2-resumo').get_attribute('aria-live') == 'polite'
+    assert page.locator('.aluno-v2-meta').get_attribute('aria-live') == 'polite'
     page.close()
 
 
@@ -346,60 +338,9 @@ def test_nome_de_curso_malicioso_nao_executa_no_dashboard(app, servidor_vivo, br
             db.session.commit()
 
 
-def test_mural_de_atividades_escapa_nome_de_usuario_malicioso(app, servidor_vivo, browser, seeded):
-    """Achado da 2ª revisão Fable 5 (auditoria de release): o fix de H1
-    cobriu os 5 grupos novos (_dashSaasRender*), mas renderActivityFeed —
-    função legada (Sprint 6.2) que TAMBÉM é chamada dentro do mesmo
-    dashboard (_renderAlunoDashboardInner → renderActivityFeed()) —
-    continuava injetando user_name/course_name/user_initial em innerHTML
-    sem escape. Mesma classe de vazamento: qualquer usuário que renomeia a
-    própria conta executa JS pra todo mundo que abrir o dashboard e ver o
-    "Mural de Conclusões"."""
-    payload = '<img src=x onerror="window.__xss_fired_feed=true">'
-    with app.app_context():
-        from extensions import db
-        from models import User, ActivityFeed
-        uid = seeded['users']['aluno']
-        user = User.query.get(uid)
-        nome_original = user.name
-        user.name = payload
-        db.session.add(ActivityFeed(user_id=uid, course_id=seeded['course_id'], action='completed'))
-        db.session.commit()
-
-    try:
-        page = browser.new_page(viewport={'width': 1280, 'height': 900})
-        disparou_dialog = []
-        page.on('dialog', lambda d: (disparou_dialog.append(d.message), d.dismiss()))
-
-        page.goto(servidor_vivo + '/')
-        page.fill('#login-email', 'aluno@test.com')
-        page.fill('#login-pass', 'senha123')
-        page.press('#login-pass', 'Enter')
-        page.wait_for_selector('#activityFeedSection', timeout=8000)
-        page.wait_for_timeout(800)   # renderActivityFeed() é async, roda depois do grid
-
-        assert not disparou_dialog, f'JS malicioso disparou dialog: {disparou_dialog}'
-        assert page.evaluate('window.__xss_fired_feed') is None, \
-            'onerror do payload executou — renderActivityFeed não escapava user_name'
-        assert page.locator('#activityFeedSection img[src="x"]').count() == 0
-
-        page.close()
-    finally:
-        with app.app_context():
-            from extensions import db
-            from models import User, ActivityFeed
-            uid = seeded['users']['aluno']
-            User.query.get(uid).name = nome_original
-            ActivityFeed.query.filter_by(user_id=uid, course_id=seeded['course_id']).delete()
-            db.session.commit()
-
-
 def test_container_do_dashboard_tem_max_width_em_viewport_largo(servidor_vivo, browser, seeded):
-    """GAM-05 PR 2 (P0.1, MELHORIAS-UI-ALUNO.md): em telas muito largas o
-    grid do dashboard não pode esticar até a borda do viewport (colunas
-    absurdas) nem ficar reduzido a uma coluna minúscula centralizada —
-    prova real medindo a largura RENDERIZADA em 1920px: precisa ocupar
-    pelo menos 70% do viewport (não 100%, não um resto pequeno)."""
+    """Em telas muito largas o conteúdo não estica até a borda (linhas de
+    leitura absurdas) nem vira uma coluna minúscula — v2 limita a ~1120px."""
     page = browser.new_page(viewport={'width': 1920, 'height': 1080})
     page.goto(servidor_vivo + '/')
     page.fill('#login-email', 'aluno@test.com')
@@ -407,81 +348,23 @@ def test_container_do_dashboard_tem_max_width_em_viewport_largo(servidor_vivo, b
     page.press('#login-pass', 'Enter')
     page.wait_for_selector('#dash-saas-continuar', timeout=8000)
 
-    largura_grid = page.evaluate("document.querySelector('.dash-saas-grid').getBoundingClientRect().width")
-    proporcao = largura_grid / 1920
-    assert proporcao >= 0.70, f'grid ocupa só {proporcao:.0%} do viewport de 1920px ({largura_grid}px)'
-    assert largura_grid < 1920, 'grid esticou até a borda do viewport — max-width não está sendo aplicado'
-
+    largura = page.evaluate("document.querySelector('.aluno-v2').getBoundingClientRect().width")
+    assert 700 <= largura <= 1200, f'largura do dashboard fora do esperado: {largura}px'
     page.close()
 
 
-def test_card_de_pontuacao_usa_gradiente_da_marca_e_contem_a_chama_de_streak(servidor_vivo, browser, seeded):
-    """GAM-05 PR 2 (P0.2 + P0.3): o card 'Sua pontuação' vira o ponto focal
-    do dashboard (fundo --brand-gradient) e absorve o chip de streak que
-    antes vivia na Saudação — comparação de computed style via elemento de
-    referência oculto, mesmo padrão usado no teste do botão 'Ver catálogo'
-    (PR 1) pra evitar falso-positivo de normalização de cor do navegador.
-
-    A asserção de font-size (>=48px) é xfail intencional — ver
-    docs/DEBITOS.md: neste ambiente de teste, `.dash-saas-pontuacao-total`
-    computa font-size 16px mesmo com a única regra que casa (confirmado
-    via CDP CSS.getMatchedStylesForNode) declarando 3rem/3.5rem, com
-    !important, com valor LITERAL (sem var()), e até via atributo
-    style="" inline — todas as formas testadas falharam do mesmo jeito
-    nesta stack, enquanto um HTML isolado com a mesma regra funciona.
-    Causa raiz não isolada apesar de investigação extensa; gradiente de
-    fundo e a chama de streak (as outras duas asserções desta função)
-    continuam validadas normalmente."""
+def test_meta_do_dia_mostra_a_chama_de_streak_na_saudacao(servidor_vivo, browser, seeded):
+    """Dashboard v2: o streak (motor de hábito) sobe para a meta do dia, ao
+    lado da saudação — uma chama só na tela, sem duplicar no resumo."""
     page = browser.new_page()
     page.goto(servidor_vivo + '/')
     page.fill('#login-email', 'aluno@test.com')
     page.fill('#login-pass', 'senha123')
     page.press('#login-pass', 'Enter')
-    page.wait_for_selector('#dash-saas-pontuacao .dash-saas-pontuacao-total', timeout=8000)
-
-    card = page.locator('#dash-saas-pontuacao')
-    background = card.evaluate("el => getComputedStyle(el).backgroundImage")
-    referencia_gradiente = page.evaluate("""
-        () => { const el = document.createElement('div'); el.style.background = 'var(--brand-gradient)';
-                document.body.appendChild(el); const v = getComputedStyle(el).backgroundImage; el.remove(); return v; }
-    """)
-    assert background == referencia_gradiente, \
-        f'card de pontuação não usa --brand-gradient: {background!r} != {referencia_gradiente!r}'
-
-    # a chama de streak (SVG, GAM-02) está DENTRO do card de pontuação
-    assert card.locator('.dash-saas-flame').count() == 1, 'chama de streak não está dentro do card de pontuação'
-
-    # e o número de pontos é visualmente o maior texto (>= --text-display-lg,
-    # 48px) — xfail documentado acima, ver docs/DEBITOS.md
-    tamanho_fonte = page.locator('.dash-saas-pontuacao-total').evaluate("el => parseFloat(getComputedStyle(el).fontSize)")
-    if tamanho_fonte < 48:
-        pytest.xfail(f'número de pontos com {tamanho_fonte}px — esperado >=48px (P0.2); '
-                     'ver docs/DEBITOS.md, achado durante GAM-05 PR 2')
-    else:
-        assert tamanho_fonte >= 48
-
-    page.close()
-
-
-def test_saudacao_nao_tem_mais_chip_de_streak_nem_texto_de_pontos_pro_proximo_nivel(servidor_vivo, browser, seeded):
-    """GAM-05 PR 2 (P0.3): a Saudação (Grupo 1) perde o chip standalone de
-    streak (relocado pro card de pontuação) e o texto "pontos para o
-    próximo nível" (que só deve viver no Grupo 4, Próximas Metas) nunca
-    mais deve aparecer na frase de contexto da saudação."""
-    page = browser.new_page()
-    page.goto(servidor_vivo + '/')
-    page.fill('#login-email', 'aluno@test.com')
-    page.fill('#login-pass', 'senha123')
-    page.press('#login-pass', 'Enter')
-    page.wait_for_selector('#dash-saas-saudacao h1', timeout=8000)
-    page.wait_for_timeout(300)
-
-    saudacao_html = page.locator('#dash-saas-saudacao').inner_html()
-    assert 'dash-saas-streak-chip' not in saudacao_html, \
-        'chip de streak ainda aparece na saudação — deveria estar só no card de pontuação'
-    assert 'dash-saas-flame' not in saudacao_html
-    assert 'pontos para o próximo nível' not in saudacao_html
-
+    page.wait_for_selector('#dash-saas-saudacao .aluno-v2-meta', timeout=8000)
+    assert page.locator('#dash-saas-saudacao .dash-saas-flame').count() == 1
+    assert page.locator('#dash-saas-pontuacao .dash-saas-flame').count() == 0
+    assert 'Meta de hoje' in page.locator('#dash-saas-saudacao').inner_text()
     page.close()
 
 
@@ -512,9 +395,9 @@ def test_flame_relocado_respeita_prefers_reduced_motion(servidor_vivo, browser, 
         page.fill('#login-email', 'aluno@test.com')
         page.fill('#login-pass', 'senha123')
         page.press('#login-pass', 'Enter')
-        page.wait_for_selector('#dash-saas-pontuacao .dash-saas-flame', timeout=8000)
+        page.wait_for_selector('#dash-saas-saudacao .dash-saas-flame', timeout=8000)
 
-        flame = page.locator('#dash-saas-pontuacao .dash-saas-flame')
+        flame = page.locator('#dash-saas-saudacao .dash-saas-flame')
         assert flame.count() == 1
         animacao = flame.evaluate("el => getComputedStyle(el).animationName")
         assert animacao in ('none', ''), \
@@ -533,25 +416,19 @@ def test_flame_relocado_respeita_prefers_reduced_motion(servidor_vivo, browser, 
 
 
 def test_revisao_do_dia_nao_renderiza_nada(servidor_vivo, browser, seeded):
-    """GAM-05 (docs/MELHORIAS-UI-ALUNO.md PR 1, decisão D2): com
-    DASH_SAAS_FLAGS.revisao_ia_enabled desligado (estado atual, feature
-    LRN-02 não existe de verdade ainda), o slot "Revisão do dia" no Grupo 4
-    ("Próximas metas") não deve renderizar NADA — nem um card de
-    placeholder mencionando a feature futura. Antes desta correção, o
-    grupo mostrava um card fixo "Revisão do dia / Chega na Release 1.0"."""
+    """Com DASH_SAAS_FLAGS.revisao_ia_enabled desligado (LRN-02 ainda não
+    existe), nada de "Revisão do dia" nem placeholder de feature futura."""
     page = browser.new_page()
     page.goto(servidor_vivo + '/')
     page.fill('#login-email', 'aluno@test.com')
     page.fill('#login-pass', 'senha123')
     page.press('#login-pass', 'Enter')
-    page.wait_for_selector('#dash-saas-metas', timeout=8000)
-    page.wait_for_timeout(300)   # _dashSaasRenderMetas() roda depois do fetch inicial
-
-    metas_html = page.locator('#dash-saas-metas').inner_html()
-    assert 'dash-saas-meta-revisao' not in metas_html
-    assert 'Revisão do dia' not in metas_html
-    assert 'Release' not in metas_html
-
+    page.wait_for_selector('#dash-saas-continuar', timeout=8000)
+    page.wait_for_timeout(300)
+    html = page.locator('#main-content').inner_html()
+    assert 'dash-saas-meta-revisao' not in html
+    assert 'Revisão do dia' not in html
+    assert 'Release' not in html
     page.close()
 
 

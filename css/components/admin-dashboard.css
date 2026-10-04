@@ -117,3 +117,4 @@
   font-weight: 500;
 }
 .admin-fila-row.feito .admin-fila-acoes { visibility: hidden; }
+.badge-marca { background: var(--brand-primary-subtle); color: var(--brand-primary); }

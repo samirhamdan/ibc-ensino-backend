@@ -153,3 +153,12 @@ def test_tenant_padrao_nao_pode_ser_suspenso(app, ops, relogio):
 def test_admin_de_tenant_nao_e_operador(admin):
     assert admin.get('/api/ops/me').status_code == 403
     assert admin.get('/api/ops/tenants').status_code == 403
+
+
+def test_flag_operador_vem_nos_dados_do_usuario(app, operador, admin):
+    """O menu do operador é decidido pelo payload do usuário (sem request extra que gera 403)."""
+    c = app.test_client()
+    r = c.post('/api/auth/login', json={'email': 'op@test.com', 'password': 'senha123'})
+    assert r.get_json()['operador'] is True
+    assert c.get('/api/auth/user').get_json()['operador'] is True
+    assert admin.get('/api/auth/user').get_json()['operador'] is False

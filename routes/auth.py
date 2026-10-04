@@ -122,6 +122,7 @@ def login():
 
     data_out = user.to_dict()
     data_out['new_achievements'] = new_achievements
+    data_out['operador'] = _eh_operador(user)
     return jsonify(data_out), 200
 
 
@@ -211,7 +212,14 @@ def get_user():
     user = _current_user()
     if not user:
         return jsonify({'error': 'Não autenticado'}), 401
-    return jsonify(user.to_dict()), 200
+    dados = user.to_dict()
+    dados['operador'] = _eh_operador(user)
+    return jsonify(dados), 200
+
+
+def _eh_operador(user):
+    from core.plataforma.models import OperadorPlataforma
+    return OperadorPlataforma.query.filter_by(user_id=user.id, ativo=True).first() is not None
 
 
 @auth_bp.route('/users', methods=['GET'])
