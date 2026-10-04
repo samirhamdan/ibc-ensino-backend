@@ -1,0 +1,52 @@
+/* Painel do tutor v2 (revisão Pareto): caixa de entrada de dúvidas com resposta ao lado. */
+.tutor-v2 { max-width: 1180px; margin: 0 auto; padding: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-lg); }
+.tutor-v2-head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-md); flex-wrap: wrap; }
+.tutor-v2-titulo { font-size: var(--text-28); font-weight: 700; color: var(--text-primary); margin: 0; }
+.tutor-v2-sub { margin: 4px 0 0; color: var(--text-secondary); }
+.tutor-v2-contador { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
+
+.tutor-v2-alerta {
+  display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-md); align-items: center;
+  background: var(--danger-100); border-radius: var(--radius-md); padding: var(--space-md);
+}
+@media (max-width: 760px) { .tutor-v2-alerta { grid-template-columns: 1fr; } }
+.tutor-v2-alerta div { display: flex; flex-direction: column; gap: 2px; }
+.tutor-v2-alerta strong { color: var(--danger-700); font-size: var(--text-sm); }
+.tutor-v2-alerta span:not(.badge-tom) { color: var(--danger-700); font-size: var(--text-xs); }
+.tutor-v2-alerta .btn { width: auto; }
+
+.tutor-v2-inbox { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: var(--space-lg); align-items: start; }
+@media (max-width: 900px) { .tutor-v2-inbox { grid-template-columns: 1fr; } }
+
+.tutor-v2-lista { background: var(--bg-surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: var(--space-sm); display: flex; flex-direction: column; gap: 4px; max-height: 70vh; overflow-y: auto; }
+.tutor-v2-lista-topo { display: flex; justify-content: space-between; padding: var(--space-sm); font-size: var(--text-xs); font-weight: 600; color: var(--text-secondary); }
+.tutor-v2-item { display: flex; gap: 10px; text-align: left; border: 0; background: none; font: inherit; cursor: pointer; padding: var(--space-sm); border-radius: var(--radius-md); }
+.tutor-v2-item:hover { background: var(--bg-hover); }
+.tutor-v2-item.ativo { background: var(--brand-primary-subtle); }
+.tutor-v2-item-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.tutor-v2-item-topo { display: flex; justify-content: space-between; gap: 8px; font-size: var(--text-xs); color: var(--text-muted); }
+.tutor-v2-item-topo strong { color: var(--text-primary); }
+.tutor-v2-item-q { font-size: var(--text-xs); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tutor-v2-item-curso { font-size: var(--text-xs); color: var(--brand-primary); }
+
+.tutor-v2-avatar { width: 32px; height: 32px; flex-shrink: 0; border-radius: var(--radius-full); background: var(--brand-primary-subtle); color: var(--brand-primary); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: var(--text-sm); }
+.tutor-v2-avatar--lg { width: 40px; height: 40px; }
+
+.tutor-v2-painel { background: var(--bg-surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-md); }
+.tutor-v2-autor { display: flex; align-items: center; gap: 12px; }
+.tutor-v2-autor div { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.tutor-v2-autor strong { color: var(--text-primary); font-size: var(--text-sm); }
+.tutor-v2-autor span { color: var(--brand-primary); font-size: var(--text-xs); }
+.tutor-v2-autor .btn { width: auto; }
+.tutor-v2-pergunta { font-size: var(--text-20); font-weight: 600; color: var(--text-primary); margin: 0; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tutor-v2-iguais { border: 0; margin: 0; padding: var(--space-sm) var(--space-md); background: var(--brand-primary-subtle); border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 6px; }
+.tutor-v2-iguais legend { float: left; width: 100%; padding: 0 0 4px; font-size: var(--text-xs); font-weight: 600; color: var(--brand-primary); }
+.tutor-v2-iguais label { display: block; font-size: var(--text-sm); color: var(--text-primary); cursor: pointer; line-height: 1.5; }
+.tutor-v2-iguais input { margin-right: 6px; vertical-align: middle; }
+.tutor-v2-resposta { min-height: 140px; resize: vertical; }
+.tutor-v2-acoes { display: flex; justify-content: space-between; gap: var(--space-sm); }
+.tutor-v2-acoes .btn { width: auto; }
+
+.tutor-v2-vazio { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: var(--space-2xl); background: var(--bg-surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); color: var(--text-secondary); text-align: center; }
+.tutor-v2-vazio .icon { color: var(--success); }
+.tutor-v2-vazio strong { color: var(--text-primary); font-size: var(--text-20); }

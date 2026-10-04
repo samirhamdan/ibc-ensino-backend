@@ -56,60 +56,92 @@ def ask_question(course_id):
     return jsonify(result), 201
 
 
-@questions_bp.route('/<int:question_id>/responder', methods=['POST'])
-def answer_question(question_id):
-    user = _current_user()
-    if not user:
-        return jsonify({'error': 'Não autenticado'}), 401
+def _pode_responder(user, question):
+    """Tutor responde se é o tutor principal do curso, está vinculado ao curso
+    (TutorCourse) ou recebeu a pergunta por atribuição. Admin responde tudo."""
+    papel = role_no_tenant(user)
+    if papel == 'admin':
+        return True
+    if papel != 'tutor':
+        return False
+    is_course_tutor = bool(question.course and question.course.tutor_id == user.id)
+    is_linked_tutor = bool(question.course and TutorCourse.query.filter_by(
+        tenant_id=current_tenant_id(), tutor_id=user.id, course_id=question.course_id).first())
+    return is_course_tutor or is_linked_tutor or question.assigned_tutor_id == user.id
 
-    if role_no_tenant(user) not in ('admin', 'tutor'):
-        return jsonify({'error': 'Apenas tutores podem responder perguntas'}), 403
 
-    question = get_scoped_or_404(Question, question_id)
-
-    # Tutor pode responder se: é o tutor principal do curso, OU foi vinculado
-    # ao curso via TutorCourse (admin /tutors/<id>/assign-course), OU a pergunta
-    # foi atribuída a ele (admin /questions/<id>/assign). Antes só o tutor_id
-    # do curso passava — o fluxo de atribuição do admin ficava inoperante (403).
-    if role_no_tenant(user) == 'tutor':
-        is_course_tutor = bool(question.course and question.course.tutor_id == user.id)
-        is_linked_tutor = bool(question.course and TutorCourse.query.filter_by(tenant_id=current_tenant_id(), 
-            tutor_id=user.id, course_id=question.course_id).first())
-        is_assigned = question.assigned_tutor_id == user.id
-        if not (is_course_tutor or is_linked_tutor or is_assigned):
-            return jsonify({'error': 'Você só pode responder perguntas dos seus cursos'}), 403
-
-    data = request.get_json(silent=True) or {}
-    resposta = (data.get('resposta') or '').strip()
-    if not resposta:
-        return jsonify({'error': 'resposta é obrigatória'}), 400
-
+def _registrar_resposta(user, question, resposta):
     is_first_answer = question.status != 'answered'
-
     question.resposta = resposta
     question.respondido_por = user.name
     question.status = 'answered'
     db.session.commit()
-
-    # Pontos para quem perguntou, concedidos aqui (servidor, evento real) e só
-    # na primeira resposta — não mais via /gamification/add-points, que
-    # aceitava question_id arbitrário vindo do cliente sem checagem alguma.
+    # Pontos para quem perguntou, concedidos no servidor e só na primeira resposta.
     if is_first_answer:
         from routes.gamification import award_points
         award_points(question.user_id, 'question_answered')
-
-    notification = Notification(
+    db.session.add(Notification(
         user_id=question.user_id,
         title='Sua pergunta foi respondida',
         message=f'{user.name} respondeu sua pergunta em "{question.course.name if question.course else "um curso"}".',
         type='message',
         link='minhas-perguntas',
         created_by=user.id,
-    )
-    db.session.add(notification)
+    ))
     db.session.commit()
 
+
+@questions_bp.route('/<int:question_id>/responder', methods=['POST'])
+def answer_question(question_id):
+    user = _current_user()
+    if not user:
+        return jsonify({'error': 'Não autenticado'}), 401
+    if role_no_tenant(user) not in ('admin', 'tutor'):
+        return jsonify({'error': 'Apenas tutores podem responder perguntas'}), 403
+
+    question = get_scoped_or_404(Question, question_id)
+    if not _pode_responder(user, question):
+        return jsonify({'error': 'Você só pode responder perguntas dos seus cursos'}), 403
+
+    data = request.get_json(silent=True) or {}
+    resposta = (data.get('resposta') or '').strip()
+    if not resposta:
+        return jsonify({'error': 'resposta é obrigatória'}), 400
+
+    _registrar_resposta(user, question, resposta)
     return jsonify(question.to_dict()), 200
+
+
+@questions_bp.route('/responder-lote', methods=['POST'])
+def answer_questions_batch():
+    """Mesma resposta para várias dúvidas iguais (o tutor marca quais são a mesma pergunta)."""
+    user = _current_user()
+    if not user:
+        return jsonify({'error': 'Não autenticado'}), 401
+    if role_no_tenant(user) not in ('admin', 'tutor'):
+        return jsonify({'error': 'Apenas tutores podem responder perguntas'}), 403
+
+    data = request.get_json(silent=True) or {}
+    resposta = (data.get('resposta') or '').strip()
+    ids = data.get('ids') or []
+    if not resposta:
+        return jsonify({'error': 'resposta é obrigatória'}), 400
+    if not isinstance(ids, list) or not ids or len(ids) > 20:
+        return jsonify({'error': 'Informe de 1 a 20 perguntas'}), 400
+    try:
+        ids = list(dict.fromkeys(int(i) for i in ids))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'ids inválidos'}), 400
+
+    perguntas = Question.query.filter(Question.tenant_id == current_tenant_id(), Question.id.in_(ids)).all()
+    if len(perguntas) != len(ids):
+        return jsonify({'error': 'Pergunta não encontrada'}), 404
+    if not all(_pode_responder(user, q) for q in perguntas):
+        return jsonify({'error': 'Você só pode responder perguntas dos seus cursos'}), 403
+
+    for q in perguntas:
+        _registrar_resposta(user, q, resposta)
+    return jsonify({'respondidas': len(perguntas)}), 200
 
 
 # ── Dashboard endpoints ──────────────────────────────────────────────────────

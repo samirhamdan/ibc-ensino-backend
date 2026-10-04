@@ -57,6 +57,7 @@
 <link rel="stylesheet" href="css/pages/brand-xr.css">
 <link rel="stylesheet" href="css/pages/ops.css">
 <link rel="stylesheet" href="css/pages/aluno-v2.css">
+<link rel="stylesheet" href="css/pages/tutor-v2.css">
 
 <!-- Tema do tenant (UX_ALUNO_SAAS.md §2.2): XHR SÍNCRONO de propósito —
      precisa terminar e o <style id="tenant-theme"> ser inserido no DOM
@@ -4931,50 +4932,124 @@ async function renderTutorPanelDashboard(){
   try { return await _renderTutorPanelDashboardInner(); }
   catch(e){ console.error('[ERRO] renderTutorPanelDashboard:', e); _renderDashboardError(e, 'painel do tutor'); }
 }
+// Painel do tutor v2 (revisão Pareto): caixa de entrada — responder rápido é o que segura o aluno.
+let _tutorFila = [], _tutorSel = null;
+
+function _tempoRelativo(iso){
+  const ms = Date.now() - new Date(iso + (iso.endsWith('Z') ? '' : 'Z')).getTime();
+  const h = Math.floor(ms / 3600000);
+  if(h < 1) return 'agora há pouco';
+  if(h < 24) return `há ${h} h`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? 'há 1 dia' : `há ${d} dias`;
+}
+
 async function _renderTutorPanelDashboardInner(){
   const el=document.getElementById('main-content');
-  el.innerHTML=`
-    ${renderHero(currentUser, {})}
-    <div class="dash-heading">${icon('user-check','20')} Painel do Tutor</div>
-    <div class="dash-subtitle">Olá, ${currentUser.name.split(' ')[0]}! Aqui está seu resumo.</div>
-    <div id="tutor-panel-body"><div class="alert alert-info"><span class="alert-icon">⏳</span><div class="alert-body">Carregando...</div></div></div>`;
-  const res=await api('GET','/tutor/dashboard');
-  if(!res.ok){ document.getElementById('tutor-panel-body').innerHTML='<div class="alert alert-danger"><span class="alert-icon">'+icon('x-circle','16','icon--x-circle')+'</span><div class="alert-body">Não foi possível carregar.</div></div>'; return; }
-  const d=await res.json();
-  const body=document.getElementById('tutor-panel-body');
-  const pend=d.pending_questions;
-  body.innerHTML=`
-    ${pend.length?`
-    <div class="pending-questions-alert">
-      <div class="pending-questions-title">${icon('message','16')} ${pend.length} dúvida(s) sem resposta — responda agora!</div>
-      ${pend.map(q=>`<div class="question-item"><div class="question-item-header"><span><strong>${escapeHtml(q.author)}:</strong> "${escapeHtml(q.text)}"</span><span class="time-badge">${new Date(q.timestamp).toLocaleString('pt-BR')}</span></div><div class="question-course-tag">${icon('book','12')} ${escapeHtml(q.course)}</div><div><button class="btn btn-primary btn-sm" onclick="setTutorDashTab('duvidas');showTutorDashboard()">Responder Agora</button></div></div>`).join('')}
-    </div>`:`<div class="alert alert-success"><span class="alert-icon">${icon('checkmark-circle','16')}</span><div class="alert-body">Nenhuma dúvida pendente — tudo em dia!</div></div>`}
-    <div class="dash-section">
-      <div class="dash-section-title">${icon('catalog','16')} Meus Cursos</div>
-      <div class="grid grid-cols-2 gap-lg">
-        ${d.my_courses.map(c=>`<div class="card"><div class="card-body"><h3 class="card-title">${c.icon||'📚'} ${escapeHtml(c.name)}</h3><div class="stat-row"><span>${icon('users','14')} ${c.students} aluno(s)</span><span style="color:var(--primary);font-weight:var(--fw-bold)">${c.completion_rate}% conclusão</span></div><div class="progress progress-sm" style="margin:var(--space-sm) 0"><div class="progress-bar" style="width:${c.completion_rate}%"></div></div><div style="font-size:var(--text-xs);color:var(--gray);margin-bottom:var(--space-md)">${c.completed}/${c.students} concluíram</div>${c.alerts.length?`<div class="alert alert-sm alert-warning" style="margin-bottom:var(--space-md)"><span>${icon('lightbulb','14')} ${c.alerts[0]}</span></div>`:`<div class="alert alert-sm alert-success" style="margin-bottom:var(--space-md)"><span>${icon('checkmark-circle','14')} Curso rodando bem</span></div>`}<button class="btn btn-outline btn-sm btn-full" onclick="selectCourse(${c.id})">Ver Alunos</button></div></div>`).join('')}
+  el.innerHTML=`<div class="tutor-v2" id="tutor-v2"><div class="alert alert-info"><span class="alert-icon">${icon('clock','16')}</span><div class="alert-body">Carregando dúvidas…</div></div></div>`;
+  const res=await api('GET','/questions/tutor/dashboard');
+  if(!res.ok){ document.getElementById('tutor-v2').innerHTML=_dashSaasErro('renderTutorPanelDashboard()'); return; }
+  const todas = await res.json();
+  _tutorFila = todas.filter(q => !q.resposta && (q.status || 'open') === 'open')
+                    .sort((a, b) => a.created_at.localeCompare(b.created_at));
+  if(!_tutorFila.find(q => q.id === _tutorSel)) _tutorSel = _tutorFila.length ? _tutorFila[0].id : null;
+  _tutorRender();
+}
+
+function _tutorRender(){
+  const el = document.getElementById('tutor-v2'); if(!el) return;
+  const nome = (currentUser && currentUser.name || '').split(' ').find(p => p && !/^(prof|profa|dr|dra|pr|pra|rev)\.?$/i.test(p)) || '';
+  const n = _tutorFila.length;
+  const maisAntiga = n ? _tempoRelativo(_tutorFila[0].created_at) : '';
+  // Curso que concentra muitas dúvidas abertas costuma ter problema no material.
+  const porCurso = {};
+  _tutorFila.forEach(q => { porCurso[q.course_id] = porCurso[q.course_id] || { n: 0, nome: q.course_name, id: q.course_id }; porCurso[q.course_id].n++; });
+  const critico = Object.values(porCurso).filter(c => c.n >= 3).sort((a, b) => b.n - a.n)[0];
+
+  el.innerHTML = `
+    <div class="tutor-v2-head">
+      <div>
+        <h1 class="tutor-v2-titulo">Olá, ${escapeHtml(nome)}</h1>
+        <p class="tutor-v2-sub">Responder rápido é o que mais segura o aluno no curso.</p>
+      </div>
+      <div class="tutor-v2-contador">
+        <span class="badge-tom ${n ? 'badge-warn' : 'badge-ok'}">${n ? (n === 1 ? '1 pendente' : n + ' pendentes') : 'Tudo respondido'}</span>
+        ${n ? `<span class="badge-tom badge-info">Mais antiga ${escapeHtml(maisAntiga)}</span>` : ''}
       </div>
     </div>
-    <div class="card" style="margin-bottom:var(--space-xl)">
-      <div class="card-header"><h3 class="card-title">${icon('bar-chart','16')} Atividade (últimos 7 dias)</h3></div>
-      <div class="card-body">
-        <div class="kpi-grid">
-          <div class="stat-card" style="box-shadow:none;border:1px solid var(--gray-light)">
-            <div class="stat-value">${d.weekly_activity.new_questions}</div>
-            <div class="stat-label">${icon('message','14')} Novas dúvidas</div>
-            <div class="stat-trend stat-trend-up">↑ respondeu ${d.weekly_activity.answered}</div>
-          </div>
-          <div class="stat-card" style="box-shadow:none;border:1px solid var(--gray-light)">
-            <div class="stat-value">${d.weekly_activity.new_students}</div>
-            <div class="stat-label">${icon('users','14')} Novos alunos</div>
-          </div>
-        </div>
+    ${critico ? `<div class="tutor-v2-alerta">
+      <span class="badge-tom badge-bad">Conteúdo pode ter problema</span>
+      <div><strong>${escapeHtml(critico.nome)} concentra ${critico.n} dúvidas abertas</strong><span>Muitas dúvidas no mesmo curso costumam indicar um ponto confuso no material. Ajustar a aula evita novas perguntas.</span></div>
+      <button class="btn btn-outline btn-sm" onclick="selectCourse(${critico.id})">Abrir curso</button>
+    </div>` : ''}
+    ${n ? `<div class="tutor-v2-inbox">
+      <div class="tutor-v2-lista" role="listbox" aria-label="Dúvidas pendentes, mais antigas primeiro">
+        <div class="tutor-v2-lista-topo"><span>Mais antigas primeiro</span><span>${n}</span></div>
+        ${_tutorFila.map(q => `
+          <button type="button" role="option" aria-selected="${q.id === _tutorSel}" class="tutor-v2-item${q.id === _tutorSel ? ' ativo' : ''}" onclick="_tutorSelecionar(${q.id})">
+            <span class="tutor-v2-avatar">${escapeHtml((q.autor || '?').charAt(0).toUpperCase())}</span>
+            <span class="tutor-v2-item-txt">
+              <span class="tutor-v2-item-topo"><strong>${escapeHtml(q.autor || 'Aluno')}</strong><span>${escapeHtml(_tempoRelativo(q.created_at))}</span></span>
+              <span class="tutor-v2-item-q">${escapeHtml(q.texto)}</span>
+              <span class="tutor-v2-item-curso">${escapeHtml(q.course_name || '')}</span>
+            </span>
+          </button>`).join('')}
       </div>
+      ${_tutorPainel()}
+    </div>` : `<div class="tutor-v2-vazio">${icon('checkmark-circle','32')}<strong>Nenhuma dúvida pendente.</strong><span>Seus alunos estão em dia — bom trabalho.</span></div>`}`;
+  _tutorAtualizarBotao();
+}
+
+function _tutorPainel(){
+  const q = _tutorFila.find(x => x.id === _tutorSel); if(!q) return '';
+  const mesmasCurso = _tutorFila.filter(x => x.id !== q.id && x.course_id === q.course_id);
+  return `<section class="tutor-v2-painel" aria-label="Responder dúvida">
+    <div class="tutor-v2-autor">
+      <span class="tutor-v2-avatar tutor-v2-avatar--lg">${escapeHtml((q.autor || '?').charAt(0).toUpperCase())}</span>
+      <div><strong>${escapeHtml(q.autor || 'Aluno')} · ${escapeHtml(_tempoRelativo(q.created_at))}</strong><span>${escapeHtml(q.course_name || '')}</span></div>
+      <button class="btn btn-ghost btn-sm" onclick="selectCourse(${q.course_id})">Abrir curso</button>
     </div>
-    <div class="quick-actions">
-      <button class="btn btn-primary" onclick="showTutorDashboard()">Ver Todos Alunos</button>
-      <button class="btn btn-outline" onclick="showAdminPanel('catalog')">Criar Aula</button>
-    </div>`;
+    <p class="tutor-v2-pergunta">${escapeHtml(q.texto)}</p>
+    ${mesmasCurso.length ? `<fieldset class="tutor-v2-iguais">
+      <legend>É a mesma dúvida? Marque para responder todos de uma vez</legend>
+      ${mesmasCurso.map(x => `<label><input type="checkbox" class="tutor-v2-igual" value="${x.id}" onchange="_tutorAtualizarBotao()"> <strong>${escapeHtml(x.autor || 'Aluno')}:</strong> ${escapeHtml(x.texto)}</label>`).join('')}
+    </fieldset>` : ''}
+    <label class="sr-only" for="tutor-v2-resposta">Sua resposta</label>
+    <textarea id="tutor-v2-resposta" class="form-control tutor-v2-resposta" rows="6" placeholder="Escreva sua resposta… o aluno recebe uma notificação."></textarea>
+    <div class="tutor-v2-acoes">
+      <button class="btn btn-ghost" onclick="_tutorPular()">Pular</button>
+      <button class="btn btn-primary" id="tutor-v2-enviar" onclick="_tutorResponder()">Responder</button>
+    </div>
+  </section>`;
+}
+
+function _tutorMarcadas(){ return [...document.querySelectorAll('.tutor-v2-igual:checked')].map(c => parseInt(c.value)); }
+function _tutorAtualizarBotao(){
+  const b = document.getElementById('tutor-v2-enviar'); if(!b) return;
+  const total = 1 + _tutorMarcadas().length;
+  b.textContent = total > 1 ? `Responder para os ${total} alunos` : 'Responder';
+}
+function _tutorSelecionar(id){ _tutorSel = id; _tutorRender(); const t = document.getElementById('tutor-v2-resposta'); if(t) t.focus(); }
+function _tutorPular(){
+  if(_tutorFila.length < 2) return;
+  const i = _tutorFila.findIndex(q => q.id === _tutorSel);
+  _tutorSel = _tutorFila[(i + 1) % _tutorFila.length].id; _tutorRender();
+}
+async function _tutorResponder(){
+  const txt = (document.getElementById('tutor-v2-resposta').value || '').trim();
+  if(!txt){ showToast('Escreva a resposta antes de enviar.', 'error'); return; }
+  const ids = [_tutorSel, ..._tutorMarcadas()];
+  const b = document.getElementById('tutor-v2-enviar'); b.disabled = true; b.textContent = 'Enviando…';
+  const r = ids.length > 1
+    ? await api('POST', '/questions/responder-lote', { ids, resposta: txt })
+    : await api('POST', `/questions/${_tutorSel}/responder`, { resposta: txt });
+  const d = await r.json().catch(() => ({}));
+  if(!r.ok){ b.disabled = false; _tutorAtualizarBotao(); showToast(d.error || 'Não foi possível enviar.', 'error'); return; }
+  showToast(ids.length > 1 ? `Resposta enviada para ${ids.length} alunos.` : 'Resposta enviada.', 'success');
+  const idx = _tutorFila.findIndex(q => q.id === _tutorSel);
+  _tutorFila = _tutorFila.filter(q => !ids.includes(q.id));
+  _tutorSel = _tutorFila.length ? _tutorFila[Math.min(idx, _tutorFila.length - 1)].id : null;
+  _tutorRender();
 }
 
 // ── Dashboard do aluno — UX_ALUNO_SAAS.md §3/§6 Etapa 2 ───────────────────

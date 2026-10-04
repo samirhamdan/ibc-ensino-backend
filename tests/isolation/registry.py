@@ -36,6 +36,7 @@ TENANT_SCOPED = {
     'notifications.get_public_config': 'test_config_isolation.py::test_config_e_niveis_por_tenant',
     'notifications.get_gamification_config': 'test_config_isolation.py::test_config_e_niveis_por_tenant',
     'dashboards.enviar_lembrete_inativos': 'test_lembrete_isolation.py::test_lembrete_so_notifica_alunos_do_proprio_tenant',
+    'questions.answer_questions_batch': 'test_responder_lote_isolation.py::test_lote_responde_varias_e_recusa_pergunta_de_outro_tenant',
     'admin.get_branding': 'test_config_isolation.py::test_marca_por_tenant',
     'admin.update_branding': 'test_config_isolation.py::test_marca_por_tenant',
     'admin.upload_branding_image': 'test_config_isolation.py::test_marca_por_tenant',
