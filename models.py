@@ -310,6 +310,8 @@ class Question(TenantScopedModel, db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     course_id = db.Column(db.Integer, db.ForeignKey('courses.id'), nullable=False)
+    # aula de origem (opcional): agrupa dúvidas iguais e aponta conteúdo confuso
+    module_id = db.Column(db.Integer, db.ForeignKey('modules.id', ondelete='SET NULL'), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     assigned_tutor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     texto = db.Column(db.Text, nullable=False)
@@ -320,11 +322,14 @@ class Question(TenantScopedModel, db.Model):
     resolved_at = db.Column(db.DateTime, nullable=True)
 
     assigned_tutor = db.relationship('User', foreign_keys=[assigned_tutor_id])
+    module = db.relationship('Module', foreign_keys=[module_id])
 
     def to_dict(self):
         return {
             'id': self.id,
             'course_id': self.course_id,
+            'module_id': self.module_id,
+            'module_nome': self.module.nome if self.module else None,
             'autor': self.author.name if self.author else '',
             'texto': self.texto,
             'resposta': self.resposta,

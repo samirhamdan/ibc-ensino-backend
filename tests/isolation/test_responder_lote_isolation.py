@@ -48,3 +48,23 @@ def test_lote_valida_entrada(admin):
     assert admin.post('/api/questions/responder-lote', json={'ids': [], 'resposta': 'x'}).status_code == 400
     assert admin.post('/api/questions/responder-lote', json={'ids': [1], 'resposta': ''}).status_code == 400
     assert admin.post('/api/questions/responder-lote', json={'ids': list(range(21)), 'resposta': 'x'}).status_code == 400
+
+
+def test_aula_de_outro_tenant_nao_pode_ser_origem_da_duvida(iso_app, seeded):
+    from extensions import db
+    from models import Course, Module
+    from core.tenancy import Tenant
+    from tests.isolation.conftest import HOST_A
+    with iso_app.app_context():
+        b = Tenant.query.filter_by(slug='demo').first()
+        cb = Course(name='Curso B aula', tenant_id=b.id); db.session.add(cb); db.session.flush()
+        mb = Module(course_id=cb.id, nome='Aula B', tenant_id=b.id); db.session.add(mb); db.session.commit()
+        mid, cid_b = mb.id, cb.id
+    try:
+        c = TenantClient(iso_app.test_client(), HOST_A)
+        c.post('/api/auth/login', json={'email': 'aluno@test.com', 'password': 'senha123'})
+        r = c.post(f"/api/questions/{seeded['course_id']}", json={'texto': 'x', 'module_id': mid})
+        assert r.status_code == 400
+    finally:
+        with iso_app.app_context():
+            Module.query.filter_by(id=mid).delete(); Course.query.filter_by(id=cid_b).delete(); db.session.commit()

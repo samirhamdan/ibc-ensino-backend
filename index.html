@@ -1872,6 +1872,10 @@ function openAskQuestionModal(courseId){
     <div style="background:white;border-radius:var(--radius);padding:1.4rem;width:100%;max-width:420px;margin:1rem">
       <h3 style="font-family:var(--font-display);color:var(--navy);margin-bottom:.8rem">${icon('message','18')} Fazer Pergunta</h3>
       <div class="form-group" style="margin-bottom:.7rem">
+        <label for="nova-pergunta-aula">Sobre qual aula?</label>
+        <select id="nova-pergunta-aula" class="form-control"><option value="">Curso em geral</option></select>
+      </div>
+      <div class="form-group" style="margin-bottom:.7rem">
         <label>Sua dúvida</label>
         <textarea id="ask-question-text" placeholder="Digite sua pergunta para o tutor..." style="min-height:90px"></textarea>
       </div>
@@ -1882,13 +1886,17 @@ function openAskQuestionModal(courseId){
       </div>
     </div>`;
   document.body.appendChild(modal);
+  _preencherAulasPergunta(courseId);
+  setTimeout(() => { const t = document.getElementById('ask-question-text'); if(t) t.focus(); }, 50);
 }
 
 async function sendQuestion(courseId){
   const texto=document.getElementById('ask-question-text').value.trim();
   const msgEl=document.getElementById('ask-question-msg');
   if(!texto){ msgEl.style.color='var(--danger)'; msgEl.textContent='Digite sua pergunta.'; return; }
-  const res=await api('POST',`/questions/${courseId}`,{texto});
+  const aulaSel=document.getElementById('nova-pergunta-aula');
+  const module_id=aulaSel && aulaSel.value ? parseInt(aulaSel.value) : null;
+  const res=await api('POST',`/questions/${courseId}`,{texto, module_id});
   if(res.ok){
     const qd = await res.json();
     msgEl.style.color='var(--success)';
@@ -2405,6 +2413,7 @@ function renderPerguntas(){
         </div>
         <span class="badge-${p.resposta?'respondida':'pendente'}">${p.resposta?'Respondida':'Pendente'}</span>
       </div>
+      ${p.module_nome?`<div class="pergunta-aula">${icon('book','12')} ${escapeHtml(p.module_nome)}</div>`:''}
       <div class="pergunta-texto">${escapeHtml(p.texto)}</div>
       ${respostaHtml}
     </div>`;
@@ -2414,19 +2423,37 @@ function renderPerguntas(){
     <div class="admin-section-header">💬 ${canEdit?'Nova Pergunta de Teste':'Fazer uma Pergunta'}</div>
     <div class="admin-section-body">
       <div class="form-group" style="margin-bottom:.7rem">
+        <label for="nova-pergunta-aula" style="font-size:.78rem;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:.3rem">Sobre qual aula?</label>
+        <select id="nova-pergunta-aula" class="form-control" style="max-width:420px"><option value="">Curso em geral</option></select>
+      </div>
+      <div class="form-group" style="margin-bottom:.7rem">
         <textarea id="nova-pergunta" placeholder="Digite sua dúvida sobre o conteúdo deste curso..." style="min-height:72px;width:100%;padding:.55rem .8rem;border:1.5px solid #dde;border-radius:8px;font-family:inherit;font-size:.85rem;resize:vertical"></textarea>
       </div>
       <button class="btn-gold" onclick="enviarPergunta()">Enviar pergunta</button>
     </div>
   </div>`;
 
+  setTimeout(()=>_preencherAulasPergunta(c.id), 0);
   return `${pergs.length?'<div class="pergunta-list">'+pergCards+'</div>':'<div class="pdf-no-files" style="margin-bottom:1rem">Nenhuma pergunta ainda. Seja o primeiro a perguntar!</div>'}`+novaForm;
+}
+
+// Lista as aulas do curso no formulário de pergunta, já marcando a aula em que o aluno está.
+async function _preencherAulasPergunta(courseId){
+  const sel = document.getElementById('nova-pergunta-aula'); if(!sel) return;
+  const r = await api('GET', `/courses/${courseId}/aulas`);
+  if(!r.ok) return;
+  const aulas = await r.json();
+  const atual = (currentAula && currentAula.course && currentAula.course.id === courseId) ? currentAula.id : null;
+  sel.innerHTML = '<option value="">Curso em geral</option>' + aulas.map((a, i) =>
+    `<option value="${a.id}"${a.id === atual ? ' selected' : ''}>Aula ${i + 1} — ${escapeHtml(a.nome)}</option>`).join('');
 }
 
 async function enviarPergunta(){
   const texto=document.getElementById('nova-pergunta').value.trim();
   if(!texto){showToast('Digite uma pergunta.');return;}
-  const res=await api('POST',`/questions/${currentCourse.id}`,{texto});
+  const aulaSel=document.getElementById('nova-pergunta-aula');
+  const module_id=aulaSel && aulaSel.value ? parseInt(aulaSel.value) : null;
+  const res=await api('POST',`/questions/${currentCourse.id}`,{texto, module_id});
   if(res.ok){
     const q=await res.json();
     currentQuestions=[q,...currentQuestions];
@@ -4938,7 +4965,7 @@ let _tutorFila = [], _tutorSel = null;
 function _tempoRelativo(iso){
   const ms = Date.now() - new Date(iso + (iso.endsWith('Z') ? '' : 'Z')).getTime();
   const h = Math.floor(ms / 3600000);
-  if(h < 1) return 'agora há pouco';
+  if(h < 1) return 'há poucos minutos';
   if(h < 24) return `há ${h} h`;
   const d = Math.floor(h / 24);
   return d === 1 ? 'há 1 dia' : `há ${d} dias`;
@@ -4962,9 +4989,13 @@ function _tutorRender(){
   const n = _tutorFila.length;
   const maisAntiga = n ? _tempoRelativo(_tutorFila[0].created_at) : '';
   // Curso que concentra muitas dúvidas abertas costuma ter problema no material.
-  const porCurso = {};
-  _tutorFila.forEach(q => { porCurso[q.course_id] = porCurso[q.course_id] || { n: 0, nome: q.course_name, id: q.course_id }; porCurso[q.course_id].n++; });
-  const critico = Object.values(porCurso).filter(c => c.n >= 3).sort((a, b) => b.n - a.n)[0];
+  const contar = (chave, rotulo) => {
+    const g = {};
+    _tutorFila.forEach(q => { const k = chave(q); if(k == null) return; g[k] = g[k] || { n: 0, rotulo: rotulo(q), curso: q.course_id, aula: q.aula_num }; g[k].n++; });
+    return Object.values(g).filter(x => x.n >= 3).sort((a, b) => b.n - a.n)[0];
+  };
+  const critico = contar(q => q.module_id, q => `A aula "${q.module_nome}" (${q.course_name})`)
+               || contar(q => q.course_id, q => q.course_name);
 
   el.innerHTML = `
     <div class="tutor-v2-head">
@@ -4979,8 +5010,8 @@ function _tutorRender(){
     </div>
     ${critico ? `<div class="tutor-v2-alerta">
       <span class="badge-tom badge-bad">Conteúdo pode ter problema</span>
-      <div><strong>${escapeHtml(critico.nome)} concentra ${critico.n} dúvidas abertas</strong><span>Muitas dúvidas no mesmo curso costumam indicar um ponto confuso no material. Ajustar a aula evita novas perguntas.</span></div>
-      <button class="btn btn-outline btn-sm" onclick="selectCourse(${critico.id})">Abrir curso</button>
+      <div><strong>${escapeHtml(critico.rotulo)} concentra ${critico.n} dúvidas abertas</strong><span>Muitas dúvidas no mesmo ponto costumam indicar um trecho confuso no material. Ajustar a aula evita novas perguntas.</span></div>
+      <button class="btn btn-outline btn-sm" onclick="_tutorAbrirAula(${critico.curso}, ${critico.aula || 'null'})">${critico.aula ? 'Abrir aula' : 'Abrir curso'}</button>
     </div>` : ''}
     ${n ? `<div class="tutor-v2-inbox">
       <div class="tutor-v2-lista" role="listbox" aria-label="Dúvidas pendentes, mais antigas primeiro">
@@ -4991,7 +5022,7 @@ function _tutorRender(){
             <span class="tutor-v2-item-txt">
               <span class="tutor-v2-item-topo"><strong>${escapeHtml(q.autor || 'Aluno')}</strong><span>${escapeHtml(_tempoRelativo(q.created_at))}</span></span>
               <span class="tutor-v2-item-q">${escapeHtml(q.texto)}</span>
-              <span class="tutor-v2-item-curso">${escapeHtml(q.course_name || '')}</span>
+              <span class="tutor-v2-item-curso">${escapeHtml(q.course_name || '')}${q.aula_num ? ` · Aula ${q.aula_num}` : ''}</span>
             </span>
           </button>`).join('')}
       </div>
@@ -5002,17 +5033,21 @@ function _tutorRender(){
 
 function _tutorPainel(){
   const q = _tutorFila.find(x => x.id === _tutorSel); if(!q) return '';
-  const mesmasCurso = _tutorFila.filter(x => x.id !== q.id && x.course_id === q.course_id);
+  const outras = _tutorFila.filter(x => x.id !== q.id && x.course_id === q.course_id);
+  const mesmaAula = q.module_id ? outras.filter(x => x.module_id === q.module_id) : [];
+  const restoCurso = outras.filter(x => !mesmaAula.includes(x));
+  const itemIgual = x => `<label><input type="checkbox" class="tutor-v2-igual" value="${x.id}" onchange="_tutorAtualizarBotao()"> <strong>${escapeHtml(x.autor || 'Aluno')}:</strong> ${escapeHtml(x.texto)}</label>`;
   return `<section class="tutor-v2-painel" aria-label="Responder dúvida">
     <div class="tutor-v2-autor">
       <span class="tutor-v2-avatar tutor-v2-avatar--lg">${escapeHtml((q.autor || '?').charAt(0).toUpperCase())}</span>
-      <div><strong>${escapeHtml(q.autor || 'Aluno')} · ${escapeHtml(_tempoRelativo(q.created_at))}</strong><span>${escapeHtml(q.course_name || '')}</span></div>
-      <button class="btn btn-ghost btn-sm" onclick="selectCourse(${q.course_id})">Abrir curso</button>
+      <div><strong>${escapeHtml(q.autor || 'Aluno')} · ${escapeHtml(_tempoRelativo(q.created_at))}</strong><span>${escapeHtml(q.course_name || '')}${q.aula_num ? ` › Aula ${q.aula_num} — ${escapeHtml(q.module_nome || '')}` : ''}</span></div>
+      <button class="btn btn-ghost btn-sm" onclick="_tutorAbrirAula(${q.course_id}, ${q.aula_num || 'null'})">${q.aula_num ? 'Abrir aula' : 'Abrir curso'}</button>
     </div>
     <p class="tutor-v2-pergunta">${escapeHtml(q.texto)}</p>
-    ${mesmasCurso.length ? `<fieldset class="tutor-v2-iguais">
+    ${outras.length ? `<fieldset class="tutor-v2-iguais">
       <legend>É a mesma dúvida? Marque para responder todos de uma vez</legend>
-      ${mesmasCurso.map(x => `<label><input type="checkbox" class="tutor-v2-igual" value="${x.id}" onchange="_tutorAtualizarBotao()"> <strong>${escapeHtml(x.autor || 'Aluno')}:</strong> ${escapeHtml(x.texto)}</label>`).join('')}
+      ${mesmaAula.length ? `<span class="tutor-v2-iguais-grupo">Na mesma aula</span>${mesmaAula.map(itemIgual).join('')}` : ''}
+      ${restoCurso.length ? `<span class="tutor-v2-iguais-grupo">${mesmaAula.length ? 'Outras do curso' : 'No mesmo curso'}</span>${restoCurso.map(itemIgual).join('')}` : ''}
     </fieldset>` : ''}
     <label class="sr-only" for="tutor-v2-resposta">Sua resposta</label>
     <textarea id="tutor-v2-resposta" class="form-control tutor-v2-resposta" rows="6" placeholder="Escreva sua resposta… o aluno recebe uma notificação."></textarea>
@@ -5021,6 +5056,11 @@ function _tutorPainel(){
       <button class="btn btn-primary" id="tutor-v2-enviar" onclick="_tutorResponder()">Responder</button>
     </div>
   </section>`;
+}
+
+async function _tutorAbrirAula(cursoId, aulaNum){
+  await selectCourse(cursoId);
+  if(aulaNum) await loadAula(cursoId, aulaNum);
 }
 
 function _tutorMarcadas(){ return [...document.querySelectorAll('.tutor-v2-igual:checked')].map(c => parseInt(c.value)); }
@@ -5255,7 +5295,7 @@ function _dashSaasRenderContinuar(d){
 
 async function _alunoTirarDuvida(cursoId){
   await selectCourse(cursoId);
-  if(typeof setTab === 'function') setTab('perguntas');
+  openAskQuestionModal(cursoId);
 }
 
 function _dashSaasRenderResumo(d){

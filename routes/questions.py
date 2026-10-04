@@ -40,7 +40,21 @@ def ask_question(course_id):
     if not texto:
         return jsonify({'error': 'texto é obrigatório'}), 400
 
-    q = Question(course_id=course_id, user_id=user.id, texto=texto)
+    module_id = data.get('module_id')
+    if module_id not in (None, ''):
+        from models import Module
+        try:
+            modulo = Module.query.filter_by(tenant_id=current_tenant_id(), id=int(module_id),
+                                            course_id=course_id).first()
+        except (TypeError, ValueError):
+            modulo = None
+        if modulo is None:
+            return jsonify({'error': 'Aula inválida para este curso'}), 400
+        module_id = modulo.id
+    else:
+        module_id = None
+
+    q = Question(course_id=course_id, module_id=module_id, user_id=user.id, texto=texto)
     db.session.add(q)
     db.session.commit()
 
@@ -182,10 +196,16 @@ def tutor_dashboard():
                                     Question.assigned_tutor_id == user.id))
 
     questions = query.order_by(Question.created_at.desc()).all()
+    from routes.lessons import _ordered_modules
+    numero_da_aula = {}
+    for cid in {q.course_id for q in questions if q.module_id}:
+        for i, m in enumerate(_ordered_modules(cid), start=1):
+            numero_da_aula[m.id] = i
     result = []
     for q in questions:
         d = q.to_dict()
         d['course_name'] = q.course.name if q.course else ''
         d['course_icon'] = q.course.icon if q.course else ''
+        d['aula_num'] = numero_da_aula.get(q.module_id)
         result.append(d)
     return jsonify(result), 200
