@@ -11,7 +11,10 @@ A VPS tem ~2 GB de RAM compartilhada com outros sistemas (alessio, morumbi3d, mo
 SENHA=$(openssl rand -hex 16); echo "Guarde: $SENHA"
 docker exec alessio_postgres psql -U alessio -d n8n -c "CREATE USER xr WITH PASSWORD '$SENHA';"
 docker exec alessio_postgres psql -U alessio -d n8n -c "CREATE DATABASE xr OWNER xr;"
+# Mesmo comportamento do Railway: RLS ainda não é ativado (ver docs/RUNBOOK-RLS.md)
+docker exec alessio_postgres psql -U alessio -d n8n -c "ALTER USER xr BYPASSRLS;"
 ```
+Use só letras e números na senha (`openssl rand -hex 16` já gera assim).
 
 ## 2. Código e .env
 ```sh

@@ -26,15 +26,25 @@ def seed_admin():
               "(defina ambos no ambiente se precisar criar um admin inicial).")
         return
 
-    if User.query.filter_by(email=admin_email).first():
-        print(f"Usuário admin '{admin_email}' já existe — pulando.")
-        return
+    from core.tenancy.context import default_tenant_id
+    from core.tenancy.models import TenantUser
 
-    admin = User(name='Administrador', email=admin_email, role='admin')
-    admin.set_password(admin_password)
-    db.session.add(admin)
+    admin = User.query.filter_by(email=admin_email).first()
+    if admin:
+        print(f"Usuário admin '{admin_email}' já existe — pulando criação.")
+    else:
+        admin = User(name='Administrador', email=admin_email, role='admin')
+        admin.set_password(admin_password)
+        db.session.add(admin)
+        db.session.flush()
+        print(f"Usuário admin '{admin_email}' criado.")
+
+    # Sem vínculo no tenant padrão o login recusa ("sem acesso a este tenant").
+    tid = default_tenant_id()
+    if not TenantUser.query.filter_by(tenant_id=tid, user_id=admin.id).first():
+        db.session.add(TenantUser(tenant_id=tid, user_id=admin.id, papel='admin_tenant'))
+        print(f"Admin '{admin_email}' vinculado ao tenant padrão.")
     db.session.commit()
-    print(f"Usuário admin '{admin_email}' criado.")
 
 
 def seed_categories():
